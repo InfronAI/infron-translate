@@ -325,7 +325,7 @@ export class PageTranslator {
   private readonly dirtyRoots = new Set<ParentNode>()
   private readonly translatedHosts = new Set<Element>()
   private readonly sourceHosts = new Map<Element, string | null>()
-  private readonly originalChildNodes = new Map<Element, Node[]>()
+  private readonly originalTextNodes = new Map<Element, Array<{ node: Text; value: string }>>()
   private attemptedTextByHost = new WeakMap<Element, string>()
   private sourceBlockByHost = new WeakMap<Element, Element>()
   private volatileHosts = new WeakSet<Element>()
@@ -359,7 +359,7 @@ export class PageTranslator {
     window.clearTimeout(this.mutationTimer)
     window.clearTimeout(this.initialRetryTimer)
     for (const host of this.translatedHosts) {
-      this.restoreOriginalChildren(host)
+      this.restoreOriginalText(host)
       host.removeAttribute(TRANSLATED_ATTR)
       host.removeAttribute(TRANSLATION_TEXT_ATTR)
       host.removeAttribute(DISPLAY_MODE_ATTR)
@@ -373,7 +373,7 @@ export class PageTranslator {
     }
     this.translatedHosts.clear()
     this.sourceHosts.clear()
-    this.originalChildNodes.clear()
+    this.originalTextNodes.clear()
     this.attemptedTextByHost = new WeakMap<Element, string>()
     this.sourceBlockByHost = new WeakMap<Element, Element>()
     this.volatileHosts = new WeakSet<Element>()
@@ -647,7 +647,7 @@ export class PageTranslator {
       host.setAttribute(TRANSLATION_TEXT_ATTR, translation)
       host.setAttribute(DISPLAY_MODE_ATTR, settings.translationDisplayMode)
       if (settings.translationDisplayMode === 'translation-only') {
-        this.replaceWithTranslation(host, translation)
+        this.replaceTextWithTranslation(host, translation)
       }
       if (isUi) {
         host.setAttribute(UI_TRANSLATION_ATTR, '')
@@ -754,7 +754,7 @@ export class PageTranslator {
   }
 
   private invalidateHost(host: Element): void {
-    this.restoreOriginalChildren(host)
+    this.restoreOriginalText(host)
     host.removeAttribute(TRANSLATED_ATTR)
     host.removeAttribute(TRANSLATION_TEXT_ATTR)
     host.removeAttribute(DISPLAY_MODE_ATTR)
@@ -770,18 +770,33 @@ export class PageTranslator {
     this.sourceBlockByHost.delete(host)
   }
 
-  private replaceWithTranslation(host: Element, translation: string): void {
-    if (!this.originalChildNodes.has(host)) {
-      this.originalChildNodes.set(host, [...host.childNodes])
+  private replaceTextWithTranslation(host: Element, translation: string): void {
+    const nodes: Text[] = []
+    const walker = document.createTreeWalker(host, 4 /* SHOW_TEXT */)
+    let node = walker.nextNode()
+    while (node) {
+      if (node.nodeValue?.trim()) nodes.push(node as Text)
+      node = walker.nextNode()
     }
-    host.replaceChildren(document.createTextNode(translation))
+    if (!nodes.length) return
+    if (!this.originalTextNodes.has(host)) {
+      this.originalTextNodes.set(
+        host,
+        nodes.map((textNode) => ({
+          node: textNode,
+          value: textNode.nodeValue ?? '',
+        })),
+      )
+    }
+    nodes[0].nodeValue = translation
+    for (const textNode of nodes.slice(1)) textNode.nodeValue = ''
   }
 
-  private restoreOriginalChildren(host: Element): void {
-    const children = this.originalChildNodes.get(host)
-    if (!children) return
-    host.replaceChildren(...children)
-    this.originalChildNodes.delete(host)
+  private restoreOriginalText(host: Element): void {
+    const textNodes = this.originalTextNodes.get(host)
+    if (!textNodes) return
+    for (const { node, value } of textNodes) node.nodeValue = value
+    this.originalTextNodes.delete(host)
   }
 
   private cleanupDisconnectedHosts(): void {
