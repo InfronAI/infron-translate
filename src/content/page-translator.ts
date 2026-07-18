@@ -637,6 +637,7 @@ export class PageTranslator {
     for (const block of group.blocks) {
       if (!block.el.isConnected) continue
       const isUi = isPageUiTranslationCandidate(block)
+      if (settings.translationDisplayMode === 'translation-only' && isUi) continue
       const host = isUi ? pageTranslationHost(block) : block.el
       if (this.translatedHosts.has(host)) continue
       if (!this.sourceHosts.has(host)) {
