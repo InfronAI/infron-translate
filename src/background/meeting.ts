@@ -86,7 +86,7 @@ export class MeetingManager {
         message:
           input.audioMode === 'mock'
             ? 'Demo transcript stream is running.'
-            : 'Waiting for real speech recognition from the microphone.',
+            : 'Click Start mic in this window to begin real microphone transcription.',
       },
     }
 
@@ -97,7 +97,7 @@ export class MeetingManager {
     this.state = {
       ...this.state,
       session: { ...session, status: 'listening' },
-      audio: { microphone: input.audioMode !== 'tab-only', output: Boolean(outputStreamId) },
+      audio: { microphone: false, output: Boolean(outputStreamId) },
     }
     await this.showOverlay()
     if (input.audioMode === 'mock') this.startMockUpdates()
@@ -257,14 +257,9 @@ export class MeetingManager {
 
   private async broadcastUpdate(): Promise<void> {
     if (!this.state) return
-    const update: MeetingUpdatePayload = {
-      session: this.state.session,
-      segments: this.state.segments,
-      summary: this.state.summary,
-    }
     await this.safeSendTab(this.state.session.tabId, {
       type: 'meeting-assistant-update',
-      update,
+      update: this.state,
     })
   }
 

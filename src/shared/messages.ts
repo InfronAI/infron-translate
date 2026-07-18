@@ -159,7 +159,7 @@ export type ShowMeetingAssistantMsg = {
 
 export type MeetingAssistantUpdateMsg = {
   type: 'meeting-assistant-update'
-  update: MeetingUpdatePayload
+  update: MeetingRuntimeState
 }
 
 export type HideMeetingAssistantMsg = { type: 'hide-meeting-assistant' }

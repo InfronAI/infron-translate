@@ -1,10 +1,13 @@
 import type {
   MeetingRuntimeState,
   MeetingSummaryState,
-  MeetingUpdatePayload,
   TranscriptSegment,
 } from '../shared/meeting'
-import type { StopMeetingAssistantMsg } from '../shared/messages'
+import type {
+  MeetingAudioStatusMsg,
+  MeetingTranscriptSegmentMsg,
+  StopMeetingAssistantMsg,
+} from '../shared/messages'
 
 const HOST_ID = 'infron-meeting-assistant-root'
 const MIN_WIDTH = 520
@@ -26,12 +29,46 @@ type DragState = {
   windowY: number
 }
 
+type SpeechRecognitionResultItem = {
+  transcript: string
+}
+
+type SpeechRecognitionResult = {
+  isFinal: boolean
+  length: number
+  item(index: number): SpeechRecognitionResultItem
+}
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number
+  results: {
+    length: number
+    item(index: number): SpeechRecognitionResult
+  }
+}
+
+type SpeechRecognitionLike = EventTarget & {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: ((event: { error?: string }) => void) | null
+  onend: (() => void) | null
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
+
 export class MeetingOverlay {
   private host: HTMLElement | null = null
   private root: ShadowRoot | null = null
   private state: MeetingRuntimeState | null = null
   private windowState: MeetingWindowState | null = null
   private dragState: DragState | null = null
+  private recognition: SpeechRecognitionLike | null = null
+  private recognitionShouldRun = false
 
   show(state: MeetingRuntimeState): void {
     this.state = state
@@ -40,18 +77,14 @@ export class MeetingOverlay {
     this.render()
   }
 
-  update(update: MeetingUpdatePayload): void {
+  update(update: MeetingRuntimeState): void {
     if (!this.state) return
-    this.state = {
-      ...this.state,
-      session: update.session,
-      segments: update.segments,
-      summary: update.summary,
-    }
+    this.state = update
     this.render()
   }
 
   hide(): void {
+    this.stopLocalSpeechRecognition()
     this.host?.remove()
     this.host = null
     this.root = null
@@ -116,6 +149,7 @@ export class MeetingOverlay {
           <span class="badge ${session.status === 'listening' ? 'ok' : ''}">${statusLabel(session.status)}</span>
           <span class="badge ${audio.microphone ? 'ok' : ''}">Mic</span>
           <span class="badge ${audio.output ? 'ok' : ''}">Meeting audio</span>
+          <button class="window-btn mic-toggle" type="button">${this.recognition ? 'Stop mic' : 'Start mic'}</button>
           <button class="window-btn minimize" type="button" aria-label="Send Meeting Assistant to background">Background</button>
           <button class="window-btn focus" type="button" aria-label="Focus Meeting Assistant">Focus</button>
           <button class="window-btn close" type="button" aria-label="Close Meeting Assistant">Close</button>
@@ -140,6 +174,10 @@ export class MeetingOverlay {
     })
     shell.querySelector<HTMLButtonElement>('.focus')?.addEventListener('click', () => {
       this.focusWindow()
+    })
+    shell.querySelector<HTMLButtonElement>('.mic-toggle')?.addEventListener('click', () => {
+      if (this.recognition) this.stopLocalSpeechRecognition()
+      else void this.startLocalSpeechRecognition()
     })
     shell.querySelector<HTMLButtonElement>('.close')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
@@ -215,6 +253,116 @@ export class MeetingOverlay {
     shell.style.width = `${width}px`
     shell.style.height = `${height}px`
   }
+
+  private async startLocalSpeechRecognition(): Promise<void> {
+    if (!this.state) return
+    const Recognition = speechRecognitionConstructor()
+    if (!Recognition) {
+      await this.sendAudioStatus({
+        active: false,
+        source: 'none',
+        message: 'This Chrome context does not expose browser speech recognition. Use a supported Chrome build or connect an external STT provider.',
+      })
+      return
+    }
+
+    const session = this.state.session
+    const next = new Recognition()
+    next.continuous = true
+    next.interimResults = true
+    next.lang = speechRecognitionLang(session.sourceLang)
+    next.onresult = (event) => {
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const result = event.results.item(index)
+        if (!result.isFinal) continue
+        const text = Array.from({ length: result.length }, (_, itemIndex) =>
+          result.item(itemIndex).transcript,
+        ).join(' ').trim()
+        if (!text || !this.state) continue
+        const now = Date.now()
+        void chrome.runtime.sendMessage({
+          type: 'meeting-transcript-segment',
+          sessionId: this.state.session.id,
+          channel: 'microphone',
+          speakerLabel: 'You',
+          sourceLang: this.state.session.sourceLang,
+          originalText: text,
+          startedAt: now - 3000,
+          endedAt: now,
+        } satisfies MeetingTranscriptSegmentMsg)
+      }
+    }
+    next.onerror = (event) => {
+      void this.sendAudioStatus({
+        active: false,
+        source: 'browser-speech',
+        message: `Microphone transcription error: ${event.error ?? 'unknown error'}`,
+      })
+    }
+    next.onend = () => {
+      if (!this.recognitionShouldRun) return
+      try {
+        next.start()
+      } catch {
+        void this.sendAudioStatus({
+          active: false,
+          source: 'browser-speech',
+          message: 'Microphone transcription stopped. Click Start mic to retry.',
+        })
+      }
+    }
+
+    this.recognitionShouldRun = true
+    this.recognition = next
+    try {
+      next.start()
+      await this.sendAudioStatus({
+        active: true,
+        source: 'browser-speech',
+        message: 'Microphone transcription is listening. Speak into your microphone; desktop/system audio is not transcribed by this mode.',
+      })
+    } catch (error) {
+      this.recognitionShouldRun = false
+      this.recognition = null
+      await this.sendAudioStatus({
+        active: false,
+        source: 'browser-speech',
+        message: `Could not start microphone transcription: ${error instanceof Error ? error.message : String(error)}`,
+      })
+    } finally {
+      this.render()
+    }
+  }
+
+  private stopLocalSpeechRecognition(): void {
+    this.recognitionShouldRun = false
+    if (!this.recognition) return
+    this.recognition.onresult = null
+    this.recognition.onerror = null
+    this.recognition.onend = null
+    this.recognition.abort()
+    this.recognition = null
+    void this.sendAudioStatus({
+      active: false,
+      source: 'browser-speech',
+      message: 'Microphone transcription is stopped.',
+    })
+    this.render()
+  }
+
+  private async sendAudioStatus(transcription: MeetingRuntimeState['transcription']): Promise<void> {
+    if (!this.state) return
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'meeting-audio-status',
+        sessionId: this.state.session.id,
+        microphone: this.recognitionShouldRun,
+        transcription,
+      } satisfies MeetingAudioStatusMsg)
+    } catch {
+      // The service worker may be asleep; the next user action will restart it.
+    }
+  }
 }
 
 function defaultWindowState(): MeetingWindowState {
@@ -231,6 +379,25 @@ function defaultWindowState(): MeetingWindowState {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
+}
+
+function speechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  const scope = globalThis as typeof globalThis & {
+    SpeechRecognition?: SpeechRecognitionConstructor
+    webkitSpeechRecognition?: SpeechRecognitionConstructor
+  }
+  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null
+}
+
+function speechRecognitionLang(sourceLang: string): string {
+  if (sourceLang === 'cn' || sourceLang === 'zh') return 'zh-CN'
+  if (sourceLang === 'ja') return 'ja-JP'
+  if (sourceLang === 'ko') return 'ko-KR'
+  if (sourceLang === 'fr') return 'fr-FR'
+  if (sourceLang === 'de') return 'de-DE'
+  if (sourceLang === 'es') return 'es-ES'
+  if (sourceLang === 'auto') return navigator.language || 'en-US'
+  return `${sourceLang}-${sourceLang.toUpperCase()}`
 }
 
 function renderSummary(summary: MeetingSummaryState): HTMLElement {
