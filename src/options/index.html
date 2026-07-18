@@ -257,7 +257,19 @@
                 </label>
                 <label>
                   <span>Model</span>
-                  <input id="model" name="model" type="text" placeholder="gpt-4o-mini" spellcheck="false" />
+                  <span class="model-picker">
+                    <input
+                      id="model"
+                      name="model"
+                      type="text"
+                      list="modelCandidates"
+                      placeholder="deepseek/deepseek-v3.2"
+                      spellcheck="false"
+                    />
+                    <button type="button" id="fetchModels" class="button secondary compact">Fetch models</button>
+                  </span>
+                  <datalist id="modelCandidates"></datalist>
+                  <span id="modelFetchStatus" class="field-status" role="status" aria-live="polite"></span>
                 </label>
               </div>
             </div>

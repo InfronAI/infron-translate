@@ -532,6 +532,33 @@ input[type='color'] {
   gap: 10px;
 }
 
+.model-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.button.compact {
+  min-height: 40px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.field-status {
+  min-height: 15px;
+  color: var(--subtle);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.field-status[data-state='error'] {
+  color: var(--danger);
+}
+
+.field-status[data-state='ok'] {
+  color: var(--success);
+}
+
 .capability-panel {
   display: grid;
   grid-template-columns: 12px 1fr auto;

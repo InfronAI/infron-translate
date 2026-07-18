@@ -1,5 +1,6 @@
 import {
   DEFAULT_SETTINGS,
+  apiBaseUrlError,
   loadSettings,
   saveSettings,
   isConfigured,
@@ -23,6 +24,7 @@ import type { TestConnectionResult } from '../shared/messages'
 const browserTranslator = new BrowserTranslator()
 let browserCapability: BrowserTranslatorAvailability = 'unsupported'
 let capabilityRequest = 0
+let remoteModelCandidates: string[] = []
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id)
@@ -60,6 +62,31 @@ function setLanguageValue(id: 'targetLang', value: string): void {
   select.value = value
 }
 
+function currentProviderPreset(provider: string): (typeof PROVIDER_PRESETS)[number] {
+  return PROVIDER_PRESETS.find((preset) => preset.id === provider) ?? PROVIDER_PRESETS[0]
+}
+
+function updateModelCandidates(settings: UserSettings, extraModels = remoteModelCandidates): void {
+  const preset = currentProviderPreset(settings.provider)
+  const candidates = [
+    settings.model,
+    preset.modelHint,
+    ...preset.modelCandidates,
+    ...extraModels,
+  ]
+    .map((model) => model.trim())
+    .filter(Boolean)
+  const unique = [...new Set(candidates)].slice(0, 80)
+  const datalist = el<HTMLDataListElement>('modelCandidates')
+  datalist.replaceChildren(
+    ...unique.map((model) => {
+      const option = document.createElement('option')
+      option.value = model
+      return option
+    }),
+  )
+}
+
 function syncTranslationEngineAvailability(settings: UserSettings): void {
   const select = el<HTMLSelectElement>('pageTranslationEngine')
   const externalOption = select.querySelector<HTMLOptionElement>('option[value="external"]')
@@ -95,6 +122,7 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('pageTranslationItalic').checked = s.pageTranslationItalic
   el<HTMLInputElement>('pageTranslationUnderline').checked = s.pageTranslationUnderline
   el<HTMLInputElement>('pausedHostnames').value = s.pausedHostnames.join(', ')
+  updateModelCandidates(s, [])
   syncTranslationEngineAvailability(s)
   updateConfigBadge(s)
   updateProviderHint(s.provider)
@@ -145,6 +173,12 @@ function setTestStatus(text: string, state: 'testing' | 'ok' | 'error'): void {
   const node = el<HTMLElement>('testConnectionStatus')
   node.textContent = text
   node.dataset.state = state
+}
+
+function setModelFetchStatus(text: string, state: 'idle' | 'loading' | 'ok' | 'error' = 'idle'): void {
+  const node = el<HTMLElement>('modelFetchStatus')
+  node.textContent = text
+  node.dataset.state = state === 'idle' ? '' : state
 }
 
 function isTestConnectionResult(value: unknown): value is TestConnectionResult {
@@ -206,6 +240,64 @@ function updateProviderHint(provider: string): void {
     hint.textContent = 'OpenRouter OpenAI-compatible endpoint. Common Base URL: https://openrouter.ai/api/v1'
   } else {
     hint.textContent = 'Use any OpenAI-compatible endpoint, model, and API key.'
+  }
+}
+
+function modelsEndpoint(baseURL: string): string {
+  const url = new URL(baseURL)
+  url.pathname = `${url.pathname.replace(/\/+$/u, '')}/models`
+  url.search = ''
+  url.hash = ''
+  return url.toString()
+}
+
+function parseModelList(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return []
+  const data = (payload as { data?: unknown }).data
+  const list = Array.isArray(data) ? data : Array.isArray(payload) ? payload : []
+  return list
+    .map((item) => {
+      if (typeof item === 'string') return item
+      if (item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') {
+        return item.id
+      }
+      return ''
+    })
+    .map((model) => model.trim())
+    .filter(Boolean)
+}
+
+async function fetchModels(settings: UserSettings): Promise<void> {
+  const button = el<HTMLButtonElement>('fetchModels')
+  const baseURL = settings.baseURL.trim()
+  const baseError = apiBaseUrlError(baseURL)
+  if (!baseURL || baseError) {
+    setModelFetchStatus(baseError || 'Add Base URL first.', 'error')
+    return
+  }
+  button.disabled = true
+  setModelFetchStatus('Fetching models...', 'loading')
+  try {
+    const response = await fetch(modelsEndpoint(baseURL), {
+      headers: settings.apiKey.trim()
+        ? { Authorization: `Bearer ${settings.apiKey.trim()}` }
+        : undefined,
+    })
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    const models = parseModelList(await response.json())
+    if (!models.length) throw new Error('No models returned')
+    remoteModelCandidates = models
+    updateModelCandidates(readForm(settings), models)
+    setModelFetchStatus(`Loaded ${models.length} models.`, 'ok')
+  } catch (error) {
+    setModelFetchStatus(
+      `Could not fetch models: ${error instanceof Error ? error.message : String(error)}`,
+      'error',
+    )
+  } finally {
+    button.disabled = false
   }
 }
 
@@ -292,6 +384,9 @@ function applyProviderPreset(id: string): void {
   if (!model.value.trim() || /gpt-4o-mini|deepseek\/deepseek|openai\/gpt/i.test(model.value)) {
     model.value = preset.modelHint
   }
+  remoteModelCandidates = []
+  updateModelCandidates(readForm(DEFAULT_SETTINGS), [])
+  setModelFetchStatus('')
 }
 
 function setupSectionNavigation(): void {
@@ -348,6 +443,7 @@ async function init(): Promise<void> {
       const next = readForm(stored)
       syncTranslationEngineAvailability(next)
       updateConfigBadge(next)
+      updateModelCandidates(next)
       updateEngineSummary(readForm(stored))
     })
   }
@@ -356,6 +452,14 @@ async function init(): Promise<void> {
     const v = el<HTMLSelectElement>('provider').value
     updateProviderHint(v)
     applyProviderPreset(v)
+    const next = readForm(stored)
+    syncTranslationEngineAvailability(next)
+    updateConfigBadge(next)
+    updateEngineSummary(next)
+  })
+
+  el<HTMLButtonElement>('fetchModels').addEventListener('click', () => {
+    void fetchModels(readForm(stored))
   })
 
   el<HTMLFormElement>('settings-form').addEventListener('submit', async (e) => {
