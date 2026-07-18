@@ -34,6 +34,7 @@ export function pageTranslationSigOf(
     effectiveSourceLang,
     s.targetLang,
     s.pageTranslationEngine,
+    s.translationDisplayMode,
     s.minTextLength,
     s.batchCharLimit,
   ].join('\0')

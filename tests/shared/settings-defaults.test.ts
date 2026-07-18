@@ -12,6 +12,7 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.sourceLang).toBe('auto')
     expect(DEFAULT_SETTINGS.targetLang).toBe('zh')
     expect(DEFAULT_SETTINGS.pageTranslationEngine).toBe('browser')
+    expect(DEFAULT_SETTINGS.translationDisplayMode).toBe('bilingual')
     expect(DEFAULT_SETTINGS.autoPageTranslation).toBe(false)
     expect(DEFAULT_SETTINGS.pageTranslationFontSizePx).toBe(14)
     expect(DEFAULT_SETTINGS.pageTranslationUseCustomColor).toBe(false)
@@ -27,6 +28,7 @@ describe('mergeSettings', () => {
     const merged = mergeSettings({ apiKey: 'sk-test' })
     expect(merged.apiKey).toBe('sk-test')
     expect(merged.pageTranslationEngine).toBe('browser')
+    expect(merged.translationDisplayMode).toBe('bilingual')
     expect(merged.autoPageTranslation).toBe(false)
     expect(merged.sourceLang).toBe('auto')
     expect(merged.pageTranslationFontSizePx).toBe(14)
@@ -47,6 +49,18 @@ describe('mergeSettings', () => {
     )
     expect(mergeSettings({ pageTranslationEngine: 'fallback' }).pageTranslationEngine).toBe(
       'browser',
+    )
+  })
+
+  it('accepts only known translation display modes from storage', () => {
+    expect(mergeSettings({ translationDisplayMode: 'bilingual' }).translationDisplayMode).toBe(
+      'bilingual',
+    )
+    expect(
+      mergeSettings({ translationDisplayMode: 'translation-only' }).translationDisplayMode,
+    ).toBe('translation-only')
+    expect(mergeSettings({ translationDisplayMode: 'hidden' }).translationDisplayMode).toBe(
+      'bilingual',
     )
   })
 

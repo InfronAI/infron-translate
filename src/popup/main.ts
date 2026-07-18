@@ -1,5 +1,6 @@
 import { isConfigured, loadSettings, saveSettings, missingConfigFields, type UserSettings } from '../shared/settings'
 import { LANGUAGE_OPTIONS, languageLabel } from '../shared/languages'
+import type { TranslationDisplayMode } from '../shared/settings-defaults'
 import type {
   GetPageLanguageMsg,
   PageLanguageResult,
@@ -76,7 +77,8 @@ function renderStatus(settings: UserSettings): void {
     ? '开启：进入网页后自动翻译'
     : '关闭：点击按钮后翻译'
 
-  el<HTMLElement>('modeHint').textContent = '整页双语翻译'
+  el<HTMLElement>('modeHint').textContent =
+    settings.translationDisplayMode === 'translation-only' ? '整页仅译文' : '整页双语对照'
 
   const tip = el<HTMLElement>('unconfiguredTip')
   const needsExternal = true
@@ -90,9 +92,13 @@ function renderStatus(settings: UserSettings): void {
       : '尚未配置 API，请打开设置填写并保存。'
   }
 
-  el<HTMLElement>('usageHint').textContent = '使用下方按钮切换整页中英双语翻译。'
+  el<HTMLElement>('usageHint').textContent =
+    settings.translationDisplayMode === 'translation-only'
+      ? '使用下方按钮将当前网页替换为译文。'
+      : '使用下方按钮切换整页双语对照翻译。'
   setSourceLanguageValue(settings.sourceLang)
   setTargetLanguageValue(settings.targetLang)
+  el<HTMLSelectElement>('displayModeSelect').value = settings.translationDisplayMode
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {
@@ -185,6 +191,7 @@ async function init(): Promise<void> {
   const pageAutoToggle = el<HTMLInputElement>('pageAutoToggle')
   const sourceLangSelect = el<HTMLSelectElement>('sourceLangSelect')
   const targetLangSelect = el<HTMLSelectElement>('targetLangSelect')
+  const displayModeSelect = el<HTMLSelectElement>('displayModeSelect')
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
@@ -260,7 +267,7 @@ async function init(): Promise<void> {
   })
 
   async function saveLanguageSetting(
-    next: Partial<Pick<UserSettings, 'sourceLang' | 'targetLang'>>,
+    next: Partial<Pick<UserSettings, 'sourceLang' | 'targetLang' | 'translationDisplayMode'>>,
   ): Promise<void> {
     try {
       el<HTMLElement>('error').hidden = true
@@ -274,6 +281,7 @@ async function init(): Promise<void> {
     } catch (err) {
       setSourceLanguageValue(settings.sourceLang)
       setTargetLanguageValue(settings.targetLang)
+      displayModeSelect.value = settings.translationDisplayMode
       const error = el<HTMLElement>('error')
       error.hidden = false
       error.textContent = err instanceof Error ? err.message : String(err)
@@ -286,6 +294,12 @@ async function init(): Promise<void> {
 
   targetLangSelect.addEventListener('change', () => {
     void saveLanguageSetting({ targetLang: targetLangSelect.value || 'zh' })
+  })
+
+  displayModeSelect.addEventListener('change', () => {
+    void saveLanguageSetting({
+      translationDisplayMode: displayModeSelect.value as TranslationDisplayMode,
+    })
   })
 }
 

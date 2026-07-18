@@ -48,7 +48,7 @@
               <img class="logo" src="/icons/infron-mark.png" alt="" aria-hidden="true" />
               <div>
                 <h1>Infron Translate</h1>
-                <p class="subtitle" id="modeHint">整页双语翻译</p>
+                <p class="subtitle" id="modeHint">整页双语对照</p>
               </div>
             </div>
           </header>
@@ -65,6 +65,16 @@
             <label class="switch-row menu-item nested">
               <span class="switch-text">暂停此站</span>
               <input id="pauseToggle" type="checkbox" class="switch" disabled />
+            </label>
+          </section>
+
+          <section class="menu-item card language-card">
+            <label class="select-row">
+              <span class="label">翻译偏好</span>
+              <select id="displayModeSelect" class="select">
+                <option value="bilingual">双语对照</option>
+                <option value="translation-only">仅译文</option>
+              </select>
             </label>
           </section>
 
@@ -98,7 +108,7 @@
           </p>
 
           <button type="button" id="translatePage" class="btn primary menu-item">
-            <span>翻译此页（中英双语）</span>
+            <span>翻译此页</span>
           </button>
 
           <button type="button" id="openOptions" class="btn menu-item">

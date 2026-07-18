@@ -25,7 +25,7 @@
       <aside class="sidebar">
         <nav class="section-nav" aria-label="设置分区">
           <a href="#general" class="active">基础翻译</a>
-          <a href="#page-translation">整页双语</a>
+          <a href="#page-translation">整页翻译</a>
           <a href="#browser-runtime">Chrome 能力</a>
           <a href="#external-api">外部模型</a>
           <a href="#site-rules">网站管理</a>
@@ -70,7 +70,7 @@
           <section id="page-translation" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>整页双语</h2>
+                <h2>整页翻译</h2>
                 <p>保留原文，在对应文本块下追加译文，并持续处理动态内容。</p>
               </div>
             </header>
@@ -104,10 +104,23 @@
               </label>
             </div>
 
+            <div class="setting-row">
+              <div class="setting-copy">
+                <h3>翻译偏好</h3>
+                <p>双语对照会保留原文并追加译文；仅译文会直接用译文替换原文。</p>
+              </div>
+              <div class="control">
+                <select id="translationDisplayMode" name="translationDisplayMode">
+                  <option value="bilingual">双语对照</option>
+                  <option value="translation-only">仅译文</option>
+                </select>
+              </div>
+            </div>
+
             <div class="setting-row appearance-row">
               <div class="setting-copy">
                 <h3>译文样式</h3>
-                <p>控制整页双语模式插入译文的字号、颜色和字形。</p>
+                <p>控制整页翻译中文字的字号、颜色和字形。</p>
               </div>
               <div class="control appearance-controls">
                 <label class="number-field">

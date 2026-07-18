@@ -5,6 +5,7 @@ import {
   isConfigured,
   missingConfigFields,
   type TranslationEngine,
+  type TranslationDisplayMode,
   type UserSettings,
 } from '../shared/settings'
 import {
@@ -70,6 +71,7 @@ function fillForm(s: UserSettings): void {
   el<HTMLSelectElement>('reasoningPref').value = s.reasoningPref
   setLanguageValue('targetLang', s.targetLang)
   el<HTMLSelectElement>('pageTranslationEngine').value = s.pageTranslationEngine
+  el<HTMLSelectElement>('translationDisplayMode').value = s.translationDisplayMode
   el<HTMLInputElement>('autoPageTranslation').checked = s.autoPageTranslation
   el<HTMLInputElement>('pageTranslationFontSizePx').value = String(
     s.pageTranslationFontSizePx,
@@ -107,6 +109,8 @@ function readForm(stored: UserSettings): UserSettings {
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
     pageTranslationEngine: el<HTMLSelectElement>('pageTranslationEngine')
       .value as TranslationEngine,
+    translationDisplayMode: el<HTMLSelectElement>('translationDisplayMode')
+      .value as TranslationDisplayMode,
     autoPageTranslation: el<HTMLInputElement>('autoPageTranslation').checked,
     pageTranslationFontSizePx: Number(
       el<HTMLInputElement>('pageTranslationFontSizePx').value,

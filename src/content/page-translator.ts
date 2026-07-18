@@ -20,6 +20,7 @@ import { BrowserTranslator } from './browser-translator'
 
 const TRANSLATED_ATTR = 'data-infron-page-translated'
 const TRANSLATION_TEXT_ATTR = 'data-infron-page-translation-text'
+const DISPLAY_MODE_ATTR = 'data-infron-page-display-mode'
 const UI_TRANSLATION_ATTR = 'data-infron-page-ui-translation'
 const UI_STACKED_TRANSLATION_ATTR = 'data-infron-page-ui-stacked-translation'
 const UI_CONTROL_TRANSLATION_ATTR = 'data-infron-page-ui-control-translation'
@@ -58,7 +59,7 @@ function pageStyles(settings: PageSettings): string {
     settings.pageTranslationUseCustomColor || settings.pageTranslationUseBackground ? '1' : '0.78'
 
   return `
-[${TRANSLATED_ATTR}]::after {
+[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"]::after {
   content: attr(${TRANSLATION_TEXT_ATTR}) !important;
   display: block !important;
   box-sizing: border-box !important;
@@ -83,7 +84,7 @@ function pageStyles(settings: PageSettings): string {
   opacity: ${opacity} !important;
 }
 
-[${TRANSLATED_ATTR}][${UI_TRANSLATION_ATTR}]::after {
+[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"][${UI_TRANSLATION_ATTR}]::after {
   content: " · " attr(${TRANSLATION_TEXT_ATTR}) !important;
   display: inline-block !important;
   vertical-align: baseline !important;
@@ -101,7 +102,7 @@ function pageStyles(settings: PageSettings): string {
   opacity: 0.62 !important;
 }
 
-[${TRANSLATED_ATTR}][${UI_TRANSLATION_ATTR}][${UI_STACKED_TRANSLATION_ATTR}]::after {
+[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"][${UI_TRANSLATION_ATTR}][${UI_STACKED_TRANSLATION_ATTR}]::after {
   content: attr(${TRANSLATION_TEXT_ATTR}) !important;
   display: block !important;
   margin: 0.12em 0 0 !important;
@@ -110,7 +111,7 @@ function pageStyles(settings: PageSettings): string {
   white-space: normal !important;
 }
 
-[${TRANSLATED_ATTR}][${UI_TRANSLATION_ATTR}][${UI_CONTROL_TRANSLATION_ATTR}]::after {
+[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"][${UI_TRANSLATION_ATTR}][${UI_CONTROL_TRANSLATION_ATTR}]::after {
   content: " · " attr(${TRANSLATION_TEXT_ATTR}) !important;
   display: inline-block !important;
   vertical-align: baseline !important;
@@ -156,6 +157,7 @@ type PageSettings = Pick<
   UserSettings,
   | 'targetLang'
   | 'pageTranslationEngine'
+  | 'translationDisplayMode'
   | 'pageTranslationFontSizePx'
   | 'pageTranslationUseCustomColor'
   | 'pageTranslationTextColor'
@@ -307,7 +309,7 @@ export function isPageTranslationCandidate(
   return true
 }
 
-/** Owns one reversible full-page bilingual translation run. */
+/** Owns one reversible full-page translation run. */
 export class PageTranslator {
   private active = false
   private generation = 0
@@ -323,6 +325,7 @@ export class PageTranslator {
   private readonly dirtyRoots = new Set<ParentNode>()
   private readonly translatedHosts = new Set<Element>()
   private readonly sourceHosts = new Map<Element, string | null>()
+  private readonly originalChildNodes = new Map<Element, Node[]>()
   private attemptedTextByHost = new WeakMap<Element, string>()
   private sourceBlockByHost = new WeakMap<Element, Element>()
   private volatileHosts = new WeakSet<Element>()
@@ -356,8 +359,10 @@ export class PageTranslator {
     window.clearTimeout(this.mutationTimer)
     window.clearTimeout(this.initialRetryTimer)
     for (const host of this.translatedHosts) {
+      this.restoreOriginalChildren(host)
       host.removeAttribute(TRANSLATED_ATTR)
       host.removeAttribute(TRANSLATION_TEXT_ATTR)
+      host.removeAttribute(DISPLAY_MODE_ATTR)
       host.removeAttribute(UI_TRANSLATION_ATTR)
       host.removeAttribute(UI_STACKED_TRANSLATION_ATTR)
       host.removeAttribute(UI_CONTROL_TRANSLATION_ATTR)
@@ -368,6 +373,7 @@ export class PageTranslator {
     }
     this.translatedHosts.clear()
     this.sourceHosts.clear()
+    this.originalChildNodes.clear()
     this.attemptedTextByHost = new WeakMap<Element, string>()
     this.sourceBlockByHost = new WeakMap<Element, Element>()
     this.volatileHosts = new WeakSet<Element>()
@@ -639,6 +645,10 @@ export class PageTranslator {
       }
       host.setAttribute(TRANSLATED_ATTR, '')
       host.setAttribute(TRANSLATION_TEXT_ATTR, translation)
+      host.setAttribute(DISPLAY_MODE_ATTR, settings.translationDisplayMode)
+      if (settings.translationDisplayMode === 'translation-only') {
+        this.replaceWithTranslation(host, translation)
+      }
       if (isUi) {
         host.setAttribute(UI_TRANSLATION_ATTR, '')
         if (isButtonLikeUi(block)) {
@@ -699,7 +709,9 @@ export class PageTranslator {
       if (translatedHost && record.type === 'attributes') continue
       if (translatedHost) {
         const source = translatedHost.getAttribute(PAGE_SOURCE_ATTR) ?? ''
-        if (normalizeText(elementText(translatedHost)) === source) continue
+        const translation = translatedHost.getAttribute(TRANSLATION_TEXT_ATTR) ?? ''
+        const current = normalizeText(elementText(translatedHost))
+        if (current === normalizeText(source) || current === normalizeText(translation)) continue
         if (this.markChurnAndMaybeVolatile(translatedHost)) {
           // Host changes too often to be worth translating: restore the original
           // text and stop tracking it so we never loop on it again.
@@ -742,8 +754,10 @@ export class PageTranslator {
   }
 
   private invalidateHost(host: Element): void {
+    this.restoreOriginalChildren(host)
     host.removeAttribute(TRANSLATED_ATTR)
     host.removeAttribute(TRANSLATION_TEXT_ATTR)
+    host.removeAttribute(DISPLAY_MODE_ATTR)
     host.removeAttribute(UI_TRANSLATION_ATTR)
     host.removeAttribute(UI_STACKED_TRANSLATION_ATTR)
     host.removeAttribute(UI_CONTROL_TRANSLATION_ATTR)
@@ -754,6 +768,20 @@ export class PageTranslator {
     this.sourceHosts.delete(host)
     this.attemptedTextByHost.delete(this.sourceBlockByHost.get(host) ?? host)
     this.sourceBlockByHost.delete(host)
+  }
+
+  private replaceWithTranslation(host: Element, translation: string): void {
+    if (!this.originalChildNodes.has(host)) {
+      this.originalChildNodes.set(host, [...host.childNodes])
+    }
+    host.replaceChildren(document.createTextNode(translation))
+  }
+
+  private restoreOriginalChildren(host: Element): void {
+    const children = this.originalChildNodes.get(host)
+    if (!children) return
+    host.replaceChildren(...children)
+    this.originalChildNodes.delete(host)
   }
 
   private cleanupDisconnectedHosts(): void {

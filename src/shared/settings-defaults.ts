@@ -1,6 +1,7 @@
 import type { ProviderId, ReasoningPref } from './providers'
 
 export type TranslationEngine = 'external' | 'browser'
+export type TranslationDisplayMode = 'bilingual' | 'translation-only'
 
 export type UserSettings = {
   baseURL: string
@@ -16,9 +17,11 @@ export type UserSettings = {
   /** auto means use the detected language for the active webpage. */
   sourceLang: string
   targetLang: string
-  /** Engine used by the full-page bilingual DOM translation mode. */
+  /** Engine used by full-page DOM translation. */
   pageTranslationEngine: TranslationEngine
-  /** Automatically enable full-page bilingual mode after detecting the page language. */
+  /** How translated page text is rendered. */
+  translationDisplayMode: TranslationDisplayMode
+  /** Automatically enable full-page translation after detecting the page language. */
   autoPageTranslation: boolean
   pageTranslationFontSizePx: number
   pageTranslationUseCustomColor: boolean
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   sourceLang: 'auto',
   targetLang: 'zh',
   pageTranslationEngine: 'browser',
+  translationDisplayMode: 'bilingual',
   autoPageTranslation: false,
   pageTranslationFontSizePx: 14,
   pageTranslationUseCustomColor: false,
@@ -68,6 +72,13 @@ function asReasoningPref(v: unknown): ReasoningPref {
 
 function asTranslationEngine(v: unknown, fallback: TranslationEngine): TranslationEngine {
   return v === 'browser' || v === 'external' ? v : fallback
+}
+
+function asTranslationDisplayMode(
+  v: unknown,
+  fallback: TranslationDisplayMode,
+): TranslationDisplayMode {
+  return v === 'bilingual' || v === 'translation-only' ? v : fallback
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -102,6 +113,10 @@ export function mergeSettings(partial: unknown): UserSettings {
     pageTranslationEngine: asTranslationEngine(
       p.pageTranslationEngine,
       DEFAULT_SETTINGS.pageTranslationEngine,
+    ),
+    translationDisplayMode: asTranslationDisplayMode(
+      p.translationDisplayMode,
+      DEFAULT_SETTINGS.translationDisplayMode,
     ),
     autoPageTranslation:
       typeof p.autoPageTranslation === 'boolean'

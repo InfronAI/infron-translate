@@ -1,14 +1,14 @@
 # Infron Translate
 
-Infron Translate is a Chrome Manifest V3 extension for full-page bilingual translation. It detects the source language from the current webpage, lets the user choose a target language, and inserts translations into the page while keeping the original content visible.
+Infron Translate is a Chrome Manifest V3 extension for full-page translation. It detects the source language from the current webpage, lets the user choose a target language, and can either show bilingual text or replace the original text with translations.
 
 ## Current Capabilities
 
 - Detect the source language from the current page and allow a manual source-language override from the popup.
 - Let users choose the target language from the popup or settings page.
-- Translate rendered DOM text and append translations below the original text.
-- Toggle full-page bilingual mode from the popup.
-- Automatically start bilingual mode on eligible pages.
+- Translate rendered DOM text as bilingual comparison text or translation-only replacement.
+- Toggle full-page translation from the popup.
+- Automatically start full-page translation on eligible pages.
 - Choose the full-page translation engine: external LLM or Chrome built-in Translator API.
 - Process dynamically added content from infinite scroll, dialogs, drawers, and open Shadow DOM.
 - Cache repeated text translations to avoid duplicate requests.
@@ -59,17 +59,22 @@ Full-page translation can use Chrome's on-device Translator API. The settings pa
 
 ## Usage
 
-### Full-Page Bilingual Translation
+### Full-Page Translation
 
-Use the popup button to start or stop full-page bilingual translation.
+Use the popup button to start or stop full-page translation.
 
-Full-page mode scans rendered DOM text, prioritizes visible content, and appends translations below the original text. Use the popup button again to remove inserted translations.
+Full-page mode scans rendered DOM text and prioritizes visible content. The translation preference controls how text is shown:
+
+- Bilingual comparison: keep the original text and append the translation below it.
+- Translation only: replace the original text with the translation.
+
+Use the popup button again to remove inserted translations or restore replaced source text.
 
 The full-page translator watches DOM updates, so it can translate content that appears later through infinite scroll, dialogs, drawers, or open Shadow DOM.
 
-### Automatic Bilingual Pages
+### Automatic Page Translation
 
-When automatic bilingual pages are enabled, the extension detects the current page language and starts full-page translation when appropriate. Paused sites are always skipped.
+When automatic page translation is enabled, the extension detects the current page language and starts full-page translation when appropriate. Paused sites are always skipped.
 
 If full-page mode uses Chrome Translator, automatic startup only happens when the detected source language and selected target language are available. If full-page mode uses the external LLM, matched page text is sent to the configured service.
 
@@ -102,8 +107,9 @@ Scripts:
 ## Manual QA
 
 - Settings persist after saving and reloading a page.
-- The popup button starts and stops full-page bilingual translation.
-- Full-page mode appends translations below original text without removing source content.
+- The popup button starts and stops full-page translation.
+- Bilingual comparison mode appends translations below original text without removing source content.
+- Translation-only mode replaces original text and restores it when toggled off.
 - Full-page mode can be toggled off cleanly.
 - Chrome Translator full-page mode works for supported detected language pairs.
 - External LLM full-page mode sends batched text requests and does not fall back silently.
