@@ -161,11 +161,10 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.15)),
-    linear-gradient(135deg, #64d2ff, #5e5ce6 55%, #bf5af2);
+  background: #fff;
+  object-fit: cover;
   box-shadow:
-    0 4px 12px rgba(94, 92, 230, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.16),
     inset 1px 1px 0 rgba(255, 255, 255, 0.7);
   flex-shrink: 0;
 }

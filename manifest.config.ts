@@ -5,9 +5,21 @@ export default defineManifest({
   name: 'Infron Translate',
   description: 'Automatically detect webpage language and add bilingual full-page translations.',
   version: '0.2.0',
+  icons: {
+    16: 'icons/icon16.png',
+    32: 'icons/icon32.png',
+    48: 'icons/icon48.png',
+    128: 'icons/icon128.png',
+  },
   action: {
     default_popup: 'src/popup/index.html',
     default_title: 'Infron Translate',
+    default_icon: {
+      16: 'icons/icon16.png',
+      32: 'icons/icon32.png',
+      48: 'icons/icon48.png',
+      128: 'icons/icon128.png',
+    },
   },
   options_ui: {
     page: 'src/options/index.html',

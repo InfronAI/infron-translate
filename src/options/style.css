@@ -74,16 +74,14 @@ select {
 }
 
 .brand-mark {
-  display: grid;
   width: 34px;
   height: 34px;
-  place-items: center;
-  border: 1px solid #0e4fae;
   border-radius: 7px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 17px;
-  font-weight: 750;
+  background: #fff;
+  object-fit: cover;
+  box-shadow:
+    0 3px 10px rgb(0 0 0 / 14%),
+    inset 0 0 0 1px rgb(0 0 0 / 8%);
 }
 
 .brand-copy {
