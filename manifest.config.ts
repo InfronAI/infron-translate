@@ -39,4 +39,10 @@ export default defineManifest({
   ],
   permissions: ['storage', 'tabs', 'scripting'],
   host_permissions: ['http://*/*', 'https://*/*'],
+  web_accessible_resources: [
+    {
+      resources: ['icons/infron-mark.png'],
+      matches: ['http://*/*', 'https://*/*'],
+    },
+  ],
 })
