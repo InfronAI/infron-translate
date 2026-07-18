@@ -79,7 +79,7 @@ Current implementation:
 - Starts from the extension popup.
 - Opens a two-panel overlay on the active webpage.
 - Uses an offscreen document for tab-audio capture setup.
-- Shows microphone and meeting-audio capture state in the overlay header.
+- Shows microphone and webpage-audio capture state plus live input level meters in the overlay.
 - Starts microphone transcription from the visible overlay with the **Start mic** button.
 - Streams real microphone transcription when browser speech recognition is available.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.

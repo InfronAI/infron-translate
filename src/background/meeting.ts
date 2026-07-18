@@ -79,7 +79,7 @@ export class MeetingManager {
       session,
       segments: [],
       summary,
-      audio: { microphone: false, output: false },
+      audio: { microphone: false, output: false, microphoneLevel: 0, outputLevel: 0 },
       transcription: {
         active: input.audioMode === 'mock',
         source: input.audioMode === 'mock' ? 'mock' : 'none',
@@ -97,7 +97,12 @@ export class MeetingManager {
     this.state = {
       ...this.state,
       session: { ...session, status: 'listening' },
-      audio: { microphone: false, output: Boolean(outputStreamId) },
+      audio: {
+        microphone: false,
+        output: Boolean(outputStreamId),
+        microphoneLevel: 0,
+        outputLevel: 0,
+      },
     }
     await this.showOverlay()
     if (input.audioMode === 'mock') this.startMockUpdates()
@@ -111,6 +116,8 @@ export class MeetingManager {
       audio: {
         microphone: message.microphone ?? this.state.audio.microphone,
         output: message.output ?? this.state.audio.output,
+        microphoneLevel: clampLevel(message.microphoneLevel ?? this.state.audio.microphoneLevel),
+        outputLevel: clampLevel(message.outputLevel ?? this.state.audio.outputLevel),
       },
       transcription: message.transcription ?? this.state.transcription,
     }
@@ -322,4 +329,9 @@ export class MeetingManager {
       // The MVP overlay can still run with simulated transcript data.
     }
   }
+}
+
+function clampLevel(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(1, Math.max(0, value))
 }

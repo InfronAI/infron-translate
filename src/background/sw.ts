@@ -199,6 +199,10 @@ function isMeetingTranscription(value: unknown): boolean {
   )
 }
 
+function isAudioLevel(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+}
+
 /** Runtime validation prevents internal pages from turning the worker into an unbounded fetch proxy. */
 function isToBackground(value: unknown): value is ToBackground {
   if (!isRecord(value) || typeof value.type !== 'string') return false
@@ -253,6 +257,8 @@ function isToBackground(value: unknown): value is ToBackground {
       value.sessionId.length <= 128 &&
       (value.microphone === undefined || typeof value.microphone === 'boolean') &&
       (value.output === undefined || typeof value.output === 'boolean') &&
+      (value.microphoneLevel === undefined || isAudioLevel(value.microphoneLevel)) &&
+      (value.outputLevel === undefined || isAudioLevel(value.outputLevel)) &&
       (value.transcription === undefined || isMeetingTranscription(value.transcription))
     )
   }

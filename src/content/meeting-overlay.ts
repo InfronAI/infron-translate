@@ -69,6 +69,9 @@ export class MeetingOverlay {
   private dragState: DragState | null = null
   private recognition: SpeechRecognitionLike | null = null
   private recognitionShouldRun = false
+  private micStream: MediaStream | null = null
+  private micAudioContext: AudioContext | null = null
+  private micLevelTimer: ReturnType<typeof setInterval> | null = null
 
   show(state: MeetingRuntimeState): void {
     this.state = state
@@ -156,6 +159,10 @@ export class MeetingOverlay {
         </div>
       </header>
       <main class="screens">
+        <section class="audio-meters">
+          ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel)}
+          ${meterHtml('Webpage audio', audio.output, audio.outputLevel)}
+        </section>
         <article class="screen summary-screen"></article>
         <article class="screen transcript-screen"></article>
       </main>
@@ -267,6 +274,12 @@ export class MeetingOverlay {
     }
 
     const session = this.state.session
+    try {
+      await this.startMicLevelMeter(session.id)
+    } catch {
+      this.render()
+      return
+    }
     const next = new Recognition()
     next.continuous = true
     next.interimResults = true
@@ -327,6 +340,7 @@ export class MeetingOverlay {
     } catch (error) {
       this.recognitionShouldRun = false
       this.recognition = null
+      this.stopMicLevelMeter()
       await this.sendAudioStatus({
         active: false,
         source: 'browser-speech',
@@ -339,17 +353,26 @@ export class MeetingOverlay {
 
   private stopLocalSpeechRecognition(): void {
     this.recognitionShouldRun = false
+    this.stopMicLevelMeter()
     if (!this.recognition) return
     this.recognition.onresult = null
     this.recognition.onerror = null
     this.recognition.onend = null
     this.recognition.abort()
     this.recognition = null
-    void this.sendAudioStatus({
-      active: false,
-      source: 'browser-speech',
-      message: 'Microphone transcription is stopped.',
-    })
+    if (this.state) {
+      void chrome.runtime.sendMessage({
+        type: 'meeting-audio-status',
+        sessionId: this.state.session.id,
+        microphone: false,
+        microphoneLevel: 0,
+        transcription: {
+          active: false,
+          source: 'browser-speech',
+          message: 'Microphone transcription is stopped.',
+        },
+      } satisfies MeetingAudioStatusMsg)
+    }
     this.render()
   }
 
@@ -364,6 +387,57 @@ export class MeetingOverlay {
       } satisfies MeetingAudioStatusMsg)
     } catch {
       // The service worker may be asleep; the next user action will restart it.
+    }
+  }
+
+  private async startMicLevelMeter(sessionId: string): Promise<void> {
+    this.stopMicLevelMeter()
+    try {
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      })
+      this.micAudioContext = new AudioContext()
+      const source = this.micAudioContext.createMediaStreamSource(this.micStream)
+      const analyser = this.micAudioContext.createAnalyser()
+      analyser.fftSize = 512
+      source.connect(analyser)
+      const data = new Uint8Array(analyser.fftSize)
+      this.micLevelTimer = globalThis.setInterval(() => {
+        analyser.getByteTimeDomainData(data)
+        void chrome.runtime.sendMessage({
+          type: 'meeting-audio-status',
+          sessionId,
+          microphone: true,
+          microphoneLevel: rmsLevel(data),
+        } satisfies MeetingAudioStatusMsg)
+      }, 500)
+    } catch (error) {
+      await this.sendAudioStatus({
+        active: false,
+        source: 'browser-speech',
+        message: `Microphone access failed: ${error instanceof Error ? error.message : String(error)}`,
+      })
+      throw error
+    }
+  }
+
+  private stopMicLevelMeter(): void {
+    if (this.micLevelTimer) {
+      globalThis.clearInterval(this.micLevelTimer)
+      this.micLevelTimer = null
+    }
+    if (this.micAudioContext) {
+      void this.micAudioContext.close()
+      this.micAudioContext = null
+    }
+    if (this.micStream) {
+      for (const track of this.micStream.getTracks()) track.stop()
+      this.micStream = null
     }
   }
 }
@@ -382,6 +456,30 @@ function defaultWindowState(): MeetingWindowState {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
+}
+
+function meterHtml(label: string, enabled: boolean, level: number): string {
+  const percent = Math.round(clamp(level, 0, 1) * 100)
+  return `
+    <div class="meter">
+      <div class="meter-head">
+        <span>${escapeHtml(label)}</span>
+        <strong>${enabled ? `${percent}%` : 'Off'}</strong>
+      </div>
+      <div class="meter-track" aria-hidden="true">
+        <span style="width: ${enabled ? percent : 0}%"></span>
+      </div>
+    </div>
+  `
+}
+
+function rmsLevel(data: Uint8Array): number {
+  let sum = 0
+  for (const value of data) {
+    const centered = (value - 128) / 128
+    sum += centered * centered
+  }
+  return Math.min(1, Math.sqrt(sum / data.length) * 4)
 }
 
 function speechRecognitionConstructor(): SpeechRecognitionConstructor | null {
@@ -713,8 +811,54 @@ h2 {
 .screens {
   min-height: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: minmax(320px, 0.92fr) minmax(360px, 1.08fr);
   gap: 14px;
+}
+
+.audio-meters {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.meter {
+  padding: 10px 12px;
+  border: 1px solid rgb(15 23 42 / 7%);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 58%);
+}
+
+.meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.meter-head strong {
+  color: #0f766e;
+}
+
+.meter-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(148 163 184 / 18%);
+}
+
+.meter-track span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #14b8a6, #22c55e);
+  transition: width 0.18s ease;
 }
 
 .screen {
@@ -849,6 +993,7 @@ ul {
     resize: none;
   }
   .screens { grid-template-columns: 1fr; }
+  .audio-meters { grid-template-columns: 1fr; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .status { justify-content: flex-start; }
 }

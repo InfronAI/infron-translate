@@ -13,6 +13,8 @@ type InternalMeetingAudioStopMsg = {
 
 let streams: MediaStream[] = []
 let playback: HTMLAudioElement | null = null
+let audioContext: AudioContext | null = null
+let levelTimer: ReturnType<typeof setInterval> | null = null
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -50,6 +52,7 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
       playback = new Audio()
       playback.srcObject = tabAudio
       await playback.play()
+      startOutputLevelMeter(session.id, tabAudio)
       outputReady = true
     } catch (error) {
       console.warn(
@@ -76,6 +79,14 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
 }
 
 function stopCapture(): void {
+  if (levelTimer) {
+    globalThis.clearInterval(levelTimer)
+    levelTimer = null
+  }
+  if (audioContext) {
+    void audioContext.close()
+    audioContext = null
+  }
   if (playback) {
     playback.pause()
     playback.srcObject = null
@@ -85,6 +96,35 @@ function stopCapture(): void {
     for (const track of stream.getTracks()) track.stop()
   }
   streams = []
+}
+
+function startOutputLevelMeter(sessionId: string, stream: MediaStream): void {
+  if (levelTimer) globalThis.clearInterval(levelTimer)
+  if (audioContext) void audioContext.close()
+  audioContext = new AudioContext()
+  const source = audioContext.createMediaStreamSource(stream)
+  const analyser = audioContext.createAnalyser()
+  analyser.fftSize = 512
+  source.connect(analyser)
+  const data = new Uint8Array(analyser.fftSize)
+  levelTimer = globalThis.setInterval(() => {
+    analyser.getByteTimeDomainData(data)
+    void sendAudioStatus({
+      type: 'meeting-audio-status',
+      sessionId,
+      output: true,
+      outputLevel: rmsLevel(data),
+    })
+  }, 500)
+}
+
+function rmsLevel(data: Uint8Array): number {
+  let sum = 0
+  for (const value of data) {
+    const centered = (value - 128) / 128
+    sum += centered * centered
+  }
+  return Math.min(1, Math.sqrt(sum / data.length) * 4)
 }
 
 async function sendAudioStatus(message: MeetingAudioStatusMsg): Promise<void> {
