@@ -53,6 +53,7 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
   }
   if (
     message.type === 'meeting-transcript-segment' ||
+    message.type === 'meeting-transcript-partial' ||
     message.type === 'meeting-audio-chunk' ||
     message.type === 'meeting-audio-status' ||
     message.type === 'set-meeting-context'
@@ -268,6 +269,21 @@ function isToBackground(value: unknown): value is ToBackground {
       typeof value.endedAt === 'number'
     )
   }
+  if (value.type === 'meeting-transcript-partial') {
+    return (
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length <= 128 &&
+      isMeetingChannel(value.channel) &&
+      typeof value.speakerLabel === 'string' &&
+      value.speakerLabel.length <= 80 &&
+      typeof value.sourceLang === 'string' &&
+      value.sourceLang.length <= 64 &&
+      typeof value.text === 'string' &&
+      value.text.length <= 20_000 &&
+      typeof value.startedAt === 'number' &&
+      typeof value.updatedAt === 'number'
+    )
+  }
   if (value.type === 'meeting-audio-chunk') {
     return (
       typeof value.sessionId === 'string' &&
@@ -422,6 +438,11 @@ async function handle(
 
   if (message.type === 'meeting-transcript-segment') {
     await meetingManager.ingestTranscript(message)
+    return { type: 'meeting-internal-result', ok: true }
+  }
+
+  if (message.type === 'meeting-transcript-partial') {
+    await meetingManager.ingestTranscriptPartial(message)
     return { type: 'meeting-internal-result', ok: true }
   }
 

@@ -1,5 +1,15 @@
 import type { MeetingSession } from '../shared/meeting'
-import type { MeetingAudioChunkMsg, MeetingAudioStatusMsg } from '../shared/messages'
+import type {
+  MeetingAudioChunkMsg,
+  MeetingAudioStatusMsg,
+  MeetingTranscriptPartialMsg,
+  MeetingTranscriptSegmentMsg,
+} from '../shared/messages'
+import type { UserSettings } from '../shared/settings-defaults'
+import {
+  clearStepFunAsrAuthorizationRule,
+  StepFunRealtimeAsrConnection,
+} from '../background/stt-stream'
 
 const AUDIO_CHUNK_MS = 500
 
@@ -13,6 +23,19 @@ type InternalMeetingAudioStopMsg = {
   type: 'meeting-audio-stop'
 }
 
+type InternalMeetingAsrAudioMsg = {
+  type: 'meeting-asr-audio'
+  settings: UserSettings
+  chunk: MeetingAudioChunkMsg
+  uiLanguage: MeetingSession['uiLanguage']
+}
+
+type InternalMeetingAsrStopMsg = {
+  type: 'meeting-asr-stop'
+  sessionId?: string
+  channel?: MeetingAudioChunkMsg['channel']
+}
+
 let streams: MediaStream[] = []
 let playback: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
@@ -24,6 +47,7 @@ let pcmTimer: ReturnType<typeof setInterval> | null = null
 let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
+const asrStreams = new Map<string, StepFunRealtimeAsrConnection>()
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -35,6 +59,16 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
 
   if (message.type === 'meeting-audio-stop') {
     stopCapture()
+    return false
+  }
+
+  if (message.type === 'meeting-asr-audio' && isMeetingAsrAudio(message)) {
+    void appendAsrAudio(message)
+    return false
+  }
+
+  if (message.type === 'meeting-asr-stop' && isMeetingAsrStop(message)) {
+    stopAsr(message.sessionId, message.channel)
     return false
   }
 
@@ -206,6 +240,92 @@ async function sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
   }
 }
 
+async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void> {
+  try {
+    await asrStreamFor(message).append(message.chunk)
+  } catch (error) {
+    await sendAudioStatus({
+      type: 'meeting-audio-status',
+      sessionId: message.chunk.sessionId,
+      transcription: {
+        active: false,
+        source: 'external-stt',
+        message: asrFailedMessage(
+          message.uiLanguage,
+          error instanceof Error ? error.message : String(error),
+        ),
+      },
+    })
+  }
+}
+
+function asrStreamFor(message: InternalMeetingAsrAudioMsg): StepFunRealtimeAsrConnection {
+  const key = asrKey(message.chunk.sessionId, message.chunk.channel)
+  const existing = asrStreams.get(key)
+  if (existing) return existing
+  const stream = new StepFunRealtimeAsrConnection(message.settings, {
+    onReady: () => undefined,
+    onDelta: (text, chunk) => {
+      void chrome.runtime.sendMessage({
+        type: 'meeting-transcript-partial',
+        sessionId: chunk.sessionId,
+        channel: chunk.channel,
+        speakerLabel: '',
+        sourceLang: chunk.sourceLang,
+        text,
+        startedAt: chunk.startedAt,
+        updatedAt: chunk.endedAt,
+      } satisfies MeetingTranscriptPartialMsg)
+    },
+    onCompleted: (text, chunk) => {
+      void chrome.runtime.sendMessage({
+        type: 'meeting-transcript-segment',
+        sessionId: chunk.sessionId,
+        channel: chunk.channel,
+        speakerLabel: '',
+        sourceLang: chunk.sourceLang,
+        originalText: text,
+        startedAt: chunk.startedAt,
+        endedAt: chunk.endedAt,
+      } satisfies MeetingTranscriptSegmentMsg)
+    },
+    onError: (error, chunk) => {
+      asrStreams.get(key)?.close()
+      asrStreams.delete(key)
+      void sendAudioStatus({
+        type: 'meeting-audio-status',
+        sessionId: chunk.sessionId,
+        transcription: {
+          active: false,
+          source: 'external-stt',
+          message: asrFailedMessage(message.uiLanguage, error),
+        },
+      })
+    },
+  })
+  asrStreams.set(key, stream)
+  return stream
+}
+
+function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']): void {
+  for (const [key, stream] of asrStreams) {
+    const [streamSessionId, streamChannel] = key.split(':')
+    if (sessionId && streamSessionId !== sessionId) continue
+    if (channel && streamChannel !== channel) continue
+    stream.close()
+    asrStreams.delete(key)
+  }
+  if (!asrStreams.size) void clearStepFunAsrAuthorizationRule().catch(() => undefined)
+}
+
+function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): string {
+  return `${sessionId}:${channel}`
+}
+
+function asrFailedMessage(language: MeetingSession['uiLanguage'], error: string): string {
+  return language === 'zh' ? `StepFun ASR 失败：${error}` : `StepFun ASR failed: ${error}`
+}
+
 function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {
   const sampleCount = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
   const bytes = new Uint8Array(sampleCount * 2)
@@ -261,6 +381,46 @@ function isMeetingAudioStart(value: unknown): value is InternalMeetingAudioStart
     typeof value.session.id === 'string' &&
     (value.outputStreamId === undefined || typeof value.outputStreamId === 'string')
   )
+}
+
+function isMeetingAsrAudio(value: unknown): value is InternalMeetingAsrAudioMsg {
+  return (
+    isRecord(value) &&
+    value.type === 'meeting-asr-audio' &&
+    isRecord(value.settings) &&
+    typeof value.settings.asrEndpoint === 'string' &&
+    typeof value.settings.asrModel === 'string' &&
+    typeof value.settings.asrApiKey === 'string' &&
+    (value.uiLanguage === 'zh' || value.uiLanguage === 'en') &&
+    isMeetingAudioChunk(value.chunk)
+  )
+}
+
+function isMeetingAsrStop(value: unknown): value is InternalMeetingAsrStopMsg {
+  return (
+    isRecord(value) &&
+    value.type === 'meeting-asr-stop' &&
+    (value.sessionId === undefined || typeof value.sessionId === 'string') &&
+    (value.channel === undefined || isMeetingChannel(value.channel))
+  )
+}
+
+function isMeetingAudioChunk(value: unknown): value is MeetingAudioChunkMsg {
+  return (
+    isRecord(value) &&
+    value.type === 'meeting-audio-chunk' &&
+    typeof value.sessionId === 'string' &&
+    isMeetingChannel(value.channel) &&
+    typeof value.sourceLang === 'string' &&
+    typeof value.mimeType === 'string' &&
+    typeof value.audioBase64 === 'string' &&
+    typeof value.startedAt === 'number' &&
+    typeof value.endedAt === 'number'
+  )
+}
+
+function isMeetingChannel(value: unknown): value is MeetingAudioChunkMsg['channel'] {
+  return value === 'microphone' || value === 'meeting-output'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

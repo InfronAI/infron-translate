@@ -79,12 +79,21 @@ export class StepFunRealtimeAsrConnection {
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(endpoint)
       this.ws = ws
+      let opened = false
+      let settled = false
+      const fail = (error: Error) => {
+        if (settled) return
+        settled = true
+        reject(error)
+      }
       const timeout = globalThis.setTimeout(() => {
-        reject(new Error('StepFun ASR WebSocket connection timed out'))
+        fail(new Error('StepFun ASR WebSocket connection timed out'))
         ws.close()
       }, WS_CONNECT_TIMEOUT_MS)
 
       ws.addEventListener('open', () => {
+        opened = true
+        settled = true
         globalThis.clearTimeout(timeout)
         this.configureSession(message)
         this.callbacks.onReady(message)
@@ -92,11 +101,17 @@ export class StepFunRealtimeAsrConnection {
       })
       ws.addEventListener('message', (event) => this.handleMessage(event))
       ws.addEventListener('error', () => {
-        reject(new Error('StepFun ASR WebSocket connection failed'))
+        fail(new Error('StepFun ASR WebSocket connection failed'))
       })
-      ws.addEventListener('close', () => {
+      ws.addEventListener('close', (event) => {
+        const detail = closeDetail(event)
+        if (!opened) {
+          globalThis.clearTimeout(timeout)
+          fail(new Error(`StepFun ASR WebSocket closed during handshake${detail}`))
+          return
+        }
         if (!this.closed && this.lastChunk) {
-          this.callbacks.onError('StepFun ASR WebSocket closed', this.lastChunk)
+          this.callbacks.onError(`StepFun ASR WebSocket closed${detail}`, this.lastChunk)
         }
         this.ws = null
       })
@@ -282,4 +297,9 @@ function escapeRegex(value: string): string {
 
 function eventId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+function closeDetail(event: CloseEvent): string {
+  const reason = event.reason.trim()
+  return ` (code ${event.code}${reason ? `, ${reason}` : ''})`
 }

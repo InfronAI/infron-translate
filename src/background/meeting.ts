@@ -12,6 +12,7 @@ import type {
 import type {
   MeetingAudioChunkMsg,
   MeetingAudioStatusMsg,
+  MeetingTranscriptPartialMsg,
   MeetingTranscriptSegmentMsg,
   HideMeetingAssistantMsg,
   MeetingAssistantUpdateMsg,
@@ -23,10 +24,6 @@ import {
   persistTranslationCache,
   translateBlocksSingleFlight,
 } from './translate'
-import {
-  clearStepFunAsrAuthorizationRule,
-  StepFunRealtimeAsrConnection,
-} from './stt-stream'
 
 const OFFSCREEN_URL = 'src/offscreen/meeting-audio.html'
 const TRANSCRIPT_HISTORY_LIMIT = 500
@@ -61,7 +58,6 @@ export class MeetingManager {
   private state: MeetingRuntimeState | null = null
   private timer: ReturnType<typeof setInterval> | null = null
   private cursor = 0
-  private readonly asrStreams = new Map<string, StepFunRealtimeAsrConnection>()
 
   getState(): MeetingRuntimeState | null {
     return this.state
@@ -161,10 +157,40 @@ export class MeetingManager {
     await this.broadcastUpdate()
   }
 
+  async ingestTranscriptPartial(message: MeetingTranscriptPartialMsg): Promise<void> {
+    if (!this.state || this.state.session.id !== message.sessionId) return
+    const partial: TranscriptPartial = {
+      channel: message.channel,
+      speakerLabel: participantLabel(this.state.session.uiLanguage, message.channel),
+      sourceLang: message.sourceLang,
+      text: message.text.trim(),
+      startedAt: message.startedAt,
+      updatedAt: message.updatedAt,
+    }
+    if (!partial.text) return
+    this.state = {
+      ...this.state,
+      partials: {
+        ...this.state.partials,
+        [message.channel]: partial,
+      },
+      transcription: {
+        active: true,
+        source: 'external-stt',
+        message: meetingMessage(this.state.session.uiLanguage, 'streaming', {
+          channel: localizedChannel(this.state.session.uiLanguage, message.channel).toLowerCase(),
+        }),
+      },
+    }
+    await this.broadcastUpdate()
+  }
+
   async ingestTranscript(message: MeetingTranscriptSegmentMsg): Promise<void> {
     if (!this.state || this.state.session.id !== message.sessionId) return
     const originalText = message.originalText.trim()
     if (!originalText) return
+    const partials = { ...this.state.partials }
+    delete partials[message.channel]
     const translatedText = await this.translateTranscriptText(originalText)
     const segment: TranscriptSegment = {
       id: `${message.sessionId}-${message.endedAt}-${Math.random().toString(36).slice(2, 7)}`,
@@ -182,6 +208,7 @@ export class MeetingManager {
     const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
     this.state = {
       ...this.state,
+      partials,
       segments,
       summary,
       contextAlignment,
@@ -213,7 +240,23 @@ export class MeetingManager {
       return
     }
     try {
-      await this.asrStreamFor(message, settings).append(message)
+      await this.updateAudioStatus({
+        type: 'meeting-audio-status',
+        sessionId: message.sessionId,
+        transcription: {
+          active: true,
+          source: 'external-stt',
+          message: meetingMessage(this.state.session.uiLanguage, 'streaming', {
+            channel: localizedChannel(this.state.session.uiLanguage, message.channel).toLowerCase(),
+          }),
+        },
+      })
+      await chrome.runtime.sendMessage({
+        type: 'meeting-asr-audio',
+        settings,
+        chunk: message,
+        uiLanguage: this.state.session.uiLanguage,
+      })
     } catch (error) {
       await this.updateAudioStatus({
         type: 'meeting-audio-status',
@@ -227,108 +270,6 @@ export class MeetingManager {
         },
       })
     }
-  }
-
-  private asrStreamFor(
-    message: MeetingAudioChunkMsg,
-    settings: Awaited<ReturnType<typeof loadSettings>>,
-  ): StepFunRealtimeAsrConnection {
-    const key = `${message.sessionId}:${message.channel}`
-    let stream = this.asrStreams.get(key)
-    if (stream) return stream
-    stream = new StepFunRealtimeAsrConnection(settings, {
-      onReady: (chunk) => {
-        void this.handleAsrReady(chunk)
-      },
-      onDelta: (text, chunk) => {
-        void this.handleAsrDelta(text, chunk)
-      },
-      onCompleted: (text, chunk) => {
-        void this.handleAsrCompleted(text, chunk)
-      },
-      onError: (error, chunk) => {
-        void this.handleAsrError(error, chunk)
-      },
-    })
-    this.asrStreams.set(key, stream)
-    return stream
-  }
-
-  private async handleAsrReady(message: MeetingAudioChunkMsg): Promise<void> {
-    if (!this.state || this.state.session.id !== message.sessionId) return
-    await this.updateAudioStatus({
-      type: 'meeting-audio-status',
-      sessionId: message.sessionId,
-      transcription: {
-        active: true,
-        source: 'external-stt',
-        message: meetingMessage(this.state.session.uiLanguage, 'streaming', {
-          channel: localizedChannel(this.state.session.uiLanguage, message.channel).toLowerCase(),
-        }),
-      },
-    })
-  }
-
-  private async handleAsrDelta(text: string, message: MeetingAudioChunkMsg): Promise<void> {
-    if (!this.state || this.state.session.id !== message.sessionId) return
-    const partial: TranscriptPartial = {
-      channel: message.channel,
-      speakerLabel: participantLabel(this.state.session.uiLanguage, message.channel),
-      sourceLang: message.sourceLang,
-      text: text.trim(),
-      startedAt: message.startedAt,
-      updatedAt: message.endedAt,
-    }
-    this.state = {
-      ...this.state,
-      partials: {
-        ...this.state.partials,
-        [message.channel]: partial,
-      },
-      transcription: {
-        active: true,
-        source: 'external-stt',
-        message: meetingMessage(this.state.session.uiLanguage, 'streaming', {
-          channel: localizedChannel(this.state.session.uiLanguage, message.channel).toLowerCase(),
-        }),
-      },
-    }
-    await this.broadcastUpdate()
-  }
-
-  private async handleAsrCompleted(text: string, message: MeetingAudioChunkMsg): Promise<void> {
-    if (!this.state || this.state.session.id !== message.sessionId) return
-    const trimmed = text.trim()
-    if (!trimmed) return
-    const partials = { ...this.state.partials }
-    delete partials[message.channel]
-    this.state = { ...this.state, partials }
-    await this.ingestTranscript({
-      type: 'meeting-transcript-segment',
-      sessionId: message.sessionId,
-      channel: message.channel,
-      speakerLabel: participantLabel(this.state.session.uiLanguage, message.channel),
-      sourceLang: message.sourceLang,
-      originalText: trimmed,
-      startedAt: message.startedAt,
-      endedAt: message.endedAt,
-    })
-  }
-
-  private async handleAsrError(error: string, message: MeetingAudioChunkMsg): Promise<void> {
-    if (!this.state || this.state.session.id !== message.sessionId) return
-    const key = `${message.sessionId}:${message.channel}`
-    this.asrStreams.get(key)?.close()
-    this.asrStreams.delete(key)
-    await this.updateAudioStatus({
-      type: 'meeting-audio-status',
-      sessionId: message.sessionId,
-      transcription: {
-        active: false,
-        source: 'external-stt',
-        message: meetingMessage(this.state.session.uiLanguage, 'asrFailed', { error }),
-      },
-    })
   }
 
   async setSystemAudioEnabled(sessionId: string, enabled: boolean): Promise<void> {
@@ -383,7 +324,6 @@ export class MeetingManager {
     if (this.timer) globalThis.clearInterval(this.timer)
     this.timer = null
     this.closeAllAsrStreams()
-    await clearStepFunAsrAuthorizationRule()
     const stopped: MeetingRuntimeState = {
       ...this.state,
       session: { ...this.state.session, status: 'stopped', stoppedAt: Date.now() },
@@ -399,14 +339,17 @@ export class MeetingManager {
   }
 
   private closeAsrStream(sessionId: string, channel: MeetingAudioChunkMsg['channel']): void {
-    const key = `${sessionId}:${channel}`
-    this.asrStreams.get(key)?.close()
-    this.asrStreams.delete(key)
+    void chrome.runtime
+      .sendMessage({
+        type: 'meeting-asr-stop',
+        sessionId,
+        channel,
+      })
+      .catch(() => undefined)
   }
 
   private closeAllAsrStreams(): void {
-    for (const stream of this.asrStreams.values()) stream.close()
-    this.asrStreams.clear()
+    void chrome.runtime.sendMessage({ type: 'meeting-asr-stop' }).catch(() => undefined)
   }
 
   private initialSummary(sessionId: string, uiLanguage: MeetingUiLanguage): MeetingSummaryState {

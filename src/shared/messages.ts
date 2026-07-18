@@ -147,6 +147,17 @@ export type MeetingTranscriptSegmentMsg = {
   endedAt: number
 }
 
+export type MeetingTranscriptPartialMsg = {
+  type: 'meeting-transcript-partial'
+  sessionId: string
+  channel: MeetingChannel
+  speakerLabel: string
+  sourceLang: string
+  text: string
+  startedAt: number
+  updatedAt: number
+}
+
 export type MeetingAudioChunkMsg = {
   type: 'meeting-audio-chunk'
   sessionId: string
@@ -211,6 +222,7 @@ export type ToBackground =
   | SetMeetingContextMsg
   | GetMeetingAssistantStateMsg
   | MeetingTranscriptSegmentMsg
+  | MeetingTranscriptPartialMsg
   | MeetingAudioChunkMsg
   | MeetingAudioStatusMsg
   | OpenOptionsMsg
