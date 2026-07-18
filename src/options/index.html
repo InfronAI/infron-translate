@@ -24,16 +24,16 @@
     <div class="workspace">
       <aside class="sidebar">
         <nav class="section-nav" aria-label="设置分区">
-          <a href="#general" class="active">翻译</a>
-          <a href="#page-translation">页面模式</a>
-          <a href="#browser-runtime">Chrome 支持</a>
-          <a href="#external-api">Cloud Model</a>
-          <a href="#speech-recognition">语音识别</a>
+          <a href="#general" class="active">基础偏好</a>
+          <a href="#page-translation">网页翻译</a>
+          <a href="#browser-runtime">Chrome 内置翻译</a>
+          <a href="#external-api">云端翻译模型</a>
+          <a href="#speech-recognition">会议转录</a>
           <a href="#site-rules">网站规则</a>
         </nav>
         <div class="sidebar-note">
           <span>隐私</span>
-          <p>Chrome 在设备本地处理。Cloud Model 只会把文本发送到你配置的端点。</p>
+          <p>网页翻译和会议转录使用不同凭证；音频只会发送到你配置的 ASR 端点。</p>
         </div>
       </aside>
 
@@ -41,15 +41,15 @@
         <div class="content-heading">
           <p class="eyebrow">偏好设置</p>
           <h1>设置</h1>
-          <p id="helpSummary">设置语言、页面行为和云端翻译凭证。</p>
+          <p id="helpSummary">配置网页翻译、会议转录、模型凭证和站点规则。</p>
         </div>
 
         <form id="settings-form" autocomplete="off">
           <section id="general" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>翻译</h2>
-                <p>设置默认翻译语言。</p>
+                <h2>基础偏好</h2>
+                <p>设置界面语言和默认译文语言。</p>
               </div>
             </header>
 
@@ -87,20 +87,20 @@
           <section id="page-translation" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>页面模式</h2>
-                <p>选择整页翻译的运行方式和展示方式。</p>
+                <h2>网页翻译</h2>
+                <p>配置整页翻译的启动方式、展示模式和译文样式。</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>翻译引擎</h3>
-                <p>使用 Chrome 获得本地速度，或使用 Cloud Model 获得更广的模型能力。</p>
+                <p>选择网页翻译使用 Chrome 内置翻译还是云端翻译模型。</p>
               </div>
               <div class="control">
                 <select id="pageTranslationEngine" name="pageTranslationEngine">
                   <option value="browser">Chrome 内置翻译</option>
-                  <option value="external">Cloud Model</option>
+                  <option value="external">云端翻译模型</option>
                 </select>
               </div>
             </div>
@@ -108,11 +108,11 @@
             <div class="setting-row emphasized-row">
               <div class="setting-copy">
                 <div class="title-with-badge">
-                  <h3>自动翻译页面</h3>
+                  <h3>自动网页翻译</h3>
                   <span class="small-badge">全局</span>
                 </div>
-                <p>自动翻译支持的页面，或在弹框中手动控制。</p>
-                <p class="privacy-warning">Cloud Model 会把匹配到的页面文本发送到你配置的端点。</p>
+                <p>自动翻译支持的网页，也可以在插件弹框中手动控制。</p>
+                <p class="privacy-warning">Cloud Model 会把匹配到的网页文本发送到你配置的模型端点。</p>
               </div>
               <label class="switch-control">
                 <input id="autoPageTranslation" name="autoPageTranslation" type="checkbox" />
@@ -123,7 +123,7 @@
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>显示模式</h3>
+                <h3>网页译文展示</h3>
                 <p>同时显示原文和译文，或直接用译文替换原文。</p>
               </div>
               <div class="control">
@@ -136,8 +136,8 @@
 
             <div class="setting-row appearance-row">
               <div class="setting-copy">
-                <h3>译文样式</h3>
-                <p>调整插入页面的译文字号、颜色和格式。</p>
+                <h3>网页译文样式</h3>
+                <p>调整插入网页的译文字号、颜色和格式。</p>
               </div>
               <div class="control appearance-controls">
                 <label class="number-field">
@@ -210,7 +210,7 @@
           <section id="browser-runtime" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>Chrome 内置支持</h2>
+                <h2>Chrome 内置翻译</h2>
                 <p>检查 Chrome 是否支持从英语翻译到你的目标语言。</p>
               </div>
             </header>
@@ -235,8 +235,8 @@
           <section id="external-api" class="settings-section">
             <header class="section-heading section-heading-with-status">
               <div>
-                <h2>Cloud Model</h2>
-                <p>仅当翻译引擎设置为 Cloud Model 时需要配置。</p>
+                <h2>云端翻译模型</h2>
+                <p>仅当网页翻译引擎选择 Cloud Model 时使用。</p>
               </div>
               <div id="cloudConnectionStatus" class="connection-status warn">
                 <span class="connection-dot" aria-hidden="true"></span>
@@ -334,14 +334,14 @@
           <section id="speech-recognition" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>语音识别</h2>
-                <p>配置会议助手实时转录使用的 ASR SSE 接口。</p>
+                <h2>会议转录</h2>
+                <p>配置会议助手实时音频转录使用的 ASR SSE 接口。</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>ASR Endpoint</h3>
+                <h3>转录接口 Endpoint</h3>
                 <p>用于音频转录的 SSE 接口地址，默认使用 StepFun ASR。</p>
               </div>
               <div class="control">
@@ -361,7 +361,7 @@
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>ASR API Key</h3>
+                <h3>转录 API Key</h3>
                 <p>仅用于会议助手音频转录。保存时留空会保留已保存的密钥。</p>
               </div>
               <div class="control">
@@ -386,7 +386,7 @@
             <header class="section-heading">
               <div>
                 <h2>网站规则</h2>
-                <p>管理不应启动页面翻译的网站。</p>
+                <p>管理不应自动启动网页翻译的网站。</p>
               </div>
             </header>
             <div class="setting-row">
