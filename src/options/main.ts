@@ -208,7 +208,7 @@ function updateStyleControlStates(): void {
 }
 
 function updateEngineSummary(settings: UserSettings): void {
-  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome' : '外部 LLM'
+  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '云端 AI 模型'
   el<HTMLElement>('engineSummary').textContent = `整页 ${page}`
 }
 
@@ -233,12 +233,12 @@ function renderBrowserCapability(
     available: ['Chrome 内置翻译已就绪', '当前语言对可直接在设备侧翻译。'],
     downloadable: ['需要下载语言包', '点击下载并测试；完成后可用于网页自动双语。'],
     downloading: ['语言包正在下载', detail || '请保持此页面打开。'],
-    unavailable: ['当前语言对不可用', '可更换语言代码，或将对应翻译引擎切换为外部 LLM。'],
+    unavailable: ['当前语言对不可用', '可更换语言代码，或将对应翻译引擎切换为云端 AI 模型。'],
     unsupported: [
       '当前环境未提供 Translator API',
       `检测到 Chrome/Chromium ${browserVersion()}。该能力要求桌面版 Chrome 138+，其他 Chromium 浏览器不保证支持。`,
     ],
-    error: ['检测失败', detail || '请重新检测；持续失败时可改用外部 LLM。'],
+    error: ['检测失败', detail || '请重新检测；持续失败时可改用云端 AI 模型。'],
   } as const
   title.textContent = content[availability][0]
   description.textContent = detail || content[availability][1]
@@ -351,7 +351,7 @@ async function init(): Promise<void> {
       fillForm(stored)
       const usesBrowser = stored.pageTranslationEngine === 'browser'
       if (usesBrowser && (browserCapability === 'unsupported' || browserCapability === 'unavailable')) {
-        setStatus('已保存，但当前 Chrome 内置翻译不可用；请查看能力诊断或改用外部 LLM。', false)
+        setStatus('已保存，但当前 Chrome 内置翻译不可用；请查看能力诊断或改用云端 AI 模型。', false)
       } else if (
         usesBrowser &&
         (browserCapability === 'downloadable' || browserCapability === 'downloading')

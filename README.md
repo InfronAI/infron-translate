@@ -9,7 +9,7 @@ Infron Translate is a Chrome Manifest V3 extension for full-page translation. It
 - Translate rendered DOM text as bilingual comparison text or translation-only replacement.
 - Toggle full-page translation from the popup.
 - Automatically start full-page translation on eligible pages.
-- Choose the full-page translation engine: external LLM or Chrome built-in Translator API.
+- Choose the full-page translation engine: Chrome built-in Translator API or a cloud AI model.
 - Process dynamically added content from infinite scroll, dialogs, drawers, and open Shadow DOM.
 - Cache repeated text translations to avoid duplicate requests.
 - Pause translation per site from the extension popup.
@@ -39,7 +39,7 @@ The source language is detected from the current webpage. The popup shows the de
 
 ### External Model
 
-The external model is used when the full-page engine is set to external LLM.
+The external model is used when the full-page engine is set to cloud AI model.
 
 Required fields:
 
@@ -76,13 +76,13 @@ The full-page translator watches DOM updates, so it can translate content that a
 
 When automatic page translation is enabled, the extension detects the current page language and starts full-page translation when appropriate. Paused sites are always skipped.
 
-If full-page mode uses Chrome Translator, automatic startup only happens when the detected source language and selected target language are available. If full-page mode uses the external LLM, matched page text is sent to the configured service.
+If full-page mode uses Chrome Translator, automatic startup only happens when the detected source language and selected target language are available. If full-page mode uses the cloud AI model, matched page text is sent to the configured service.
 
 ## Privacy and Network Behavior
 
 - API keys are stored in `chrome.storage.local`.
 - Content scripts do not receive the API key, Base URL, model, or provider configuration.
-- External LLM translation sends text only to the configured `baseURL`.
+- Cloud AI model translation sends text only to the configured `baseURL`.
 - Chrome Translator full-page mode processes text on device.
 - External full-page translation can proactively send visible page text to the configured service.
 - Paused sites do not start full-page translation.
@@ -112,6 +112,6 @@ Scripts:
 - Translation-only mode replaces original text and restores it when toggled off.
 - Full-page mode can be toggled off cleanly.
 - Chrome Translator full-page mode works for supported detected language pairs.
-- External LLM full-page mode sends batched text requests and does not fall back silently.
+- Cloud AI model full-page mode sends batched text requests and does not fall back silently.
 - Repeated text reuses cached translations.
 - Paused sites do not translate automatically.

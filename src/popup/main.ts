@@ -67,7 +67,7 @@ function renderStatus(settings: UserSettings): void {
   const configured = isConfigured(settings)
   const pageEngine = el<HTMLElement>('pageEngineStatus')
   pageEngine.textContent =
-    settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '外部 LLM'
+    settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '云端 AI'
   pageEngine.className =
     settings.pageTranslationEngine === 'browser' || configured ? 'pill ok' : 'pill warn'
 

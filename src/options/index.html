@@ -32,7 +32,7 @@
         </nav>
         <div class="sidebar-note">
           <span>隐私边界</span>
-          <p>Chrome 内置模式在设备侧处理文本。外部模式只发送到你配置的服务。</p>
+          <p>Chrome 内置模式在设备侧处理文本。云端 AI 模型只发送到你配置的服务。</p>
         </div>
       </aside>
 
@@ -78,12 +78,12 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>整页翻译引擎</h3>
-                <p>Chrome 内置速度更快；外部 LLM 适合需要更强上下文理解的页面。</p>
+                <p>Chrome 内置速度更快；云端 AI 模型适合需要更强上下文理解的页面。</p>
               </div>
               <div class="control">
                 <select id="pageTranslationEngine" name="pageTranslationEngine">
                   <option value="browser">Chrome 内置翻译</option>
-                  <option value="external">外部 LLM</option>
+                  <option value="external">云端 AI 模型</option>
                 </select>
               </div>
             </div>
@@ -95,7 +95,7 @@
                   <span class="small-badge">全局</span>
                 </div>
                 <p>开启后会在支持的网页自动插入译文；关闭后可在弹窗中手动点击翻译。</p>
-                <p class="privacy-warning">选择外部 LLM 时，匹配到的页面文本会自动发送到所配置服务。</p>
+                <p class="privacy-warning">选择云端 AI 模型时，匹配到的页面文本会自动发送到所配置服务。</p>
               </div>
               <label class="switch-control">
                 <input id="autoPageTranslation" name="autoPageTranslation" type="checkbox" />
@@ -219,7 +219,7 @@
             <header class="section-heading section-heading-with-status">
               <div>
                 <h2>外部模型</h2>
-                <p>用于外部 LLM 文本翻译。</p>
+                <p>用于云端 AI 模型文本翻译。</p>
               </div>
               <span id="configBadge" class="config-badge warn">检测中</span>
             </header>
