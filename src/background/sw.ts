@@ -50,6 +50,17 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
   }
 }
 
+function isOptionsPageSender(sender: chrome.runtime.MessageSender): boolean {
+  if (!sender.url) return false
+  try {
+    const senderUrl = new URL(sender.url)
+    const optionsUrl = new URL(chrome.runtime.getURL('src/options/index.html'))
+    return senderUrl.origin === optionsUrl.origin && senderUrl.pathname === optionsUrl.pathname
+  } catch {
+    return false
+  }
+}
+
 // Content scripts declared in the manifest only load on navigation, so tabs open
 // before first install stay untranslatable until reloaded. Inject into them once.
 chrome.runtime.onInstalled.addListener((details) => {
@@ -305,10 +316,10 @@ async function handle(
   }
 
   if (message.type === 'test-connection') {
-    // Only the extension's own pages (no originating tab) may supply an arbitrary
-    // endpoint/key; otherwise a content script could turn the worker into a fetch proxy.
-    if (sender.tab) {
-      return { type: 'test-connection-result', ok: false, error: 'Connection tests can only be started from the settings page' }
+    // Only the extension's settings page may supply an arbitrary endpoint/key;
+    // otherwise a content script could turn the worker into a fetch proxy.
+    if (!isOptionsPageSender(sender)) {
+      return { type: 'test-connection-result', ok: false, error: 'Open settings to test Cloud Model connection' }
     }
     const stored = await loadSettings()
     const probe: UserSettings = {

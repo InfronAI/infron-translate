@@ -239,11 +239,11 @@ async function normalizeUnavailableEngine(settings: UserSettings): Promise<UserS
 function updateProviderHint(provider: string): void {
   const hint = el<HTMLElement>('providerHint')
   if (provider === 'infron') {
-    hint.textContent = 'Infron OpenAI-compatible endpoint. Common Base URL: https://llm.onerouter.pro/v1'
+    hint.textContent = 'Recommended default. Base URL: https://llm.onerouter.pro/v1'
   } else if (provider === 'openrouter') {
-    hint.textContent = 'OpenRouter OpenAI-compatible endpoint. Common Base URL: https://openrouter.ai/api/v1'
+    hint.textContent = 'Use OpenRouter models. Base URL: https://openrouter.ai/api/v1'
   } else {
-    hint.textContent = 'Use any OpenAI-compatible endpoint, model, and API key.'
+    hint.textContent = 'Use any OpenAI-compatible endpoint.'
   }
 }
 
@@ -276,11 +276,11 @@ async function fetchModels(settings: UserSettings): Promise<void> {
   const baseURL = settings.baseURL.trim()
   const baseError = apiBaseUrlError(baseURL)
   if (!baseURL || baseError) {
-    setModelFetchStatus(baseError || 'Add Base URL first.', 'error')
+    setModelFetchStatus(baseError || 'Enter a Base URL first.', 'error')
     return
   }
   button.disabled = true
-  setModelFetchStatus('Fetching models...', 'loading')
+  setModelFetchStatus('Loading models...', 'loading')
   try {
     const response = await fetch(modelsEndpoint(baseURL), {
       headers: settings.apiKey.trim()
@@ -291,13 +291,13 @@ async function fetchModels(settings: UserSettings): Promise<void> {
       throw new Error(`HTTP ${response.status}`)
     }
     const models = parseModelList(await response.json())
-    if (!models.length) throw new Error('No models returned')
+    if (!models.length) throw new Error('No models found')
     remoteModelCandidates = models
     updateModelCandidates(readForm(settings), models)
-    setModelFetchStatus(`Loaded ${models.length} models.`, 'ok')
+    setModelFetchStatus(`${models.length} models loaded.`, 'ok')
   } catch (error) {
     setModelFetchStatus(
-      `Could not fetch models: ${error instanceof Error ? error.message : String(error)}`,
+      `Model list unavailable: ${error instanceof Error ? error.message : String(error)}`,
       'error',
     )
   } finally {
@@ -313,8 +313,8 @@ function updateStyleControlStates(): void {
 }
 
 function updateEngineSummary(settings: UserSettings): void {
-  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome built-in' : 'Cloud AI model'
-  el<HTMLElement>('engineSummary').textContent = `Translation engine: ${page}`
+  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome built-in' : 'Cloud Model'
+  el<HTMLElement>('engineSummary').textContent = `Engine: ${page}`
 }
 
 function browserVersion(): string {
@@ -334,21 +334,21 @@ function renderBrowserCapability(
   action.disabled = availability === 'checking'
 
   const content = {
-    checking: ['Checking Chrome built-in translation', 'Checking the API and current language pair.'],
-    available: ['Chrome built-in translation is ready', 'The current language pair can translate on device.'],
-    downloadable: ['Language pack download required', 'Download and test it. After that, page translation can use it.'],
+    checking: ['Checking Chrome translation', 'Checking this language pair.'],
+    available: ['Chrome translation is ready', 'This language pair can translate on device.'],
+    downloadable: ['Language pack required', 'Download it before using Chrome translation.'],
     downloading: ['Downloading language pack', detail || 'Keep this page open.'],
-    unavailable: ['Current language pair is unavailable', 'Change languages or switch the translation engine to Cloud AI model.'],
+    unavailable: ['Language pair unavailable', 'Choose another target language or use Cloud Model.'],
     unsupported: [
-      'Translator API is not available in this environment',
-      `Detected Chrome/Chromium ${browserVersion()}. This feature requires desktop Chrome 138+; other Chromium browsers are not guaranteed to work.`,
+      'Chrome Translator API unavailable',
+      `Detected Chrome/Chromium ${browserVersion()}. Use desktop Chrome 138+ for built-in translation.`,
     ],
-    error: ['Check failed', detail || 'Check again. If it keeps failing, switch to Cloud AI model.'],
+    error: ['Check failed', detail || 'Try again or switch to Cloud Model.'],
   } as const
   title.textContent = content[availability][0]
   description.textContent = detail || content[availability][1]
   action.textContent =
-    availability === 'downloadable' || availability === 'downloading' ? 'Download and test' : 'Check again'
+    availability === 'downloadable' || availability === 'downloading' ? 'Download' : 'Retry'
 }
 
 async function checkBrowserCapability(prepare = false): Promise<void> {
@@ -364,7 +364,7 @@ async function checkBrowserCapability(prepare = false): Promise<void> {
       renderBrowserCapability('downloading', 'Preparing language pack...')
       const ready = await browserTranslator.prepare('en', target, (progress) => {
         if (request !== capabilityRequest) return
-        renderBrowserCapability('downloading', `Language pack download ${Math.round(progress * 100)}%`)
+        renderBrowserCapability('downloading', `Downloaded ${Math.round(progress * 100)}%`)
       })
       if (request !== capabilityRequest) return
       browserCapability = ready ? 'available' : 'unavailable'
@@ -484,7 +484,7 @@ async function init(): Promise<void> {
         el<HTMLSelectElement>('pageTranslationEngine').value = 'browser'
         syncTranslationEngineAvailability(readForm(stored))
         updateEngineSummary(readForm(stored))
-        setStatus(`Complete Cloud Model setup before selecting it: add ${missing.join(', ')}.`, false)
+        setStatus(`Complete Cloud Model setup: add ${missing.join(', ')}.`, false)
         return
       }
       await saveSettings(next)
@@ -492,18 +492,18 @@ async function init(): Promise<void> {
       fillForm(stored)
       const usesBrowser = stored.pageTranslationEngine === 'browser'
       if (usesBrowser && (browserCapability === 'unsupported' || browserCapability === 'unavailable')) {
-        setStatus('Saved, but Chrome built-in translation is unavailable. Check Chrome support or switch to Cloud AI model.', false)
+        setStatus('Saved. Chrome translation is unavailable for this language pair.', false)
       } else if (
         usesBrowser &&
         (browserCapability === 'downloadable' || browserCapability === 'downloading')
       ) {
-        setStatus('Saved · Download the language pack in Chrome support before using automatic page translation.', false)
+        setStatus('Saved. Download the Chrome language pack before auto-translation.', false)
       } else if (isConfigured(stored)) {
-        setStatus('Saved · Synced to open pages.', true)
+        setStatus('Saved. Open pages are synced.', true)
       } else if (!usesExternal) {
-        setStatus('Saved · Chrome built-in translation is ready.', true)
+        setStatus('Saved. Chrome translation is ready.', true)
       } else {
-        setStatus('Saved, but validation failed. Re-enter the API Key and save again.', false)
+        setStatus('Saved, but Cloud Model still needs a valid API key.', false)
       }
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err), false)

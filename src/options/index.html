@@ -12,12 +12,12 @@
         <img class="brand-mark" src="/icons/infron-mark.png" alt="" aria-hidden="true" />
         <div class="brand-copy">
           <strong>Infron Translate</strong>
-          <span>Translation workspace</span>
+          <span>Extension settings</span>
         </div>
       </div>
       <div class="engine-summary" aria-live="polite">
         <span class="status-dot"></span>
-        <span id="engineSummary">Reading settings</span>
+        <span id="engineSummary">Loading settings</span>
       </div>
     </header>
 
@@ -25,14 +25,14 @@
       <aside class="sidebar">
         <nav class="section-nav" aria-label="Settings sections">
           <a href="#general" class="active">Translation</a>
-          <a href="#page-translation">Page translation</a>
+          <a href="#page-translation">Page mode</a>
           <a href="#browser-runtime">Chrome support</a>
-          <a href="#external-api">Cloud model</a>
+          <a href="#external-api">Cloud Model</a>
           <a href="#site-rules">Site rules</a>
         </nav>
         <div class="sidebar-note">
-          <span>Privacy boundary</span>
-          <p>Chrome built-in translation processes text on device. Cloud AI model sends text only to the service you configure.</p>
+          <span>Privacy</span>
+          <p>Chrome stays on device. Cloud Model sends text only to your endpoint.</p>
         </div>
       </aside>
 
@@ -40,7 +40,7 @@
         <div class="content-heading">
           <p class="eyebrow">PREFERENCES</p>
           <h1>Settings</h1>
-          <p id="helpSummary">Configure translation behavior, automation, and page display.</p>
+          <p id="helpSummary">Set languages, page behavior, and cloud translation credentials.</p>
         </div>
 
         <form id="settings-form" autocomplete="off">
@@ -48,14 +48,14 @@
             <header class="section-heading">
               <div>
                 <h2>Translation</h2>
-                <p>Choose the target language and page translation behavior.</p>
+                <p>Set the default translation language.</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Target language</h3>
-                <p>The source language is detected from the current page; choose the translation language here.</p>
+                <p>Source is detected per page. Choose the default output language.</p>
               </div>
               <div class="control">
                 <label>
@@ -70,20 +70,20 @@
           <section id="page-translation" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>Page Translation</h2>
-                <p>Keep the source text, append translations below matching blocks, and continue handling dynamic content.</p>
+                <h2>Page Mode</h2>
+                <p>Choose how full-page translation runs and appears.</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Translation engine</h3>
-                <p>Chrome built-in translation is faster; Cloud AI model is better for pages that need stronger context handling.</p>
+                <p>Use Chrome for on-device speed, or Cloud Model for broader model coverage.</p>
               </div>
               <div class="control">
                 <select id="pageTranslationEngine" name="pageTranslationEngine">
-                  <option value="browser">Chrome built-in translation</option>
-                  <option value="external">Cloud AI model</option>
+                  <option value="browser">Chrome built-in</option>
+                  <option value="external">Cloud Model</option>
                 </select>
               </div>
             </div>
@@ -94,8 +94,8 @@
                   <h3>Auto-translate pages</h3>
                   <span class="small-badge">Global</span>
                 </div>
-                <p>When enabled, translations are inserted automatically on supported pages. When disabled, translate manually from the popup.</p>
-                <p class="privacy-warning">When Cloud AI model is selected, matched page text is sent to your configured service.</p>
+                <p>Translate supported pages automatically, or keep manual control in the popup.</p>
+                <p class="privacy-warning">Cloud Model sends matched page text to your configured endpoint.</p>
               </div>
               <label class="switch-control">
                 <input id="autoPageTranslation" name="autoPageTranslation" type="checkbox" />
@@ -107,7 +107,7 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Display mode</h3>
-                <p>Bilingual keeps the source text and appends translations. Translation only replaces source text directly.</p>
+                <p>Show source and translation together, or replace source text in place.</p>
               </div>
               <div class="control">
                 <select id="translationDisplayMode" name="translationDisplayMode">
@@ -120,7 +120,7 @@
             <div class="setting-row appearance-row">
               <div class="setting-copy">
                 <h3>Translation style</h3>
-                <p>Control font size, color, and formatting for full-page translations.</p>
+                <p>Adjust the appearance of inserted page translations.</p>
               </div>
               <div class="control appearance-controls">
                 <label class="number-field">
@@ -194,24 +194,24 @@
             <header class="section-heading">
               <div>
                 <h2>Chrome Built-in Support</h2>
-                <p>Runtime detection is more reliable than version checks. This uses English to your target language as a sample pair.</p>
+                <p>Check whether Chrome supports English to your target language.</p>
               </div>
             </header>
 
             <div id="browserCapability" class="capability-panel" data-state="checking">
               <span class="capability-indicator" aria-hidden="true"></span>
               <div class="capability-copy">
-                <strong id="browserCapabilityTitle">Checking Chrome built-in translation</strong>
-                <p id="browserCapabilityDescription">Checking the API and current language pair.</p>
+                <strong id="browserCapabilityTitle">Checking Chrome translation</strong>
+                <p id="browserCapabilityDescription">Checking the current language pair.</p>
               </div>
               <button type="button" id="browserCapabilityAction" class="button secondary" hidden>
                 Check again
               </button>
             </div>
             <div class="runtime-facts">
-              <div><strong>Chrome 138+</strong><span>Desktop stable support</span></div>
-              <div><strong>Per-language download</strong><span>Language packs may be needed first</span></div>
-              <div><strong>On-device processing</strong><span>Text is not sent to external models</span></div>
+              <div><strong>Chrome 138+</strong><span>Desktop Chrome required</span></div>
+              <div><strong>Language packs</strong><span>Some pairs require a download</span></div>
+              <div><strong>On device</strong><span>No external model request</span></div>
             </div>
           </section>
 
@@ -219,7 +219,7 @@
             <header class="section-heading section-heading-with-status">
               <div>
                 <h2>Cloud Model</h2>
-                <p>Configure this only when the translation engine is set to Cloud AI model.</p>
+                <p>Required only when Translation engine is set to Cloud Model.</p>
               </div>
               <div id="cloudConnectionStatus" class="connection-status warn">
                 <span class="connection-dot" aria-hidden="true"></span>
@@ -231,7 +231,7 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Provider</h3>
-                <p id="providerHint">Choose the compatible cloud provider preset.</p>
+                <p id="providerHint">Choose a provider preset, then confirm the endpoint and model.</p>
               </div>
               <div class="control">
                 <select id="provider" name="provider">
@@ -245,7 +245,7 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Endpoint</h3>
-                <p>Remote endpoints must use HTTPS. Local models may use localhost HTTP.</p>
+                <p>Use HTTPS for remote endpoints. Localhost HTTP is allowed.</p>
               </div>
               <div class="control stacked-control">
                 <label>
@@ -281,7 +281,7 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>API Key</h3>
-                <p>The key is stored in chrome.storage.local. Leaving it blank when saving keeps the existing key.</p>
+                <p>Stored in chrome.storage.local. Leave blank to keep the saved key.</p>
               </div>
               <div class="control">
                 <span class="secret-field">
@@ -301,7 +301,7 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Reasoning effort</h3>
-                <p>Translation usually does not need deep reasoning. Turning it off or lowering it reduces latency.</p>
+                <p>Lower reasoning usually improves translation speed.</p>
               </div>
               <div class="control">
                 <select id="reasoningPref" name="reasoningPref">
@@ -318,13 +318,13 @@
             <header class="section-heading">
               <div>
                 <h2>Site Rules</h2>
-                <p>Paused sites will not start page translation.</p>
+                <p>Manage sites where page translation should stay off.</p>
               </div>
             </header>
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>Paused sites</h3>
-                <p>Enter hostnames separated by commas. You can also pause the current site from the extension popup.</p>
+                <p>Use comma-separated hostnames, or pause the current site from the popup.</p>
               </div>
               <div class="control">
                 <input
