@@ -73,7 +73,7 @@ export class MeetingOverlay {
 
   private render(): void {
     if (!this.root || !this.state || !this.windowState) return
-    const { session, segments, summary, audio } = this.state
+    const { session, segments, summary, audio, transcription } = this.state
     this.root.replaceChildren()
     const style = document.createElement('style')
     style.textContent = css
@@ -148,7 +148,9 @@ export class MeetingOverlay {
       } satisfies StopMeetingAssistantMsg)
     })
     shell.querySelector<HTMLElement>('.summary-screen')?.append(renderSummary(summary))
-    shell.querySelector<HTMLElement>('.transcript-screen')?.append(renderTranscript(segments))
+    shell
+      .querySelector<HTMLElement>('.transcript-screen')
+      ?.append(renderTranscript(segments, transcription.message))
     this.root.append(style, shell)
   }
 
@@ -249,17 +251,21 @@ function renderSummary(summary: MeetingSummaryState): HTMLElement {
   return wrapper
 }
 
-function renderTranscript(segments: TranscriptSegment[]): HTMLElement {
+function renderTranscript(segments: TranscriptSegment[], transcriptionMessage: string): HTMLElement {
   const wrapper = document.createElement('div')
   wrapper.className = 'screen-inner'
   wrapper.append(titleBlock('2', 'Live Transcript', 'Original speech and translated text'))
+  const status = document.createElement('p')
+  status.className = 'transcription-status'
+  status.textContent = transcriptionMessage
+  wrapper.append(status)
   const list = document.createElement('div')
   list.className = 'transcript-list'
   const recent = segments.slice(-28)
   if (!recent.length) {
     const empty = document.createElement('p')
     empty.className = 'empty'
-    empty.textContent = 'Waiting for speech...'
+    empty.textContent = 'Waiting for real speech...'
     list.append(empty)
   }
   for (const segment of recent) {
@@ -629,6 +635,15 @@ ul {
 .empty {
   color: #64748b;
   font-size: 15px;
+}
+
+.transcription-status {
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: rgb(14 165 233 / 10%);
+  color: #075985;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 @media (max-width: 820px) {

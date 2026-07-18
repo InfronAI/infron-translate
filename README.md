@@ -32,7 +32,8 @@ The default extension UI language is Chinese. Users can switch the extension int
   - Capture microphone input when permission is granted.
   - Request current-tab meeting audio through Chrome tab capture.
   - Show two full-screen panels on the current page: meeting outline and live transcript with translations.
-  - Keep the speech-to-text and summary pipeline isolated behind a swappable runtime module.
+  - Use browser speech recognition for live microphone transcription when available.
+  - Keep the speech-to-text pipeline isolated so an external STT provider can be added for tab, desktop, or system audio.
 
 ## Installation
 
@@ -79,10 +80,11 @@ Current implementation:
 - Opens a two-panel overlay on the active webpage.
 - Uses an offscreen document for microphone and tab-audio capture setup.
 - Shows microphone and meeting-audio capture state in the overlay header.
-- Streams real-time sample transcript, translation, decisions, action items, and open questions through the same runtime channel that production transcription will use.
+- Streams real microphone transcription when browser speech recognition is available.
+- Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 
-Production speech recognition can be connected by replacing the current transcript adapter in `src/background/meeting.ts` while keeping the popup, offscreen audio setup, and overlay UI intact.
+Important current limitation: browser speech recognition reads the microphone, not arbitrary desktop/system audio. Captured tab audio is available to the offscreen document, but transcribing that stream requires an external STT adapter. That adapter can be connected in `src/background/meeting.ts` / `src/offscreen/meeting-audio.ts` while keeping the popup and overlay UI intact.
 
 ### Floating Auto-Translation Button
 
@@ -142,7 +144,8 @@ If Cloud Model is selected before it is fully configured, the extension opens th
 - Chrome built-in translation processes text on device.
 - Cloud Model sends matched page text only to the configured endpoint.
 - Meeting Assistant requests microphone and tab-audio permissions only after the user clicks the popup button.
-- The current Meeting Assistant implementation displays sample live transcript data until a production speech-to-text adapter is connected.
+- Meeting Assistant does not emit demo transcript text in real audio mode.
+- Browser speech recognition may use Chrome's speech service depending on browser/runtime support.
 - The settings page connection test can only be started from the extension settings page.
 - Paused sites do not start automatic page translation.
 - The extension does not include analytics, telemetry, or remote code.

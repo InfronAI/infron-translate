@@ -7,10 +7,18 @@ import type {
   TranscriptSegment,
 } from '../shared/meeting'
 import type {
+  MeetingAudioStatusMsg,
+  MeetingTranscriptSegmentMsg,
   HideMeetingAssistantMsg,
   MeetingAssistantUpdateMsg,
   ShowMeetingAssistantMsg,
 } from '../shared/messages'
+import { isConfigured, loadSettings } from '../shared/settings'
+import {
+  ensureCacheHydrated,
+  persistTranslationCache,
+  translateBlocksSingleFlight,
+} from './translate'
 
 const OFFSCREEN_URL = 'src/offscreen/meeting-audio.html'
 const MOCK_LINES = [
@@ -72,6 +80,14 @@ export class MeetingManager {
       segments: [],
       summary,
       audio: { microphone: false, output: false },
+      transcription: {
+        active: input.audioMode === 'mock',
+        source: input.audioMode === 'mock' ? 'mock' : 'none',
+        message:
+          input.audioMode === 'mock'
+            ? 'Demo transcript stream is running.'
+            : 'Waiting for real speech recognition from the microphone.',
+      },
     }
 
     await this.ensureOffscreen()
@@ -84,8 +100,52 @@ export class MeetingManager {
       audio: { microphone: input.audioMode !== 'tab-only', output: Boolean(outputStreamId) },
     }
     await this.showOverlay()
-    this.startMockUpdates()
+    if (input.audioMode === 'mock') this.startMockUpdates()
     return this.state.session
+  }
+
+  async updateAudioStatus(message: MeetingAudioStatusMsg): Promise<void> {
+    if (!this.state || this.state.session.id !== message.sessionId) return
+    this.state = {
+      ...this.state,
+      audio: {
+        microphone: message.microphone ?? this.state.audio.microphone,
+        output: message.output ?? this.state.audio.output,
+      },
+      transcription: message.transcription ?? this.state.transcription,
+    }
+    await this.broadcastUpdate()
+  }
+
+  async ingestTranscript(message: MeetingTranscriptSegmentMsg): Promise<void> {
+    if (!this.state || this.state.session.id !== message.sessionId) return
+    const originalText = message.originalText.trim()
+    if (!originalText) return
+    const translatedText = await this.translateTranscriptText(originalText)
+    const segment: TranscriptSegment = {
+      id: `${message.sessionId}-${message.endedAt}-${Math.random().toString(36).slice(2, 7)}`,
+      sessionId: message.sessionId,
+      channel: message.channel,
+      speakerLabel: message.speakerLabel,
+      startedAt: message.startedAt,
+      endedAt: message.endedAt,
+      sourceLang: message.sourceLang,
+      originalText,
+      translatedText,
+    }
+    const segments = [...this.state.segments, segment].slice(-120)
+    const summary = this.summarize(this.state.summary.sessionId, segments)
+    this.state = {
+      ...this.state,
+      segments,
+      summary,
+      transcription: {
+        active: true,
+        source: 'browser-speech',
+        message: 'Live microphone transcription is running.',
+      },
+    }
+    await this.broadcastUpdate()
   }
 
   async stop(): Promise<void> {
@@ -109,11 +169,11 @@ export class MeetingManager {
   private initialSummary(sessionId: string): MeetingSummaryState {
     return {
       sessionId,
-      currentTopic: 'Preparing meeting assistant',
-      outline: ['Waiting for live transcript segments.'],
+      currentTopic: 'Waiting for real meeting audio',
+      outline: ['No real transcript has been captured yet.'],
       decisions: [],
       actionItems: [],
-      openQuestions: ['Confirm microphone and meeting audio permissions.'],
+      openQuestions: ['Allow microphone permission, then speak to test live transcription.'],
       updatedAt: Date.now(),
     }
   }
@@ -153,24 +213,38 @@ export class MeetingManager {
       currentTopic:
         recent.at(-1)?.originalText.replace(/\.$/u, '') ?? 'Meeting assistant is listening',
       outline: [
-        'Scope and launch sequence are being discussed.',
-        'The assistant should keep transcript and summary panels live.',
-        'Audio permission and capture visibility are key product risks.',
-      ].slice(0, Math.max(1, Math.min(3, Math.ceil(segments.length / 2)))),
+        ...recent.map((segment) => `${segment.speakerLabel}: ${segment.originalText}`),
+      ].slice(-5),
       decisions:
-        segments.length >= 3
-          ? ['Ship the meeting assistant in focused phases.']
-          : [],
+        segments.length >= 3 ? ['Live transcript is being captured from real speech.'] : [],
       actionItems:
         segments.length >= 2
-          ? [{ task: 'Validate microphone and tab audio capture in Chrome.' }]
+          ? [{ task: 'Review transcript accuracy and connect production STT for meeting output audio.' }]
           : [],
       openQuestions:
         segments.length >= 4
-          ? ['Which STT provider should power production transcription?']
-          : ['Should the first version support tab audio only or desktop audio too?'],
+          ? ['Should desktop/system audio capture be added through a dedicated STT provider?']
+          : ['Is the microphone permission granted and receiving speech?'],
       updatedAt: Date.now(),
     }
+  }
+
+  private async translateTranscriptText(text: string): Promise<string> {
+    if (!this.state) return text
+    const settings = await loadSettings()
+    if (!isConfigured(settings)) return text
+    const sourceLang = this.state.session.sourceLang === 'auto' ? 'en' : this.state.session.sourceLang
+    const targetLang = this.state.session.targetLang
+    await ensureCacheHydrated()
+    const result = await translateBlocksSingleFlight(
+      `meeting:${this.state.session.id}`,
+      sourceLang,
+      targetLang,
+      [{ id: 'segment', tag: 'speech', text }],
+      { ...settings, targetLang },
+    )
+    if (result.translations.length) await persistTranslationCache()
+    return result.translations[0]?.translation || text
   }
 
   private async showOverlay(): Promise<void> {

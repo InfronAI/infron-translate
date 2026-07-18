@@ -51,6 +51,12 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
   ) {
     return { type: 'meeting-assistant-control-result', ok: false, error: detail }
   }
+  if (
+    message.type === 'meeting-transcript-segment' ||
+    message.type === 'meeting-audio-status'
+  ) {
+    return { type: 'meeting-internal-result', ok: false }
+  }
   return {
     type: 'background-error',
     ok: false,
@@ -176,6 +182,23 @@ function isLanguageCode(value: unknown): value is string {
   return typeof value === 'string' && (value === 'auto' || /^[a-z]{2,3}$/u.test(value))
 }
 
+function isMeetingChannel(value: unknown): value is 'microphone' | 'meeting-output' {
+  return value === 'microphone' || value === 'meeting-output'
+}
+
+function isMeetingTranscription(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.active === 'boolean' &&
+    typeof value.message === 'string' &&
+    value.message.length <= 500 &&
+    (value.source === 'browser-speech' ||
+      value.source === 'external-stt' ||
+      value.source === 'mock' ||
+      value.source === 'none')
+  )
+}
+
 /** Runtime validation prevents internal pages from turning the worker into an unbounded fetch proxy. */
 function isToBackground(value: unknown): value is ToBackground {
   if (!isRecord(value) || typeof value.type !== 'string') return false
@@ -209,6 +232,30 @@ function isToBackground(value: unknown): value is ToBackground {
     return value.sessionId === undefined || typeof value.sessionId === 'string'
   }
   if (value.type === 'get-meeting-assistant-state') return true
+  if (value.type === 'meeting-transcript-segment') {
+    return (
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length <= 128 &&
+      isMeetingChannel(value.channel) &&
+      typeof value.speakerLabel === 'string' &&
+      value.speakerLabel.length <= 80 &&
+      typeof value.sourceLang === 'string' &&
+      value.sourceLang.length <= 64 &&
+      typeof value.originalText === 'string' &&
+      value.originalText.length <= 20_000 &&
+      typeof value.startedAt === 'number' &&
+      typeof value.endedAt === 'number'
+    )
+  }
+  if (value.type === 'meeting-audio-status') {
+    return (
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length <= 128 &&
+      (value.microphone === undefined || typeof value.microphone === 'boolean') &&
+      (value.output === undefined || typeof value.output === 'boolean') &&
+      (value.transcription === undefined || isMeetingTranscription(value.transcription))
+    )
+  }
   if (value.type === 'translate-batch') {
     if (
       typeof value.pageKey !== 'string' ||
@@ -312,6 +359,16 @@ async function handle(
 
   if (message.type === 'get-meeting-assistant-state') {
     return { type: 'meeting-assistant-state', state: meetingManager.getState() }
+  }
+
+  if (message.type === 'meeting-audio-status') {
+    await meetingManager.updateAudioStatus(message)
+    return { type: 'meeting-internal-result', ok: true }
+  }
+
+  if (message.type === 'meeting-transcript-segment') {
+    await meetingManager.ingestTranscript(message)
+    return { type: 'meeting-internal-result', ok: true }
   }
 
   if (message.type === 'translate-batch') {

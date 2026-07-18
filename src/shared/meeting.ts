@@ -51,4 +51,9 @@ export type MeetingRuntimeState = MeetingUpdatePayload & {
     microphone: boolean
     output: boolean
   }
+  transcription: {
+    active: boolean
+    source: 'browser-speech' | 'external-stt' | 'mock' | 'none'
+    message: string
+  }
 }

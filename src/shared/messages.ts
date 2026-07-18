@@ -1,6 +1,7 @@
 import type { UserSettings } from './settings-defaults'
 import type {
   MeetingAudioMode,
+  MeetingChannel,
   MeetingRuntimeState,
   MeetingSession,
   MeetingUpdatePayload,
@@ -123,6 +124,25 @@ export type StopMeetingAssistantMsg = {
 
 export type GetMeetingAssistantStateMsg = { type: 'get-meeting-assistant-state' }
 
+export type MeetingTranscriptSegmentMsg = {
+  type: 'meeting-transcript-segment'
+  sessionId: string
+  channel: MeetingChannel
+  speakerLabel: string
+  sourceLang: string
+  originalText: string
+  startedAt: number
+  endedAt: number
+}
+
+export type MeetingAudioStatusMsg = {
+  type: 'meeting-audio-status'
+  sessionId: string
+  microphone?: boolean
+  output?: boolean
+  transcription?: MeetingRuntimeState['transcription']
+}
+
 export type MeetingAssistantControlResult =
   | { type: 'meeting-assistant-control-result'; ok: true; session: MeetingSession }
   | { type: 'meeting-assistant-control-result'; ok: false; error: string }
@@ -144,6 +164,8 @@ export type MeetingAssistantUpdateMsg = {
 
 export type HideMeetingAssistantMsg = { type: 'hide-meeting-assistant' }
 
+export type MeetingInternalResult = { type: 'meeting-internal-result'; ok: boolean }
+
 export type BackgroundErrorResult = {
   type: 'background-error'
   ok: false
@@ -159,6 +181,8 @@ export type ToBackground =
   | StartMeetingAssistantMsg
   | StopMeetingAssistantMsg
   | GetMeetingAssistantStateMsg
+  | MeetingTranscriptSegmentMsg
+  | MeetingAudioStatusMsg
   | OpenOptionsMsg
   | TestConnectionMsg
 export type FromBackground =
@@ -167,6 +191,7 @@ export type FromBackground =
   | SettingsMsg
   | MeetingAssistantControlResult
   | MeetingAssistantStateResult
+  | MeetingInternalResult
   | TestConnectionResult
   | BackgroundErrorResult
   | { type: 'open-options-result'; ok: boolean }
