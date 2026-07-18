@@ -126,10 +126,12 @@ const OPTIONS_COPY = {
     reasoning: '推理强度',
     reasoningHelp: '较低推理强度通常能提升翻译速度。',
     asrTitle: '会议转录',
-    asrHelp: '配置会议助手实时音频转录使用的 ASR SSE 接口。',
-    asrEndpoint: '转录接口 Endpoint',
-    asrEndpointHelp: '用于音频转录的 SSE 接口地址，默认使用 StepFun ASR。',
-    asrEndpointLabel: 'Endpoint',
+    asrHelp: '配置会议助手实时音频转录使用的 ASR WebSocket 连接。',
+    asrEndpoint: 'WebSocket 连接',
+    asrEndpointHelp: '用于实时全双工音频转录的 WebSocket 地址，默认使用 StepFun ASR Stream。',
+    asrEndpointLabel: 'WebSocket',
+    asrModel: '转录模型',
+    asrModelHelp: '用于实时 ASR 的模型，默认使用 StepFun 推荐的 stream 模型。',
     asrApiKey: '转录 API Key',
     asrApiKeyHelp: '仅用于会议助手音频转录。保存时留空会保留已保存的密钥。',
     asrApiKeyPlaceholder: 'StepFun API Key',
@@ -251,10 +253,12 @@ const OPTIONS_COPY = {
     reasoning: 'Reasoning effort',
     reasoningHelp: 'Lower reasoning usually improves translation speed.',
     asrTitle: 'Meeting Transcription',
-    asrHelp: 'Configure the ASR SSE endpoint used by Meeting Assistant live audio transcription.',
-    asrEndpoint: 'Transcription Endpoint',
-    asrEndpointHelp: 'SSE endpoint for audio transcription. StepFun ASR is used by default.',
-    asrEndpointLabel: 'Endpoint',
+    asrHelp: 'Configure the ASR WebSocket connection used by Meeting Assistant live audio transcription.',
+    asrEndpoint: 'WebSocket Connection',
+    asrEndpointHelp: 'WebSocket URL for realtime full-duplex audio transcription. StepFun ASR Stream is used by default.',
+    asrEndpointLabel: 'WebSocket',
+    asrModel: 'Transcription Model',
+    asrModelHelp: 'Model used for realtime ASR. The recommended StepFun stream model is used by default.',
     asrApiKey: 'Transcription API Key',
     asrApiKeyHelp: 'Used only for Meeting Assistant audio transcription. Leave blank when saving to keep the saved key.',
     asrApiKeyPlaceholder: 'StepFun API Key',
@@ -387,6 +391,7 @@ function fillForm(s: UserSettings): void {
     : OPTIONS_COPY[s.uiLanguage].apiKeyPlaceholder
   el<HTMLInputElement>('model').value = s.model
   el<HTMLInputElement>('asrEndpoint').value = s.asrEndpoint
+  el<HTMLInputElement>('asrModel').value = s.asrModel
   el<HTMLInputElement>('asrApiKey').value = s.asrApiKey
   el<HTMLInputElement>('asrApiKey').placeholder = s.asrApiKey
     ? OPTIONS_COPY[s.uiLanguage].savedKeyPlaceholder
@@ -436,6 +441,7 @@ function readForm(stored: UserSettings): UserSettings {
     model: el<HTMLInputElement>('model').value.trim(),
     asrEndpoint:
       el<HTMLInputElement>('asrEndpoint').value.trim() || DEFAULT_SETTINGS.asrEndpoint,
+    asrModel: el<HTMLInputElement>('asrModel').value.trim() || DEFAULT_SETTINGS.asrModel,
     asrApiKey,
     uiLanguage: el<HTMLSelectElement>('uiLanguage').value as UserSettings['uiLanguage'],
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
@@ -685,6 +691,7 @@ function applyStaticI18n(settings: UserSettings): void {
     [copy.apiKey, copy.apiKeyHelp],
     [copy.reasoning, copy.reasoningHelp],
     [copy.asrEndpoint, copy.asrEndpointHelp],
+    [copy.asrModel, copy.asrModelHelp],
     [copy.asrApiKey, copy.asrApiKeyHelp],
     [copy.pausedSites, copy.pausedHelp],
   ] as const
@@ -703,11 +710,15 @@ function applyStaticI18n(settings: UserSettings): void {
   const labels = document.querySelectorAll<HTMLElement>('label > span')
   for (const node of labels) {
     if (node.id === 'uiLanguageLabel') continue
+    if (node.id === 'asrModelLabel') {
+      node.textContent = copy.asrModel
+      continue
+    }
     const text = node.textContent ?? ''
     if (/Target language|目标语言/u.test(text)) node.textContent = uiText(lang, 'targetLanguage')
     else if (/Font size|字号/u.test(text)) node.textContent = copy.fontSize
     else if (/Base URL|基础 URL/u.test(text)) node.textContent = copy.baseUrl
-    else if (/Endpoint/u.test(text)) node.textContent = copy.asrEndpointLabel
+    else if (/Endpoint|WebSocket/u.test(text)) node.textContent = copy.asrEndpointLabel
     else if (/Model/u.test(text)) node.textContent = copy.model
   }
   const colorLabels = document.querySelectorAll<HTMLElement>('.color-option > span')
@@ -923,7 +934,7 @@ async function init(): Promise<void> {
     })
   }
 
-  for (const id of ['asrEndpoint', 'asrApiKey']) {
+  for (const id of ['asrEndpoint', 'asrModel', 'asrApiKey']) {
     el<HTMLInputElement>(id).addEventListener('input', () => {
       updateEngineSummary(readForm(stored))
     })

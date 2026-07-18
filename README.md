@@ -83,10 +83,10 @@ Current implementation:
 - Provides a Pre-meeting Material entry in the overlay for agenda, goals, planned strategy, risks, and expected outcomes.
 - Cross-checks the live transcript against the pre-meeting material throughout the call.
 - Shows context alignment in the live summary panel, including plan status, completed goals, unmet goals, evidence, and course-correction suggestions.
-- Automatically streams microphone audio chunks to the configured ASR SSE endpoint.
-- Automatically streams captured system-audio chunks to the configured ASR SSE endpoint.
-- Defaults to StepFun ASR SSE at `https://api.stepfun.com/v1/audio/asr/sse` with the `stepaudio-2.5-asr` model.
-- Sends 16 kHz mono `pcm_s16le` audio chunks and reads streamed transcript events.
+- Streams microphone audio to the configured ASR WebSocket endpoint.
+- Streams captured system audio to the configured ASR WebSocket endpoint.
+- Defaults to StepFun ASR Stream at `wss://api.stepfun.com/v1/realtime/asr/stream` with the `stepaudio-2.5-asr-stream` model.
+- Sends 16 kHz mono `pcm_s16le` audio and reads realtime delta/completed transcript events.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 

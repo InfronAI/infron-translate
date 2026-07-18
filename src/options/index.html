@@ -335,25 +335,44 @@
             <header class="section-heading">
               <div>
                 <h2>会议转录</h2>
-                <p>配置会议助手实时音频转录使用的 ASR SSE 接口。</p>
+                <p>配置会议助手实时音频转录使用的 ASR WebSocket 连接。</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>转录接口 Endpoint</h3>
-                <p>用于音频转录的 SSE 接口地址，默认使用 StepFun ASR。</p>
+                <h3>WebSocket 连接</h3>
+                <p>用于实时全双工音频转录的 WebSocket 地址，默认使用 StepFun ASR Stream。</p>
               </div>
               <div class="control">
                 <label>
-                  <span>Endpoint</span>
+                  <span>WebSocket</span>
                   <input
                     id="asrEndpoint"
                     name="asrEndpoint"
                     type="text"
                     inputmode="url"
                     spellcheck="false"
-                    placeholder="https://api.stepfun.com/v1/audio/asr/sse"
+                    placeholder="wss://api.stepfun.com/v1/realtime/asr/stream"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-copy">
+                <h3>转录模型</h3>
+                <p>用于实时 ASR 的模型，默认使用 StepFun 推荐的 stream 模型。</p>
+              </div>
+              <div class="control">
+                <label>
+                  <span id="asrModelLabel">Model</span>
+                  <input
+                    id="asrModel"
+                    name="asrModel"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="stepaudio-2.5-asr-stream"
                   />
                 </label>
               </div>

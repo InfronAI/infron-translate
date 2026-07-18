@@ -1,7 +1,7 @@
 import type { MeetingSession } from '../shared/meeting'
 import type { MeetingAudioChunkMsg, MeetingAudioStatusMsg } from '../shared/messages'
 
-const AUDIO_CHUNK_MS = 2000
+const AUDIO_CHUNK_MS = 500
 
 type InternalMeetingAudioStartMsg = {
   type: 'meeting-audio-start'
@@ -82,7 +82,7 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
       source: 'none',
       message:
         session.audioMode === 'tab-only'
-          ? 'Tab audio is captured. StepFun ASR transcription will start when audio chunks are available.'
+          ? 'Tab audio is captured. StepFun ASR Stream will receive audio in realtime.'
           : 'Click Start mic in the visible Meeting Assistant window to begin real microphone transcription.',
     },
   })

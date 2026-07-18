@@ -37,8 +37,15 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ['storage', 'tabs', 'scripting', 'offscreen', 'tabCapture'],
-  host_permissions: ['http://*/*', 'https://*/*'],
+  permissions: [
+    'storage',
+    'tabs',
+    'scripting',
+    'offscreen',
+    'tabCapture',
+    'declarativeNetRequestWithHostAccess',
+  ],
+  host_permissions: ['http://*/*', 'https://*/*', 'wss://api.stepfun.com/*'],
   web_accessible_resources: [
     {
       resources: ['icons/infron-mark.png', 'worklets/pcm-capture.js'],

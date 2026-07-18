@@ -28,6 +28,15 @@ export type TranscriptSegment = {
   translatedText: string
 }
 
+export type TranscriptPartial = {
+  channel: MeetingChannel
+  speakerLabel: string
+  sourceLang: string
+  text: string
+  startedAt: number
+  updatedAt: number
+}
+
 export type MeetingSummaryState = {
   sessionId: string
   currentTopic: string
@@ -67,6 +76,7 @@ export type MeetingRuntimeState = MeetingUpdatePayload & {
     microphoneLabel: string
     outputLabel: string
   }
+  partials: Partial<Record<MeetingChannel, TranscriptPartial>>
   transcription: {
     active: boolean
     source: 'browser-speech' | 'external-stt' | 'mock' | 'none'

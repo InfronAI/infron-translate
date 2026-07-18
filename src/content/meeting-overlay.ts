@@ -3,6 +3,7 @@ import type {
   MeetingRuntimeState,
   MeetingSummaryState,
   MeetingUiLanguage,
+  TranscriptPartial,
   TranscriptSegment,
 } from '../shared/meeting'
 import type {
@@ -16,7 +17,7 @@ import type {
 const HOST_ID = 'infron-meeting-assistant-root'
 const MIN_WIDTH = 520
 const MIN_HEIGHT = 360
-const AUDIO_CHUNK_MS = 2000
+const AUDIO_CHUNK_MS = 500
 
 type MeetingWindowState = {
   x: number
@@ -198,7 +199,7 @@ export class MeetingOverlay {
   private render(): void {
     if (!this.root || !this.state || !this.windowState) return
     this.capturePaneScroll()
-    const { session, segments, summary, audio, transcription } = this.state
+    const { session, segments, partials, summary, audio, transcription } = this.state
     const copy = MEETING_COPY[session.uiLanguage]
     const micLabel = audio.microphoneLabel || 'Default microphone'
     const outputLabel = audio.outputLabel || 'Current Chrome tab audio'
@@ -337,7 +338,7 @@ export class MeetingOverlay {
       ?.append(renderSummary(summary, this.state.contextAlignment, copy))
     shell
       .querySelector<HTMLElement>('.transcript-screen')
-      ?.append(renderTranscript(segments, transcription.message, copy))
+      ?.append(renderTranscript(segments, Object.values(partials), transcription.message, copy))
     this.root.append(style, shell)
     this.restorePaneScroll()
   }
@@ -481,8 +482,8 @@ export class MeetingOverlay {
         source: 'external-stt',
         message:
           session.uiLanguage === 'zh'
-            ? '麦克风正在通过 StepFun ASR 转录。'
-            : 'Microphone transcription is streaming to StepFun ASR.',
+            ? '麦克风正在通过 StepFun ASR Stream 实时转录。'
+            : 'Microphone transcription is streaming through StepFun ASR Stream.',
       })
       this.render()
       return
@@ -885,6 +886,7 @@ function renderAlignment(alignment: MeetingContextAlignment, copy: MeetingCopy):
 
 function renderTranscript(
   segments: TranscriptSegment[],
+  partials: TranscriptPartial[],
   transcriptionMessage: string,
   copy: MeetingCopy,
 ): HTMLElement {
@@ -897,7 +899,7 @@ function renderTranscript(
   wrapper.append(status)
   const list = document.createElement('div')
   list.className = 'transcript-list'
-  if (!segments.length) {
+  if (!segments.length && !partials.length) {
     const empty = document.createElement('p')
     empty.className = 'empty'
     empty.textContent = copy.waitingSpeech
@@ -913,6 +915,19 @@ function renderTranscript(
       </div>
       <p class="original">${escapeHtml(segment.originalText)}</p>
       <p class="translated">${escapeHtml(segment.translatedText)}</p>
+    `
+    list.append(item)
+  }
+  for (const partial of partials.filter((item) => item.text.trim())) {
+    const item = document.createElement('div')
+    item.className = `segment partial ${partial.channel}`
+    item.innerHTML = `
+      <div class="segment-head">
+        <strong>${escapeHtml(partial.speakerLabel)}</strong>
+        <span>${timeLabel(partial.updatedAt)}</span>
+      </div>
+      <p class="original">${escapeHtml(partial.text)}</p>
+      <p class="translated">${copy.liveTranscript === '实时转录' ? '正在识别...' : 'Recognizing...'}</p>
     `
     list.append(item)
   }
@@ -1622,6 +1637,16 @@ ul {
 
 .segment.microphone {
   background: #e8f6ef;
+}
+
+.segment.partial {
+  border-style: dashed;
+  box-shadow: inset 3px 0 0 rgb(23 105 224 / 34%);
+}
+
+.segment.partial .translated {
+  color: #64748b;
+  font-weight: 620;
 }
 
 .segment-head {
