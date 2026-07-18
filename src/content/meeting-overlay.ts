@@ -151,17 +151,19 @@ export class MeetingOverlay {
         <div class="status">
           <span class="badge ${session.status === 'listening' ? 'ok' : ''}">${statusLabel(session.status)}</span>
           <span class="badge ${audio.microphone ? 'ok' : ''}">Mic</span>
-          <span class="badge ${audio.output ? 'ok' : ''}">Meeting audio</span>
-          <button class="window-btn mic-toggle" type="button">${this.recognition ? 'Stop mic' : 'Start mic'}</button>
-          <button class="window-btn minimize" type="button" aria-label="Send Meeting Assistant to background">Background</button>
-          <button class="window-btn focus" type="button" aria-label="Focus Meeting Assistant">Focus</button>
-          <button class="window-btn close" type="button" aria-label="Close Meeting Assistant">Close</button>
+          <span class="badge ${audio.output ? 'ok' : ''}">System audio</span>
+          <div class="toolbar" role="group" aria-label="Meeting Assistant controls">
+            <button class="window-btn primary mic-toggle" type="button">${this.recognition ? 'Stop mic' : 'Start mic'}</button>
+            <button class="window-btn minimize" type="button" aria-label="Send Meeting Assistant to background">Background</button>
+            <button class="window-btn focus" type="button" aria-label="Focus Meeting Assistant">Focus</button>
+            <button class="window-btn close" type="button" aria-label="Close Meeting Assistant">Close</button>
+          </div>
         </div>
       </header>
       <main class="screens">
         <section class="audio-meters">
-          ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel)}
-          ${meterHtml('Webpage audio', audio.output, audio.outputLevel)}
+          ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel, 'Local microphone signal')}
+          ${meterHtml('System audio input', audio.output, audio.outputLevel, 'Audio captured from the active Chrome tab')}
         </section>
         <article class="screen summary-screen"></article>
         <article class="screen transcript-screen"></article>
@@ -458,17 +460,22 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
-function meterHtml(label: string, enabled: boolean, level: number): string {
+function meterHtml(label: string, enabled: boolean, level: number, caption: string): string {
   const percent = Math.round(clamp(level, 0, 1) * 100)
+  const tone = percent >= 55 ? 'hot' : percent >= 18 ? 'live' : 'quiet'
   return `
-    <div class="meter">
+    <div class="meter ${enabled ? 'enabled' : ''} ${tone}">
       <div class="meter-head">
-        <span>${escapeHtml(label)}</span>
+        <div>
+          <span class="meter-label"><i aria-hidden="true"></i>${escapeHtml(label)}</span>
+          <small>${escapeHtml(caption)}</small>
+        </div>
         <strong>${enabled ? `${percent}%` : 'Off'}</strong>
       </div>
       <div class="meter-track" aria-hidden="true">
         <span style="width: ${enabled ? percent : 0}%"></span>
       </div>
+      <div class="meter-scale" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     </div>
   `
 }
@@ -739,14 +746,25 @@ h2 {
   color: #047857;
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid rgb(15 23 42 / 7%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 48%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 62%);
+}
+
 .window-btn {
   border: 0;
-  border-radius: 10px;
-  padding: 7px 12px;
-  background: rgb(15 23 42 / 8%);
+  border-radius: 9px;
+  padding: 7px 10px;
+  background: transparent;
   color: #334155;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -754,18 +772,33 @@ h2 {
 
 .window-btn:hover {
   transform: translateY(-1px);
-  background: rgb(15 118 110 / 12%);
+  background: rgb(15 118 110 / 10%);
   color: #0f766e;
 }
 
-.window-btn.close {
-  background: #111827;
+.window-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.window-btn.primary {
+  background: #0f766e;
   color: #fff;
+  box-shadow: 0 8px 18px rgb(15 118 110 / 20%);
+}
+
+.window-btn.primary:hover {
+  background: #115e59;
+  color: #fff;
+  box-shadow: 0 10px 22px rgb(15 118 110 / 26%);
+}
+
+.window-btn.close {
+  color: #991b1b;
 }
 
 .window-btn.close:hover {
-  background: #0f766e;
-  box-shadow: 0 10px 22px rgb(15 118 110 / 26%);
+  background: rgb(220 38 38 / 10%);
+  color: #b91c1c;
 }
 
 .dock {
@@ -820,36 +853,73 @@ h2 {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .meter {
-  padding: 10px 12px;
-  border: 1px solid rgb(15 23 42 / 7%);
-  border-radius: 13px;
-  background: rgb(255 255 255 / 58%);
+  position: relative;
+  padding: 12px;
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 72%), rgb(248 250 252 / 62%));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 72%);
 }
 
 .meter-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 7px;
+  margin-bottom: 10px;
   color: #475569;
-  font-size: 12px;
-  font-weight: 700;
+}
+
+.meter-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.meter-label i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgb(148 163 184 / 14%);
+}
+
+.meter.enabled .meter-label i {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 16%), 0 0 14px rgb(16 185 129 / 38%);
+}
+
+.meter-head small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .meter-head strong {
   color: #0f766e;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .meter-track {
-  height: 7px;
+  height: 11px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(148 163 184 / 18%);
+  background:
+    linear-gradient(90deg, rgb(15 23 42 / 8%), rgb(15 23 42 / 5%));
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 12%);
 }
 
 .meter-track span {
@@ -858,7 +928,25 @@ h2 {
   min-width: 2px;
   border-radius: inherit;
   background: linear-gradient(90deg, #14b8a6, #22c55e);
+  box-shadow: 0 0 16px rgb(20 184 166 / 28%);
   transition: width 0.18s ease;
+}
+
+.meter.hot .meter-track span {
+  background: linear-gradient(90deg, #22c55e, #f59e0b);
+}
+
+.meter-scale {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.meter-scale span {
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(100 116 139 / 18%);
 }
 
 .screen {
