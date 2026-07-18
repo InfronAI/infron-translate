@@ -1,6 +1,8 @@
 import type { MeetingSession } from '../shared/meeting'
 import type { MeetingAudioChunkMsg, MeetingAudioStatusMsg } from '../shared/messages'
 
+const AUDIO_CHUNK_MS = 2000
+
 type InternalMeetingAudioStartMsg = {
   type: 'meeting-audio-start'
   session: MeetingSession
@@ -167,7 +169,7 @@ async function startOutputRecorder(session: MeetingSession, stream: MediaStream)
   pcmSilentGain.connect(audioContext.destination)
   pcmTimer = globalThis.setInterval(() => {
     const endedAt = Date.now()
-    const startedAt = chunkStartedAt || endedAt - 4000
+    const startedAt = chunkStartedAt || endedAt - AUDIO_CHUNK_MS
     chunkStartedAt = endedAt
     maxLevelSinceChunk = 0
     const bytes = mergePcmBuffers(pcmBuffers)
@@ -183,7 +185,7 @@ async function startOutputRecorder(session: MeetingSession, stream: MediaStream)
       startedAt,
       endedAt,
     })
-  }, 4000)
+  }, AUDIO_CHUNK_MS)
 }
 
 async function ensurePcmWorklet(context: AudioContext): Promise<void> {

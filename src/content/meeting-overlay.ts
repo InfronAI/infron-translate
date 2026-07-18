@@ -16,6 +16,7 @@ import type {
 const HOST_ID = 'infron-meeting-assistant-root'
 const MIN_WIDTH = 520
 const MIN_HEIGHT = 360
+const AUDIO_CHUNK_MS = 2000
 
 type MeetingWindowState = {
   x: number
@@ -38,6 +39,11 @@ type DragState = {
   startY: number
   windowX: number
   windowY: number
+}
+
+type PaneScrollState = {
+  top: number
+  stickToBottom: boolean
 }
 
 type MeetingCopy = (typeof MEETING_COPY)[MeetingUiLanguage]
@@ -148,6 +154,11 @@ export class MeetingOverlay {
   private maxMicLevelSinceChunk = 0
   private contextEditorOpen = false
   private contextDraft = ''
+  private paneScroll = new Map<string, PaneScrollState>()
+  private micLifecycleListenersAttached = false
+  private readonly resumeMicCapture = (): void => {
+    void this.ensureMicCaptureAlive()
+  }
 
   show(state: MeetingRuntimeState): void {
     this.state = state
@@ -164,6 +175,7 @@ export class MeetingOverlay {
 
   hide(): void {
     this.stopLocalSpeechRecognition()
+    this.detachMicLifecycleListeners()
     this.host?.remove()
     this.host = null
     this.root = null
@@ -185,6 +197,7 @@ export class MeetingOverlay {
 
   private render(): void {
     if (!this.root || !this.state || !this.windowState) return
+    this.capturePaneScroll()
     const { session, segments, summary, audio, transcription } = this.state
     const copy = MEETING_COPY[session.uiLanguage]
     const micLabel = audio.microphoneLabel || 'Default microphone'
@@ -312,10 +325,12 @@ export class MeetingOverlay {
       this.render()
     })
     shell.querySelector<HTMLButtonElement>('.traffic.close')?.addEventListener('click', () => {
+      const sessionId = session.id
       void chrome.runtime.sendMessage({
         type: 'stop-meeting-assistant',
-        sessionId: session.id,
+        sessionId,
       } satisfies StopMeetingAssistantMsg)
+      this.hide()
     })
     shell
       .querySelector<HTMLElement>('.summary-screen')
@@ -324,6 +339,30 @@ export class MeetingOverlay {
       .querySelector<HTMLElement>('.transcript-screen')
       ?.append(renderTranscript(segments, transcription.message, copy))
     this.root.append(style, shell)
+    this.restorePaneScroll()
+  }
+
+  private capturePaneScroll(): void {
+    if (!this.root) return
+    for (const pane of ['summary', 'transcript']) {
+      const element = this.root.querySelector<HTMLElement>(`.${pane}-screen`)
+      if (!element) continue
+      const distanceFromBottom = element.scrollHeight - element.clientHeight - element.scrollTop
+      this.paneScroll.set(pane, {
+        top: element.scrollTop,
+        stickToBottom: distanceFromBottom < 48,
+      })
+    }
+  }
+
+  private restorePaneScroll(): void {
+    if (!this.root) return
+    for (const pane of ['summary', 'transcript']) {
+      const element = this.root.querySelector<HTMLElement>(`.${pane}-screen`)
+      const state = this.paneScroll.get(pane)
+      if (!element || !state) continue
+      element.scrollTop = state.stickToBottom ? element.scrollHeight : state.top
+    }
   }
 
   private focusWindow(): void {
@@ -436,6 +475,7 @@ export class MeetingOverlay {
       await this.startMicLevelMeter(session.id)
       await this.startMicRecorder(session.id, session.sourceLang)
       this.recognitionShouldRun = true
+      this.attachMicLifecycleListeners()
       await this.sendAudioStatus({
         active: true,
         source: 'external-stt',
@@ -454,6 +494,7 @@ export class MeetingOverlay {
 
   private stopLocalSpeechRecognition(): void {
     this.recognitionShouldRun = false
+    this.detachMicLifecycleListeners()
     this.stopMicLevelMeter()
     if (this.state) {
       void chrome.runtime.sendMessage({
@@ -569,6 +610,7 @@ export class MeetingOverlay {
 
   private async startMicRecorder(sessionId: string, sourceLang: string): Promise<void> {
     if (!this.micStream || !this.micAudioContext) return
+    await this.resumeMicAudioContext()
     this.micPcmBuffers = []
     this.micChunkStartedAt = Date.now()
     this.micAudioSource ??= this.micAudioContext.createMediaStreamSource(this.micStream)
@@ -587,8 +629,9 @@ export class MeetingOverlay {
     this.micPcmWorklet.connect(this.micPcmSilentGain)
     this.micPcmSilentGain.connect(this.micAudioContext.destination)
     this.micPcmTimer = globalThis.setInterval(() => {
+      void this.ensureMicCaptureAlive()
       const endedAt = Date.now()
-      const startedAt = this.micChunkStartedAt || endedAt - 4000
+      const startedAt = this.micChunkStartedAt || endedAt - AUDIO_CHUNK_MS
       this.micChunkStartedAt = endedAt
       const shouldSend = this.maxMicLevelSinceChunk > 0.025
       this.maxMicLevelSinceChunk = 0
@@ -605,7 +648,7 @@ export class MeetingOverlay {
         startedAt,
         endedAt,
       })
-    }, 4000)
+    }, AUDIO_CHUNK_MS)
   }
 
   private async sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
@@ -619,6 +662,53 @@ export class MeetingOverlay {
 
   private isMicActive(): boolean {
     return Boolean(this.micPcmWorklet)
+  }
+
+  private attachMicLifecycleListeners(): void {
+    if (this.micLifecycleListenersAttached) return
+    this.micLifecycleListenersAttached = true
+    document.addEventListener('visibilitychange', this.resumeMicCapture)
+    window.addEventListener('focus', this.resumeMicCapture)
+    window.addEventListener('pageshow', this.resumeMicCapture)
+  }
+
+  private detachMicLifecycleListeners(): void {
+    if (!this.micLifecycleListenersAttached) return
+    this.micLifecycleListenersAttached = false
+    document.removeEventListener('visibilitychange', this.resumeMicCapture)
+    window.removeEventListener('focus', this.resumeMicCapture)
+    window.removeEventListener('pageshow', this.resumeMicCapture)
+  }
+
+  private async ensureMicCaptureAlive(): Promise<void> {
+    if (!this.recognitionShouldRun || !this.state) return
+    const hasLiveTrack = this.micStream?.getAudioTracks().some((track) => track.readyState === 'live')
+    const shouldRestart =
+      !hasLiveTrack || !this.micPcmWorklet || !this.micPcmTimer || this.micAudioContext?.state === 'closed'
+    if (shouldRestart) {
+      this.stopMicLevelMeter()
+      await this.startMicLevelMeter(this.state.session.id)
+      await this.startMicRecorder(this.state.session.id, this.state.session.sourceLang)
+      await this.sendAudioStatus({
+        active: true,
+        source: 'external-stt',
+        message:
+          this.state.session.uiLanguage === 'zh'
+            ? '麦克风转录已恢复。'
+            : 'Microphone transcription resumed.',
+      })
+      return
+    }
+    await this.resumeMicAudioContext()
+  }
+
+  private async resumeMicAudioContext(): Promise<void> {
+    if (!this.micAudioContext || this.micAudioContext.state === 'running') return
+    try {
+      await this.micAudioContext.resume()
+    } catch {
+      // Chrome may reject resume while the page is still hidden; the next focus/visibility event retries.
+    }
   }
 
   private micInputLabel(): string {
@@ -807,14 +897,13 @@ function renderTranscript(
   wrapper.append(status)
   const list = document.createElement('div')
   list.className = 'transcript-list'
-  const recent = segments.slice(-28)
-  if (!recent.length) {
+  if (!segments.length) {
     const empty = document.createElement('p')
     empty.className = 'empty'
     empty.textContent = copy.waitingSpeech
     list.append(empty)
   }
-  for (const segment of recent) {
+  for (const segment of segments) {
     const item = document.createElement('div')
     item.className = `segment ${segment.channel}`
     item.innerHTML = `
@@ -940,33 +1029,40 @@ const css = `
 }
 
 .traffic-lights {
-  gap: 8px;
+  gap: 2px;
   flex: 0 0 auto;
-  padding: 0 2px;
+  padding: 0;
   cursor: default;
 }
 
 .traffic {
   all: unset;
   position: relative;
-  width: 13px;
-  height: 13px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.traffic::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
   border-radius: 999px;
   box-shadow:
     inset 0 0 0 1px rgb(15 23 42 / 10%),
     inset 0 1px 0 rgb(255 255 255 / 52%);
-  cursor: pointer;
 }
 
-.traffic.close {
+.traffic.close::before {
   background: #ff5f57;
 }
 
-.traffic.minimize {
+.traffic.minimize::before {
   background: #febc2e;
 }
 
-.traffic.maximize {
+.traffic.maximize::before {
   background: #28c840;
 }
 
@@ -1379,20 +1475,22 @@ ul {
 .screen {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid #dfe3e8;
   border-radius: 16px;
   background: rgb(255 255 255 / 72%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 72%);
+  scrollbar-gutter: stable;
 }
 
 .screen-inner {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 18px;
-  overflow: auto;
 }
 
 .title-block {

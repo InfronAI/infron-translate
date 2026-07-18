@@ -25,6 +25,8 @@ import {
 import { transcribeAudioChunk } from './stt'
 
 const OFFSCREEN_URL = 'src/offscreen/meeting-audio.html'
+const STT_QUEUE_LIMIT = 60
+const TRANSCRIPT_HISTORY_LIMIT = 500
 const MOCK_LINES = [
   {
     channel: 'meeting-output',
@@ -170,7 +172,7 @@ export class MeetingManager {
       originalText,
       translatedText,
     }
-    const segments = [...this.state.segments, segment].slice(-120)
+    const segments = [...this.state.segments, segment].slice(-TRANSCRIPT_HISTORY_LIMIT)
     const summary = this.summarize(this.state.summary.sessionId, segments)
     const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
     this.state = {
@@ -206,7 +208,7 @@ export class MeetingManager {
     })
     const queue = this.sttQueues.get(key) ?? []
     queue.push(message)
-    while (queue.length > 4) queue.shift()
+    while (queue.length > STT_QUEUE_LIMIT) queue.shift()
     this.sttQueues.set(key, queue)
     if (this.sttInFlight.has(key)) {
       await this.updateAudioStatus({
@@ -430,7 +432,7 @@ export class MeetingManager {
       originalText: line.originalText,
       translatedText: line.translatedText,
     }
-    const segments = [...this.state.segments, segment].slice(-80)
+    const segments = [...this.state.segments, segment].slice(-TRANSCRIPT_HISTORY_LIMIT)
     const summary = this.summarize(this.state.summary.sessionId, segments)
     const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
     this.state = { ...this.state, segments, summary, contextAlignment }

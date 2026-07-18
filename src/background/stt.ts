@@ -1,6 +1,7 @@
 import type { UserSettings } from '../shared/settings-defaults'
 
 const STEPFUN_ASR_MODEL = 'stepaudio-2.5-asr'
+const STT_REQUEST_TIMEOUT_MS = 20_000
 
 export type SttResult =
   | { ok: true; text: string }
@@ -29,7 +30,7 @@ export async function transcribeAudioChunk(input: {
     const response = await fetch(endpoint, {
       method: 'POST',
       redirect: 'error',
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(STT_REQUEST_TIMEOUT_MS),
       headers: {
         Accept: 'text/event-stream',
         Authorization: `Bearer ${input.settings.asrApiKey.trim()}`,
@@ -84,6 +85,16 @@ async function parseStepFunSse(response: Response): Promise<SttResult> {
   let deltaText = ''
   let doneText = ''
 
+  const handleEvent = (rawEvent: string): SttResult | null => {
+    const parsed = parseSseEvent(rawEvent)
+    if (parsed.type === 'error') {
+      return { ok: false, error: stringValue(parsed.message) || 'StepFun ASR returned an error event' }
+    }
+    if (parsed.type === 'transcript.text.delta') deltaText += stringValue(parsed.delta)
+    if (parsed.type === 'transcript.text.done') doneText = stringValue(parsed.text)
+    return null
+  }
+
   while (true) {
     const { done, value } = await reader.read()
     if (value) buffer += decoder.decode(value, { stream: !done })
@@ -92,27 +103,33 @@ async function parseStepFunSse(response: Response): Promise<SttResult> {
     while (boundary >= 0) {
       const rawEvent = buffer.slice(0, boundary)
       buffer = buffer.slice(boundary + 2)
-      const parsed = parseSseEvent(rawEvent)
-      if (parsed.type === 'error') {
-        return { ok: false, error: stringValue(parsed.message) || 'StepFun ASR returned an error event' }
-      }
-      if (parsed.type === 'transcript.text.delta') deltaText += stringValue(parsed.delta)
-      if (parsed.type === 'transcript.text.done') doneText = stringValue(parsed.text)
+      const result = handleEvent(rawEvent)
+      if (result) return result
       boundary = buffer.indexOf('\n\n')
     }
     if (done) break
   }
 
   if (buffer.trim()) {
-    const parsed = parseSseEvent(buffer)
-    if (parsed.type === 'error') {
-      return { ok: false, error: stringValue(parsed.message) || 'StepFun ASR returned an error event' }
+    const events = splitBufferedSseEvents(buffer)
+    for (const rawEvent of events) {
+      const result = handleEvent(rawEvent)
+      if (result) return result
     }
-    if (parsed.type === 'transcript.text.done') doneText = stringValue(parsed.text)
-    if (parsed.type === 'transcript.text.delta') deltaText += stringValue(parsed.delta)
   }
 
-  return { ok: true, text: doneText || deltaText }
+  return { ok: true, text: doneText.length >= deltaText.length ? doneText : deltaText }
+}
+
+function splitBufferedSseEvents(buffer: string): string[] {
+  const lines = buffer
+    .split(/\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const dataLines = lines.filter((line) => line.startsWith('data:'))
+  if (dataLines.length > 1) return dataLines
+  if (dataLines.length === 1) return [buffer]
+  return lines.filter((line) => line.startsWith('{')).map((line) => `data: ${line}`)
 }
 
 async function responseErrorDetail(response: Response): Promise<string> {
