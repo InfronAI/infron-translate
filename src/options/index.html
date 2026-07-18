@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Infron Translate 设置</title>
+    <title>Infron Translate Settings</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -12,54 +12,54 @@
         <img class="brand-mark" src="/icons/infron-mark.png" alt="" aria-hidden="true" />
         <div class="brand-copy">
           <strong>Infron Translate</strong>
-          <span>翻译工作台</span>
+          <span>Translation workspace</span>
         </div>
       </div>
       <div class="engine-summary" aria-live="polite">
         <span class="status-dot"></span>
-        <span id="engineSummary">正在读取配置</span>
+        <span id="engineSummary">Reading settings</span>
       </div>
     </header>
 
     <div class="workspace">
       <aside class="sidebar">
-        <nav class="section-nav" aria-label="设置分区">
-          <a href="#general" class="active">基础翻译</a>
-          <a href="#page-translation">整页翻译</a>
-          <a href="#browser-runtime">Chrome 能力</a>
-          <a href="#external-api">外部模型</a>
-          <a href="#site-rules">网站管理</a>
+        <nav class="section-nav" aria-label="Settings sections">
+          <a href="#general" class="active">Translation</a>
+          <a href="#page-translation">Page translation</a>
+          <a href="#browser-runtime">Chrome support</a>
+          <a href="#external-api">Cloud model</a>
+          <a href="#site-rules">Site rules</a>
         </nav>
         <div class="sidebar-note">
-          <span>隐私边界</span>
-          <p>Chrome 内置模式在设备侧处理文本。云端 AI 模型只发送到你配置的服务。</p>
+          <span>Privacy boundary</span>
+          <p>Chrome built-in translation processes text on device. Cloud AI model sends text only to the service you configure.</p>
         </div>
       </aside>
 
       <main class="content">
         <div class="content-heading">
           <p class="eyebrow">PREFERENCES</p>
-          <h1>设置</h1>
-          <p id="helpSummary">配置翻译方式、自动行为和页面呈现。</p>
+          <h1>Settings</h1>
+          <p id="helpSummary">Configure translation behavior, automation, and page display.</p>
         </div>
 
         <form id="settings-form" autocomplete="off">
           <section id="general" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>基础翻译</h2>
-                <p>控制目标语言和整页翻译行为。</p>
+                <h2>Translation</h2>
+                <p>Choose the target language and page translation behavior.</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>目标语言</h3>
-                <p>原文语言会从当前网页自动检测；这里只选择译文语言。</p>
+                <h3>Target language</h3>
+                <p>The source language is detected from the current page; choose the translation language here.</p>
               </div>
               <div class="control">
                 <label>
-                  <span>目标语言</span>
+                  <span>Target language</span>
                   <select id="targetLang" name="targetLang"></select>
                 </label>
               </div>
@@ -70,20 +70,20 @@
           <section id="page-translation" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>整页翻译</h2>
-                <p>保留原文，在对应文本块下追加译文，并持续处理动态内容。</p>
+                <h2>Page Translation</h2>
+                <p>Keep the source text, append translations below matching blocks, and continue handling dynamic content.</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>翻译引擎</h3>
-                <p>Chrome 内置速度更快；云端 AI 模型适合需要更强上下文理解的页面。</p>
+                <h3>Translation engine</h3>
+                <p>Chrome built-in translation is faster; Cloud AI model is better for pages that need stronger context handling.</p>
               </div>
               <div class="control">
                 <select id="pageTranslationEngine" name="pageTranslationEngine">
-                  <option value="browser">Chrome 内置翻译</option>
-                  <option value="external">云端 AI 模型</option>
+                  <option value="browser">Chrome built-in translation</option>
+                  <option value="external">Cloud AI model</option>
                 </select>
               </div>
             </div>
@@ -91,40 +91,40 @@
             <div class="setting-row emphasized-row">
               <div class="setting-copy">
                 <div class="title-with-badge">
-                  <h3>自动翻译网页</h3>
-                  <span class="small-badge">全局</span>
+                  <h3>Auto-translate pages</h3>
+                  <span class="small-badge">Global</span>
                 </div>
-                <p>开启后会在支持的网页自动插入译文；关闭后可在弹窗中手动点击翻译。</p>
-                <p class="privacy-warning">选择云端 AI 模型时，匹配到的页面文本会自动发送到所配置服务。</p>
+                <p>When enabled, translations are inserted automatically on supported pages. When disabled, translate manually from the popup.</p>
+                <p class="privacy-warning">When Cloud AI model is selected, matched page text is sent to your configured service.</p>
               </div>
               <label class="switch-control">
                 <input id="autoPageTranslation" name="autoPageTranslation" type="checkbox" />
                 <span class="switch-track" aria-hidden="true"></span>
-                <span class="switch-label">启用</span>
+                <span class="switch-label">Enabled</span>
               </label>
             </div>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>翻译偏好</h3>
-                <p>双语对照会保留原文并追加译文；仅译文会直接用译文替换原文。</p>
+                <h3>Display mode</h3>
+                <p>Bilingual keeps the source text and appends translations. Translation only replaces source text directly.</p>
               </div>
               <div class="control">
                 <select id="translationDisplayMode" name="translationDisplayMode">
-                  <option value="bilingual">双语对照</option>
-                  <option value="translation-only">仅译文</option>
+                  <option value="bilingual">Bilingual</option>
+                  <option value="translation-only">Translation only</option>
                 </select>
               </div>
             </div>
 
             <div class="setting-row appearance-row">
               <div class="setting-copy">
-                <h3>译文样式</h3>
-                <p>控制整页翻译中文字的字号、颜色和字形。</p>
+                <h3>Translation style</h3>
+                <p>Control font size, color, and formatting for full-page translations.</p>
               </div>
               <div class="control appearance-controls">
                 <label class="number-field">
-                  <span>字号</span>
+                  <span>Font size</span>
                   <span class="number-control">
                     <input
                       id="pageTranslationFontSizePx"
@@ -137,16 +137,16 @@
                     <span>px</span>
                   </span>
                 </label>
-                <div class="format-controls" aria-label="文字格式">
-                  <label class="format-choice" title="加粗">
+                <div class="format-controls" aria-label="Text formatting">
+                  <label class="format-choice" title="Bold">
                     <input id="pageTranslationBold" name="pageTranslationBold" type="checkbox" />
                     <span><strong>B</strong></span>
                   </label>
-                  <label class="format-choice" title="斜体">
+                  <label class="format-choice" title="Italic">
                     <input id="pageTranslationItalic" name="pageTranslationItalic" type="checkbox" />
                     <span><i>I</i></span>
                   </label>
-                  <label class="format-choice" title="下划线">
+                  <label class="format-choice" title="Underline">
                     <input
                       id="pageTranslationUnderline"
                       name="pageTranslationUnderline"
@@ -162,12 +162,12 @@
                       name="pageTranslationUseCustomColor"
                       type="checkbox"
                     />
-                    <span>自定义文字色</span>
+                    <span>Custom text color</span>
                     <input
                       id="pageTranslationTextColor"
                       name="pageTranslationTextColor"
                       type="color"
-                      aria-label="译文文字颜色"
+                      aria-label="Translation text color"
                     />
                   </label>
                   <label class="color-option">
@@ -176,12 +176,12 @@
                       name="pageTranslationUseBackground"
                       type="checkbox"
                     />
-                    <span>显示背景色</span>
+                    <span>Show background color</span>
                     <input
                       id="pageTranslationBackgroundColor"
                       name="pageTranslationBackgroundColor"
                       type="color"
-                      aria-label="译文背景颜色"
+                      aria-label="Translation background color"
                     />
                   </label>
                 </div>
@@ -193,56 +193,56 @@
           <section id="browser-runtime" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>Chrome 内置能力</h2>
-                <p>运行时检测比版本号更可靠；此处用英文到目标语言作为语言包样例。</p>
+                <h2>Chrome Built-in Support</h2>
+                <p>Runtime detection is more reliable than version checks. This uses English to your target language as a sample pair.</p>
               </div>
             </header>
 
             <div id="browserCapability" class="capability-panel" data-state="checking">
               <span class="capability-indicator" aria-hidden="true"></span>
               <div class="capability-copy">
-                <strong id="browserCapabilityTitle">正在检测 Chrome 内置翻译</strong>
-                <p id="browserCapabilityDescription">正在检查 API 和当前语言对。</p>
+                <strong id="browserCapabilityTitle">Checking Chrome built-in translation</strong>
+                <p id="browserCapabilityDescription">Checking the API and current language pair.</p>
               </div>
               <button type="button" id="browserCapabilityAction" class="button secondary" hidden>
-                重新检测
+                Check again
               </button>
             </div>
             <div class="runtime-facts">
-              <div><strong>Chrome 138+</strong><span>桌面正式版支持</span></div>
-              <div><strong>按语言对下载</strong><span>首次使用需要语言包</span></div>
-              <div><strong>设备侧处理</strong><span>文本不发送到外部模型</span></div>
+              <div><strong>Chrome 138+</strong><span>Desktop stable support</span></div>
+              <div><strong>Per-language download</strong><span>Language packs may be needed first</span></div>
+              <div><strong>On-device processing</strong><span>Text is not sent to external models</span></div>
             </div>
           </section>
 
           <section id="external-api" class="settings-section">
             <header class="section-heading section-heading-with-status">
               <div>
-                <h2>外部模型</h2>
-                <p>用于云端 AI 模型文本翻译。</p>
+                <h2>Cloud Model</h2>
+                <p>Configure this only when the translation engine is set to Cloud AI model.</p>
               </div>
-              <span id="configBadge" class="config-badge warn">检测中</span>
+              <span id="configBadge" class="config-badge warn">Checking</span>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>服务商</h3>
-                <p id="providerHint">根据 Base URL 和模型自动识别兼容参数。</p>
+                <h3>Provider</h3>
+                <p id="providerHint">Auto-detect provider parameters from the endpoint and model.</p>
               </div>
               <div class="control">
                 <select id="provider" name="provider">
-                  <option value="auto">自动识别</option>
-                  <option value="openai">OpenAI / 通用兼容</option>
+                  <option value="auto">Auto detect</option>
+                  <option value="openai">OpenAI / Generic compatible</option>
                   <option value="deepseek">DeepSeek</option>
-                  <option value="stepfun">StepFun 阶跃星辰</option>
+                  <option value="stepfun">StepFun</option>
                 </select>
               </div>
             </div>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>接口地址</h3>
-                <p>远程地址必须使用 HTTPS；本地模型可使用 localhost HTTP。</p>
+                <h3>Endpoint</h3>
+                <p>Remote endpoints must use HTTPS. Local models may use localhost HTTP.</p>
               </div>
               <div class="control stacked-control">
                 <label>
@@ -257,7 +257,7 @@
                   />
                 </label>
                 <label>
-                  <span>模型</span>
+                  <span>Model</span>
                   <input id="model" name="model" type="text" placeholder="gpt-4o-mini" spellcheck="false" />
                 </label>
               </div>
@@ -266,14 +266,14 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <h3>API Key</h3>
-                <p>密钥保存在 chrome.storage.local；留空保存会保留已有密钥。</p>
+                <p>The key is stored in chrome.storage.local. Leaving it blank when saving keeps the existing key.</p>
               </div>
               <div class="control">
                 <input
                   id="apiKey"
                   name="apiKey"
                   type="password"
-                  placeholder="sk-... 或供应商密钥"
+                  placeholder="sk-... or provider key"
                   autocomplete="off"
                   spellcheck="false"
                 />
@@ -282,25 +282,25 @@
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>推理强度</h3>
-                <p>翻译通常不需要深度推理，关闭或降低可减少等待。</p>
+                <h3>Reasoning effort</h3>
+                <p>Translation usually does not need deep reasoning. Turning it off or lowering it reduces latency.</p>
               </div>
               <div class="control">
                 <select id="reasoningPref" name="reasoningPref">
-                  <option value="off">关闭 / 最低</option>
-                  <option value="low">低</option>
-                  <option value="medium">中</option>
-                  <option value="high">高</option>
+                  <option value="off">Off / lowest</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
                 </select>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>连通性测试</h3>
-                <p>使用当前填写的接口、模型和密钥发送一次最小请求，验证是否可用。</p>
+                <h3>Connection test</h3>
+                <p>Verify the current endpoint, model, and key.</p>
               </div>
               <div class="control test-connection-control">
-                <button type="button" id="testConnection" class="button secondary">测试连接</button>
+                <button type="button" id="testConnection" class="button secondary">Test connection</button>
                 <span id="testConnectionStatus" class="test-connection-status" role="status" aria-live="polite"></span>
               </div>
             </div>
@@ -309,14 +309,14 @@
           <section id="site-rules" class="settings-section">
             <header class="section-heading">
               <div>
-                <h2>网站管理</h2>
-                <p>暂停的网站不会启动整页翻译。</p>
+                <h2>Site Rules</h2>
+                <p>Paused sites will not start page translation.</p>
               </div>
             </header>
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>暂停名单</h3>
-                <p>输入主机名并用逗号分隔，也可在扩展弹窗中暂停当前网站。</p>
+                <h3>Paused sites</h3>
+                <p>Enter hostnames separated by commas. You can also pause the current site from the extension popup.</p>
               </div>
               <div class="control">
                 <input
@@ -332,8 +332,8 @@
           <div class="actionbar">
             <span id="status" class="save-status" role="status" aria-live="polite"></span>
             <div class="action-buttons">
-              <button type="button" id="reset" class="button secondary">恢复默认</button>
-              <button type="submit" id="save" class="button primary">保存设置</button>
+              <button type="button" id="reset" class="button secondary">Reset defaults</button>
+              <button type="submit" id="save" class="button primary">Save settings</button>
             </div>
           </div>
         </form>

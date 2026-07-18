@@ -268,19 +268,19 @@ export async function translateAllBlocks(
 
 export type ConnectionTestResult = { ok: true } | { ok: false; error: string }
 
-/** Turn a raw upstream error/status into an actionable Chinese message for the options UI. */
+/** Turn a raw upstream error/status into an actionable message for the options UI. */
 function describeUpstreamError(error: string, status?: number): string {
-  if (status === 401 || status === 403) return `鉴权失败（HTTP ${status}）：请检查 API Key 是否正确。`
-  if (status === 404) return 'HTTP 404：接口地址或模型名可能不正确。'
-  if (status === 429) return 'HTTP 429：请求过于频繁或额度不足，请稍后再试。'
-  if (status !== undefined && status >= 500) return `上游服务异常（HTTP ${status}），请稍后再试。`
-  if (error === 'request timed out') return '请求超时：请检查网络或接口地址是否可达。'
+  if (status === 401 || status === 403) return `Authentication failed (HTTP ${status}). Check the API Key.`
+  if (status === 404) return 'HTTP 404: the endpoint or model name may be incorrect.'
+  if (status === 429) return 'HTTP 429: too many requests or insufficient quota. Try again later.'
+  if (status !== undefined && status >= 500) return `Upstream service error (HTTP ${status}). Try again later.`
+  if (error === 'request timed out') return 'Request timed out. Check the network or endpoint.'
   return error
 }
 
 /**
  * Fire one minimal translation request to verify the endpoint, key, and model.
- * Used by the options page's “测试连接” button; never writes to the cache.
+ * Used by the options page's "Test connection" button; never writes to the cache.
  */
 export async function testConnection(settings: UserSettings): Promise<ConnectionTestResult> {
   const userPrompt = buildTranslateUserPrompt('en', settings.targetLang, [
@@ -306,13 +306,13 @@ export async function testConnection(settings: UserSettings): Promise<Connection
   }
   try {
     const parsed = parseTranslateBatchResult(JSON.parse(result.content), new Set(['t0']))
-    if (!parsed.ok) return { ok: false, error: `响应格式无效：${parsed.error}` }
+    if (!parsed.ok) return { ok: false, error: `Invalid response format: ${parsed.error}` }
     const translation = parsed.items.find((item) => item.id === 't0')?.translation.trim()
     return translation
       ? { ok: true }
-      : { ok: false, error: '响应格式无效：未返回测试翻译' }
+      : { ok: false, error: 'Invalid response format: no test translation returned' }
   } catch {
-    return { ok: false, error: '响应格式无效：模型未返回有效 JSON' }
+    return { ok: false, error: 'Invalid response format: model did not return valid JSON' }
   }
 }
 

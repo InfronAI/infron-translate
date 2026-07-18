@@ -21,7 +21,7 @@ export type ProviderPreset = {
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   {
     id: 'openai',
-    label: 'OpenAI / 通用兼容',
+    label: 'OpenAI / Generic compatible',
     baseURL: 'https://api.openai.com/v1',
     modelHint: 'gpt-4o-mini',
     hostHints: ['api.openai.com', 'openai.com'],
@@ -37,7 +37,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'stepfun',
-    label: 'StepFun 阶跃星辰',
+    label: 'StepFun',
     baseURL: 'https://api.stepfun.com/v1',
     modelHint: 'step-3.5-flash',
     hostHints: ['stepfun.com', 'stepfun.ai', 'api.stepfun.com', 'api.stepfun.ai'],
@@ -125,12 +125,12 @@ export function applyProviderRequestBody(
 export function reasoningPrefLabel(p: ReasoningPref): string {
   switch (p) {
     case 'off':
-      return '关闭 / 最低（推荐·快）'
+      return 'Off / lowest (recommended, fast)'
     case 'low':
-      return '低'
+      return 'Low'
     case 'medium':
-      return '中'
+      return 'Medium'
     case 'high':
-      return '高（慢）'
+      return 'High (slower)'
   }
 }

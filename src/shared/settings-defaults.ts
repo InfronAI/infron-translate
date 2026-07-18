@@ -184,12 +184,12 @@ export function apiBaseUrlError(baseURL: string): string | null {
   try {
     url = new URL(baseURL)
   } catch {
-    return 'Base URL 格式无效'
+    return 'Base URL is invalid'
   }
-  if (url.username || url.password) return 'Base URL 不得包含用户名或密码'
+  if (url.username || url.password) return 'Base URL must not include a username or password'
   if (url.protocol === 'https:') return null
   if (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname)) return null
-  return '远程 Base URL 必须使用 HTTPS'
+  return 'Remote Base URL must use HTTPS'
 }
 
 export function isConfigured(settings: UserSettings): boolean {
@@ -213,6 +213,6 @@ export function missingConfigFields(settings: UserSettings): string[] {
     if (baseUrlError) missing.push(baseUrlError)
   }
   if (!(settings.apiKey?.trim() ?? '')) missing.push('API Key')
-  if (!(settings.model?.trim() ?? '')) missing.push('模型')
+  if (!(settings.model?.trim() ?? '')) missing.push('Model')
   return missing
 }

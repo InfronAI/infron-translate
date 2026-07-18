@@ -111,7 +111,7 @@ describe('chatCompletionsJson', () => {
       useJsonSchema: false,
     })
 
-    expect(result).toEqual({ ok: false, error: '远程 Base URL 必须使用 HTTPS' })
+    expect(result).toEqual({ ok: false, error: 'Remote Base URL must use HTTPS' })
     expect(fetch).not.toHaveBeenCalled()
   })
 

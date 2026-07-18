@@ -358,12 +358,27 @@ h1 {
   background: var(--accent-press);
 }
 
-.tip {
-  margin: 0;
-  font-size: 0.74rem;
-  line-height: 1.4;
+.inline-config {
+  width: fit-content;
+  margin: -2px 0 0 calc(4.8em + 12px);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--warn);
-  padding: 0 0.4rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.inline-config:hover {
+  text-decoration: underline;
+}
+
+.inline-config[hidden] {
+  display: none;
 }
 
 .error {

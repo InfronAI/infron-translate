@@ -54,7 +54,7 @@ function setLanguageValue(id: 'targetLang', value: string): void {
   if (![...select.options].some((option) => option.value === value)) {
     const option = document.createElement('option')
     option.value = value
-    option.textContent = `自定义 · ${value}`
+    option.textContent = `Custom · ${value}`
     select.append(option)
   }
   select.value = value
@@ -65,8 +65,8 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('baseURL').value = s.baseURL
   el<HTMLInputElement>('apiKey').value = s.apiKey
   el<HTMLInputElement>('apiKey').placeholder = s.apiKey
-    ? '已保存（留空再保存可保留原 Key）'
-    : 'sk-... 或供应商密钥'
+    ? 'Saved (leave blank when saving to keep the current key)'
+    : 'sk-... or provider key'
   el<HTMLInputElement>('model').value = s.model
   el<HTMLSelectElement>('reasoningPref').value = s.reasoningPref
   setLanguageValue('targetLang', s.targetLang)
@@ -149,7 +149,7 @@ function isTestConnectionResult(value: unknown): value is TestConnectionResult {
 async function runConnectionTest(settings: UserSettings): Promise<void> {
   const button = el<HTMLButtonElement>('testConnection')
   button.disabled = true
-  setTestStatus('正在测试连接…', 'testing')
+  setTestStatus('Testing connection...', 'testing')
   try {
     const response: unknown = await chrome.runtime.sendMessage({
       type: 'test-connection',
@@ -160,13 +160,13 @@ async function runConnectionTest(settings: UserSettings): Promise<void> {
       reasoningPref: settings.reasoningPref,
     })
     if (isTestConnectionResult(response) && response.ok) {
-      setTestStatus('连接成功 · 接口可正常翻译', 'ok')
+      setTestStatus('Connection successful · translation endpoint is available', 'ok')
     } else {
-      const error = isTestConnectionResult(response) && !response.ok ? response.error : '未知错误'
-      setTestStatus(`连接失败：${error}`, 'error')
+      const error = isTestConnectionResult(response) && !response.ok ? response.error : 'Unknown error'
+      setTestStatus(`Connection failed: ${error}`, 'error')
     }
   } catch (err) {
-    setTestStatus(`连接失败：${err instanceof Error ? err.message : String(err)}`, 'error')
+    setTestStatus(`Connection failed: ${err instanceof Error ? err.message : String(err)}`, 'error')
   } finally {
     button.disabled = false
   }
@@ -175,11 +175,10 @@ async function runConnectionTest(settings: UserSettings): Promise<void> {
 function updateConfigBadge(s: UserSettings): void {
   const badge = el<HTMLElement>('configBadge')
   if (isConfigured(s)) {
-    badge.textContent = '状态：已配置 ✓'
+    badge.textContent = 'Configured'
     badge.className = 'config-badge ok'
   } else {
-    const miss = missingConfigFields(s).join('、')
-    badge.textContent = `状态：未完成（缺少 ${miss || '配置'}）`
+    badge.textContent = 'Setup required'
     badge.className = 'config-badge warn'
   }
 }
@@ -188,15 +187,14 @@ function updateProviderHint(provider: string): void {
   const hint = el<HTMLElement>('providerHint')
   if (provider === 'deepseek') {
     hint.textContent =
-      'DeepSeek：默认写入 thinking.type=disabled（关思考）。Base 常用 https://api.deepseek.com'
+      'Uses thinking.type=disabled by default. Common Base URL: https://api.deepseek.com'
   } else if (provider === 'stepfun') {
     hint.textContent =
-      'StepFun：默认 reasoning_effort=low（最低推理）。Base 常用 https://api.stepfun.com/v1 或 https://api.stepfun.ai/v1'
+      'Uses reasoning_effort=low by default. Common Base URL: https://api.stepfun.com/v1'
   } else if (provider === 'openai') {
-    hint.textContent = '通用 OpenAI 兼容接口，不附加特殊思考参数。'
+    hint.textContent = 'Generic OpenAI-compatible endpoint.'
   } else {
-    hint.textContent =
-      '自动识别 Base URL / 模型：DeepSeek 关 thinking；StepFun 用 reasoning_effort=low。'
+    hint.textContent = 'Auto-detect provider parameters from the endpoint and model.'
   }
 }
 
@@ -208,12 +206,12 @@ function updateStyleControlStates(): void {
 }
 
 function updateEngineSummary(settings: UserSettings): void {
-  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '云端 AI 模型'
-  el<HTMLElement>('engineSummary').textContent = `翻译引擎：${page}`
+  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome built-in' : 'Cloud AI model'
+  el<HTMLElement>('engineSummary').textContent = `Translation engine: ${page}`
 }
 
 function browserVersion(): string {
-  return navigator.userAgent.match(/(?:Chrome|Chromium)\/(\d+)/u)?.[1] ?? '未知'
+  return navigator.userAgent.match(/(?:Chrome|Chromium)\/(\d+)/u)?.[1] ?? 'unknown'
 }
 
 function renderBrowserCapability(
@@ -229,21 +227,21 @@ function renderBrowserCapability(
   action.disabled = availability === 'checking'
 
   const content = {
-    checking: ['正在检测 Chrome 内置翻译', '正在检查 API 和当前语言对。'],
-    available: ['Chrome 内置翻译已就绪', '当前语言对可直接在设备侧翻译。'],
-    downloadable: ['需要下载语言包', '点击下载并测试；完成后可用于网页自动双语。'],
-    downloading: ['语言包正在下载', detail || '请保持此页面打开。'],
-    unavailable: ['当前语言对不可用', '可更换语言代码，或将对应翻译引擎切换为云端 AI 模型。'],
+    checking: ['Checking Chrome built-in translation', 'Checking the API and current language pair.'],
+    available: ['Chrome built-in translation is ready', 'The current language pair can translate on device.'],
+    downloadable: ['Language pack download required', 'Download and test it. After that, page translation can use it.'],
+    downloading: ['Downloading language pack', detail || 'Keep this page open.'],
+    unavailable: ['Current language pair is unavailable', 'Change languages or switch the translation engine to Cloud AI model.'],
     unsupported: [
-      '当前环境未提供 Translator API',
-      `检测到 Chrome/Chromium ${browserVersion()}。该能力要求桌面版 Chrome 138+，其他 Chromium 浏览器不保证支持。`,
+      'Translator API is not available in this environment',
+      `Detected Chrome/Chromium ${browserVersion()}. This feature requires desktop Chrome 138+; other Chromium browsers are not guaranteed to work.`,
     ],
-    error: ['检测失败', detail || '请重新检测；持续失败时可改用云端 AI 模型。'],
+    error: ['Check failed', detail || 'Check again. If it keeps failing, switch to Cloud AI model.'],
   } as const
   title.textContent = content[availability][0]
   description.textContent = detail || content[availability][1]
   action.textContent =
-    availability === 'downloadable' || availability === 'downloading' ? '下载并测试' : '重新检测'
+    availability === 'downloadable' || availability === 'downloading' ? 'Download and test' : 'Check again'
 }
 
 async function checkBrowserCapability(prepare = false): Promise<void> {
@@ -254,10 +252,10 @@ async function checkBrowserCapability(prepare = false): Promise<void> {
     browserCapability = await browserTranslator.availability('en', target)
     if (request !== capabilityRequest) return
     if (prepare && (browserCapability === 'downloadable' || browserCapability === 'downloading')) {
-      renderBrowserCapability('downloading', '准备语言包…')
+      renderBrowserCapability('downloading', 'Preparing language pack...')
       const ready = await browserTranslator.prepare('en', target, (progress) => {
         if (request !== capabilityRequest) return
-        renderBrowserCapability('downloading', `语言包下载进度 ${Math.round(progress * 100)}%`)
+        renderBrowserCapability('downloading', `Language pack download ${Math.round(progress * 100)}%`)
       })
       if (request !== capabilityRequest) return
       browserCapability = ready ? 'available' : 'unavailable'
@@ -337,13 +335,13 @@ async function init(): Promise<void> {
     e.preventDefault()
     try {
       const next = readForm(stored)
-      const usesExternal = true
+      const usesExternal = next.pageTranslationEngine === 'external'
       const missing = usesExternal ? missingConfigFields(next) : []
       if (missing.length) {
         await saveSettings(next)
         stored = await loadSettings()
         fillForm(stored)
-        setStatus(`已保存，但尚未完成配置：请填写 ${missing.join('、')}`, false)
+        setStatus(`Saved, but Cloud AI model is incomplete: add ${missing.join(', ')}.`, false)
         return
       }
       await saveSettings(next)
@@ -351,18 +349,18 @@ async function init(): Promise<void> {
       fillForm(stored)
       const usesBrowser = stored.pageTranslationEngine === 'browser'
       if (usesBrowser && (browserCapability === 'unsupported' || browserCapability === 'unavailable')) {
-        setStatus('已保存，但当前 Chrome 内置翻译不可用；请查看能力诊断或改用云端 AI 模型。', false)
+        setStatus('Saved, but Chrome built-in translation is unavailable. Check Chrome support or switch to Cloud AI model.', false)
       } else if (
         usesBrowser &&
         (browserCapability === 'downloadable' || browserCapability === 'downloading')
       ) {
-        setStatus('已保存 · 使用网页自动双语前，请先在 Chrome 能力区下载语言包。', false)
+        setStatus('Saved · Download the language pack in Chrome support before using automatic page translation.', false)
       } else if (isConfigured(stored)) {
-        setStatus('已保存 · 已同步到打开的网页。', true)
+        setStatus('Saved · Synced to open pages.', true)
       } else if (!usesExternal) {
-        setStatus('已保存 · Chrome 内置翻译已就绪。', true)
+        setStatus('Saved · Chrome built-in translation is ready.', true)
       } else {
-        setStatus('保存后校验失败，请重新填写 API Key 并保存。', false)
+        setStatus('Saved, but validation failed. Re-enter the API Key and save again.', false)
       }
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err), false)
@@ -374,7 +372,7 @@ async function init(): Promise<void> {
   })
 
   el<HTMLButtonElement>('reset').addEventListener('click', async () => {
-    if (!confirm('确定恢复默认？API Key 会被清空。')) return
+    if (!confirm('Reset defaults? This will clear the API Key.')) return
     await saveSettings({ ...DEFAULT_SETTINGS })
     location.reload()
   })

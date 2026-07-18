@@ -3,7 +3,6 @@ import {
   isConfigured,
   loadSettings,
   saveSettings,
-  missingConfigFields,
   type TranslationEngine,
   type UserSettings,
 } from '../shared/settings'
@@ -37,7 +36,7 @@ function hostnameFromUrl(url: string | undefined): string {
 function populateLanguageSelects(): void {
   const source = el<HTMLSelectElement>('sourceLangSelect')
   source.replaceChildren(
-    option('auto', '自动检测'),
+    option('auto', 'Auto detect'),
     ...LANGUAGE_OPTIONS.map(([code, name]) => option(code, `${name} · ${code}`)),
   )
 
@@ -66,7 +65,7 @@ function setLanguageSelectValue(id: string, value: string, fallback: string): vo
   const select = el<HTMLSelectElement>(id)
   const nextValue = value || fallback
   if (![...select.options].some((item) => item.value === nextValue)) {
-    select.append(option(nextValue, `自定义 · ${nextValue}`))
+    select.append(option(nextValue, `Custom · ${nextValue}`))
   }
   select.value = nextValue
 }
@@ -78,31 +77,31 @@ function renderStatus(settings: UserSettings): void {
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
   el<HTMLElement>('pageAutoDesc').textContent = settings.autoPageTranslation
-    ? '开启：进入网页后自动翻译'
-    : '关闭：点击按钮后翻译'
+    ? 'On: translate pages automatically'
+    : 'Off: translate after clicking the button'
 
   el<HTMLElement>('modeHint').textContent =
-    settings.translationDisplayMode === 'translation-only' ? '整页仅译文' : '整页双语对照'
+    settings.translationDisplayMode === 'translation-only'
+      ? 'Full-page translation only'
+      : 'Full-page bilingual'
 
-  const tip = el<HTMLElement>('unconfiguredTip')
-  const needsExternal = true
-  if (configured || !needsExternal) {
-    tip.hidden = true
-  } else {
-    tip.hidden = false
-    const miss = missingConfigFields(settings)
-    tip.textContent = miss.length
-      ? `尚未配置完整：请填写 ${miss.join('、')}`
-      : '尚未配置 API，请打开设置填写并保存。'
-  }
+  const configureCloudModel = el<HTMLButtonElement>('configureCloudModel')
+  const needsExternal = settings.pageTranslationEngine === 'external'
+  configureCloudModel.hidden = configured || !needsExternal
 
   el<HTMLElement>('usageHint').textContent =
     settings.translationDisplayMode === 'translation-only'
-      ? '使用下方按钮将当前网页替换为译文。'
-      : '使用下方按钮切换整页双语对照翻译。'
+      ? 'Use the button below to replace page text with translations.'
+      : 'Use the button below to toggle full-page bilingual translation.'
   setSourceLanguageValue(settings.sourceLang)
   setTargetLanguageValue(settings.targetLang)
   el<HTMLSelectElement>('displayModeSelect').value = settings.translationDisplayMode
+}
+
+async function openExternalConfigIfNeeded(settings: UserSettings): Promise<boolean> {
+  if (settings.pageTranslationEngine !== 'external' || isConfigured(settings)) return false
+  await chrome.runtime.openOptionsPage()
+  return true
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {
@@ -123,7 +122,7 @@ async function setHostnamePaused(hostname: string, paused: boolean): Promise<Use
     throw new Error(response.error)
   }
   if (!response || typeof response !== 'object' || !('type' in response) || response.type !== 'settings') {
-    throw new Error('更新暂停状态失败')
+    throw new Error('Failed to update this site')
   }
   return loadSettings()
 }
@@ -136,13 +135,13 @@ async function togglePageTranslation(tabId: number): Promise<void> {
     response = await chrome.tabs.sendMessage(tabId, message)
   } catch {
     const files = (chrome.runtime.getManifest().content_scripts ?? []).flatMap((s) => s.js ?? [])
-    if (!files.length) throw new Error('无法在此页面运行')
+    if (!files.length) throw new Error('Cannot run on this page')
     await chrome.scripting.executeScript({ target: { tabId }, files })
     await new Promise((resolve) => setTimeout(resolve, 120))
     response = await chrome.tabs.sendMessage(tabId, message)
   }
   if (!isTogglePageTranslationResult(response)) {
-    throw new Error('页面翻译脚本未返回有效结果')
+    throw new Error('The page translation script returned an invalid response')
   }
   if (!response.ok) throw new Error(response.error)
 }
@@ -197,6 +196,7 @@ async function init(): Promise<void> {
   const targetLangSelect = el<HTMLSelectElement>('targetLangSelect')
   const displayModeSelect = el<HTMLSelectElement>('displayModeSelect')
   const pageEngineSelect = el<HTMLSelectElement>('pageEngineSelect')
+  const configureCloudModel = el<HTMLButtonElement>('configureCloudModel')
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
@@ -210,11 +210,12 @@ async function init(): Promise<void> {
         pageLanguage.detectedSourceLang,
       )
     } else {
-      el<HTMLElement>('detectedSourceLang').textContent = '无法检测'
+      el<HTMLElement>('detectedSourceLang').textContent = 'Unavailable'
     }
     translatePageBtn.addEventListener('click', async () => {
       try {
         el<HTMLElement>('error').hidden = true
+        if (await openExternalConfigIfNeeded(settings)) return
         await togglePageTranslation(tabId)
         window.close()
       } catch (err) {
@@ -226,8 +227,8 @@ async function init(): Promise<void> {
   }
 
   if (!hostname) {
-    hostnameEl.textContent = '（无法读取此页）'
-    el<HTMLElement>('detectedSourceLang').textContent = '无法检测'
+    hostnameEl.textContent = '(cannot read this page)'
+    el<HTMLElement>('detectedSourceLang').textContent = 'Unavailable'
     pauseToggle.disabled = true
   } else {
     hostnameEl.textContent = hostname
@@ -263,6 +264,7 @@ async function init(): Promise<void> {
       await saveSettings(next)
       settings = await loadSettings()
       renderStatus(settings)
+      await openExternalConfigIfNeeded(settings)
     } catch (err) {
       pageAutoToggle.checked = !pageAutoToggle.checked
       const error = el<HTMLElement>('error')
@@ -288,6 +290,7 @@ async function init(): Promise<void> {
       await saveSettings(nextSettings)
       settings = await loadSettings()
       renderStatus(settings)
+      await openExternalConfigIfNeeded(settings)
     } catch (err) {
       setSourceLanguageValue(settings.sourceLang)
       setTargetLanguageValue(settings.targetLang)
@@ -311,6 +314,10 @@ async function init(): Promise<void> {
     void saveLanguageSetting({
       translationDisplayMode: displayModeSelect.value as TranslationDisplayMode,
     })
+  })
+
+  configureCloudModel.addEventListener('click', () => {
+    void chrome.runtime.openOptionsPage()
   })
 
   pageEngineSelect.addEventListener('change', () => {

@@ -1,6 +1,7 @@
 import type { UserSettings } from '../shared/settings-defaults'
 import { DEFAULT_SETTINGS, mergeSettings } from '../shared/settings-defaults'
 import type {
+  OpenOptionsMsg,
   PageLanguageResult,
   SettingsMsg,
   TogglePageTranslationResult,
@@ -68,6 +69,7 @@ export class PageController {
   private settingsGeneration = 0
   private detectedSourceLang = 'auto'
   private listenersBound = false
+  private externalConfigPrompted = false
 
   bindListeners(): void {
     if (this.listenersBound) return
@@ -117,6 +119,9 @@ export class PageController {
       this.detectedSourceLang = detectPageSourceLanguage()
       this.settingsGeneration++
       this.pausedHere = response.paused
+      if (this.settings.pageTranslationEngine !== 'external' || this.configured) {
+        this.externalConfigPrompted = false
+      }
       if (this.pausedHere && this.pageTranslator.isActive()) this.pageTranslator.deactivate()
 
       const pageSig = pageTranslationSigOf(
@@ -158,7 +163,10 @@ export class PageController {
     ) {
       return
     }
-    if (this.settings.pageTranslationEngine === 'external' && !this.configured) return
+    if (this.settings.pageTranslationEngine === 'external' && !this.configured) {
+      await this.openExternalConfigPage()
+      return
+    }
 
     const settingsGeneration = this.settingsGeneration
     const settings = this.settings
@@ -196,12 +204,13 @@ export class PageController {
   }
 
   private validatePageTranslation(): TogglePageTranslationResult {
-    if (this.pausedHere) return { ok: false, error: '当前网站已暂停翻译' }
+    if (this.pausedHere) return { ok: false, error: 'Translation is paused for this site' }
     if (this.settings.pageTranslationEngine === 'external' && !this.configured) {
-      return { ok: false, error: '整页翻译需要先配置外部 API' }
+      void this.openExternalConfigPage()
+      return { ok: false, error: 'Cloud AI model needs to be configured first' }
     }
     if (this.settings.pageTranslationEngine === 'browser' && !this.browserTranslator.isSupported()) {
-      return { ok: false, error: '当前浏览器不支持 Chrome 内置翻译' }
+      return { ok: false, error: 'This browser does not support Chrome built-in translation' }
     }
     return { ok: true }
   }
@@ -214,5 +223,15 @@ export class PageController {
     return this.settings.sourceLang === 'auto'
       ? this.detectedSourceLang
       : this.settings.sourceLang
+  }
+
+  private async openExternalConfigPage(): Promise<void> {
+    if (this.externalConfigPrompted) return
+    this.externalConfigPrompted = true
+    try {
+      await chrome.runtime.sendMessage({ type: 'open-options' } satisfies OpenOptionsMsg)
+    } catch {
+      // Opening the options page is a guide; translation validation still returns the real error.
+    }
   }
 }

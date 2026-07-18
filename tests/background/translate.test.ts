@@ -224,7 +224,7 @@ describe('translation request resilience', () => {
     )
     await expect(testConnection(DEFAULT_SETTINGS)).resolves.toEqual({
       ok: false,
-      error: '响应格式无效：模型未返回有效 JSON',
+      error: 'Invalid response format: model did not return valid JSON',
     })
   })
 

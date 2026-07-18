@@ -236,10 +236,15 @@ async function handle(
   if (message.type === 'translate-batch') {
     const settings = await loadSettings()
     if (!isConfigured(settings)) {
+      try {
+        await chrome.runtime.openOptionsPage()
+      } catch {
+        // The content script still receives the configuration error below.
+      }
       return {
         type: 'translate-batch-result',
         ok: false,
-        error: 'API not configured',
+        error: 'Cloud AI model needs to be configured first',
         failedIds: message.blocks.map((b) => b.id),
       }
     }
@@ -304,7 +309,7 @@ async function handle(
     // Only the extension's own pages (no originating tab) may supply an arbitrary
     // endpoint/key; otherwise a content script could turn the worker into a fetch proxy.
     if (sender.tab) {
-      return { type: 'test-connection-result', ok: false, error: '仅设置页可发起连通性测试' }
+      return { type: 'test-connection-result', ok: false, error: 'Connection tests can only be started from the settings page' }
     }
     const stored = await loadSettings()
     const probe: UserSettings = {
@@ -317,7 +322,7 @@ async function handle(
     }
     const missing = missingConfigFields(probe)
     if (missing.length) {
-      return { type: 'test-connection-result', ok: false, error: `请先填写 ${missing.join('、')}` }
+      return { type: 'test-connection-result', ok: false, error: `Add ${missing.join(', ')} first` }
     }
     const result = await testConnection(probe)
     return result.ok

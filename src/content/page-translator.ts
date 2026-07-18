@@ -244,8 +244,8 @@ const PAGE_CONTROL_SELECTOR =
  * Interactive grid/chart widgets (calendars, heatmaps, spreadsheets) pack short labels into
  * fixed-size cells. Appending an inline translation there overflows the cell and breaks the
  * layout (e.g. the GitHub contribution graph), so full-page mode leaves their text untouched.
- * This also covers the graph *legend* ("Less [][][][] More"), whose level swatches live outside
- * the grid and would otherwise get "没低中高" crammed on top of each tiny square.
+ * This also covers graph legends ("Less [][][][] More"), whose level swatches live outside
+ * the grid and would otherwise receive translated labels on top of each tiny square.
  */
 const PAGE_LAYOUT_LOCKED_SELECTOR =
   '[role="grid"], [role="treegrid"], [class*="ContributionCalendar"], .js-calendar-graph, .contrib-legend, [class*="ContributionCalendar"] [data-level], .js-calendar-graph [data-level]'
@@ -407,11 +407,11 @@ export class PageTranslator {
     this.ensureStyles(settings)
 
     if (settings.pageTranslationEngine === 'external' && !externalConfigured) {
-      this.failActivation('整页翻译需要先配置外部 API')
+      this.failActivation('Cloud AI model needs to be configured first')
       return
     }
     if (settings.pageTranslationEngine === 'browser' && !this.browserTranslator.isSupported()) {
-      this.failActivation('当前浏览器不支持 Chrome 内置翻译')
+      this.failActivation('This browser does not support Chrome built-in translation')
       return
     }
 
@@ -439,7 +439,7 @@ export class PageTranslator {
       this.dirtyRoots.clear()
       this.observePageRoots(scanRoots)
       this.cleanupDisconnectedHosts()
-      if (initial) this.showStatus('正在分析页面文本…')
+      if (initial) this.showStatus('Analyzing page text...')
 
       const blocksByElement = new Map<Element, ExtractedBlock>()
       for (const root of scanRoots) {
@@ -465,17 +465,17 @@ export class PageTranslator {
           // content is picked up immediately) and retry the initial scan until the
           // grace window elapses, only then declaring the page empty.
           if (Date.now() < this.activationDeadline) {
-            this.showStatus('正在等待页面内容加载…')
+            this.showStatus('Waiting for page content...')
             this.scheduleInitialRetry(generation)
           } else {
-            this.failActivation('当前页面没有可翻译文本')
+            this.failActivation('No translatable text found on this page')
           }
         } else {
           document.getElementById(STATUS_ID)?.remove()
         }
         return
       }
-      if (!initial) this.showStatus('检测到新内容，正在翻译…')
+      if (!initial) this.showStatus('New content detected. Translating...')
       for (const group of groups) {
         for (const block of group.blocks) {
           this.attemptedTextByHost.set(block.el, block.text)
@@ -505,14 +505,14 @@ export class PageTranslator {
       if (!this.isCurrent(generation)) return
 
       if (initial && this.translatedCount === 0 && this.translatedHosts.size === 0) {
-        this.failActivation('整页翻译失败，当前语言对可能不可用')
+        this.failActivation('Page translation failed. The current language pair may be unavailable.')
         return
       }
       const failed = this.totalCount - this.translatedCount
       this.showStatus(
         failed > 0
-          ? `翻译完成：${this.translatedCount} 段成功，${failed} 段失败`
-          : `翻译完成：${this.translatedCount} 段`,
+          ? `Translation complete: ${this.translatedCount} blocks succeeded, ${failed} failed`
+          : `Translation complete: ${this.translatedCount} blocks`,
         failed > 0,
       )
       this.scheduleStatusRemoval()
@@ -521,7 +521,7 @@ export class PageTranslator {
       const message = error instanceof Error ? error.message : String(error)
       if (initial && this.translatedHosts.size === 0) this.failActivation(message)
       else {
-        this.showStatus(`整页翻译部分失败：${message}`, true)
+        this.showStatus(`Page translation partially failed: ${message}`, true)
         this.scheduleStatusRemoval(5000)
       }
     } finally {
@@ -543,7 +543,7 @@ export class PageTranslator {
     const targetLang = browserLanguageCode(settings.targetLang)
     const ready = await this.browserTranslator.prepare(sourceLang, targetLang)
     if (!this.isCurrent(generation)) return
-    if (!ready) throw new Error('Chrome 内置翻译不支持当前语言对')
+    if (!ready) throw new Error('Chrome built-in translation does not support this language pair')
     for (const group of groups) {
       if (!this.isCurrent(generation)) return
       const translation = await this.browserTranslator.translate(
@@ -584,7 +584,7 @@ export class PageTranslator {
           blocks: batch,
         })
         if (!this.isCurrent(generation)) return
-        if (!isTranslateBatchResult(response)) throw new Error('翻译服务未返回有效结果')
+        if (!isTranslateBatchResult(response)) throw new Error('Translation service returned an invalid response')
 
         for (const item of response.translations ?? []) {
           const group = byRepresentativeId.get(item.id)
@@ -859,7 +859,7 @@ export class PageTranslator {
   }
 
   private updateProgress(): void {
-    this.showStatus(`整页翻译 ${Math.min(this.processedCount, this.totalCount)}/${this.totalCount}`)
+    this.showStatus(`Page translation ${Math.min(this.processedCount, this.totalCount)}/${this.totalCount}`)
   }
 
   private failActivation(message: string): void {

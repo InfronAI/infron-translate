@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -48,77 +48,78 @@
               <img class="logo" src="/icons/infron-mark.png" alt="" aria-hidden="true" />
               <div>
                 <h1>Infron Translate</h1>
-                <p class="subtitle" id="modeHint">整页双语对照</p>
+                <p class="subtitle" id="modeHint">Full-page bilingual</p>
               </div>
             </div>
           </header>
 
           <section class="menu-item card language-card">
             <div class="row">
-              <span class="label">当前站点</span>
+              <span class="label">Current site</span>
               <span id="hostname" class="value mono">—</span>
             </div>
             <div class="row">
-              <span class="label">检测语言</span>
-              <span id="detectedSourceLang" class="value">检测中…</span>
+              <span class="label">Detected language</span>
+              <span id="detectedSourceLang" class="value">Detecting...</span>
             </div>
             <label class="switch-row menu-item nested">
-              <span class="switch-text">暂停此站</span>
+              <span class="switch-text">Pause this site</span>
               <input id="pauseToggle" type="checkbox" class="switch" disabled />
             </label>
           </section>
 
           <section class="menu-item card language-card">
             <label class="select-row">
-              <span class="label">翻译偏好</span>
+              <span class="label">Display mode</span>
               <select id="displayModeSelect" class="select">
-                <option value="bilingual">双语对照</option>
-                <option value="translation-only">仅译文</option>
+                <option value="bilingual">Bilingual</option>
+                <option value="translation-only">Translation only</option>
               </select>
             </label>
           </section>
 
           <section class="menu-item card">
             <label class="select-row">
-              <span class="label">源语言</span>
+              <span class="label">Source language</span>
               <select id="sourceLangSelect" class="select"></select>
             </label>
             <label class="select-row">
-              <span class="label">目标语言</span>
+              <span class="label">Target language</span>
               <select id="targetLangSelect" class="select"></select>
             </label>
           </section>
 
           <section class="menu-item card">
             <label class="select-row">
-              <span class="label">翻译引擎</span>
+              <span class="label">Translation engine</span>
               <select id="pageEngineSelect" class="select">
-                <option value="browser">Chrome 内置翻译</option>
-                <option value="external">云端 AI 模型</option>
+                <option value="browser">Chrome built-in translation</option>
+                <option value="external">Cloud AI model</option>
               </select>
             </label>
+            <button type="button" id="configureCloudModel" class="inline-config" hidden>
+              Cloud AI model not configured · Configure
+            </button>
             <label class="switch-row menu-item nested">
               <div class="switch-text-block">
-                <span class="switch-text">自动翻译网页</span>
-                <span class="switch-desc" id="pageAutoDesc">关闭：点击按钮后翻译</span>
+                <span class="switch-text">Auto-translate pages</span>
+                <span class="switch-desc" id="pageAutoDesc">Off: translate after clicking the button</span>
               </div>
               <input id="pageAutoToggle" type="checkbox" class="switch" />
             </label>
           </section>
 
           <p class="hint" id="usageHint">
-            默认按需翻译并缓存；相同句子只译一次。
+            Translates on demand by default and caches repeated sentences.
           </p>
 
           <button type="button" id="translatePage" class="btn primary menu-item">
-            <span>翻译此页</span>
+            <span>Translate this page</span>
           </button>
 
           <button type="button" id="openOptions" class="btn menu-item">
-            <span>打开设置</span>
+            <span>Open settings</span>
           </button>
-
-          <p id="unconfiguredTip" class="tip" hidden></p>
           <p id="error" class="error" hidden></p>
         </div>
       </div>
