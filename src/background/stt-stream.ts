@@ -145,7 +145,7 @@ export class StepFunRealtimeAsrConnection {
         const detail = closeDetail(event)
         if (!connected) {
           globalThis.clearTimeout(timeout)
-          fail(new Error(`${connectionFailureMessage(usesLocalRelay, 'closed during handshake')}${detail}`))
+          fail(new Error(localRelayCloseMessage(usesLocalRelay, event)))
           return
         }
         if (!this.closed && this.lastChunk) {
@@ -325,4 +325,12 @@ function closeDetail(event: CloseEvent): string {
 function connectionFailureMessage(usesLocalRelay: boolean, detail: string): string {
   if (!usesLocalRelay) return `StepFun ASR WebSocket connection ${detail}`
   return `Local ASR relay connection ${detail}. Start it with: npm run asr:relay`
+}
+
+function localRelayCloseMessage(usesLocalRelay: boolean, event: CloseEvent): string {
+  if (!usesLocalRelay) return `StepFun ASR WebSocket closed during handshake${closeDetail(event)}`
+  if (event.code === 1006) {
+    return 'Local ASR relay is not reachable at ws://127.0.0.1:8787/realtime/asr/stream. Start it from the project directory with: npm run asr:relay'
+  }
+  return `Local ASR relay closed during handshake${closeDetail(event)}. Keep npm run asr:relay running and check its terminal output.`
 }

@@ -190,6 +190,14 @@ npm run asr:relay
 
 The relay uses the ASR API key saved in the extension settings. You can also provide `STEPFUN_API_KEY` as an environment variable. If the upstream StepFun connection must use a proxy, start the relay with `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY`.
 
+Quick relay check:
+
+```bash
+lsof -nP -iTCP:8787 -sTCP:LISTEN
+```
+
+If the meeting overlay reports that the local ASR relay is not reachable, keep `npm run asr:relay` running in a terminal, rebuild the extension, and reload the unpacked extension in `chrome://extensions`.
+
 Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Meeting Transcription with an ASR endpoint and API key before using live ASR.
 
 ### Floating Auto-Translation Button
