@@ -32,8 +32,99 @@ The default extension UI language is Chinese. Users can switch the extension int
   - Capture microphone input when permission is granted.
   - Request current-tab meeting audio through Chrome tab capture.
   - Show two full-screen panels on the current page: meeting outline and live transcript with translations.
-  - Use browser speech recognition for live microphone transcription when available.
-  - Keep the speech-to-text pipeline isolated so an external STT provider can be added for tab, desktop, or system audio.
+  - Stream microphone and current-tab audio through a realtime ASR WebSocket pipeline.
+
+## Architecture
+
+The extension is split across standard Manifest V3 surfaces. The popup and options page manage user intent and configuration, the service worker coordinates long-running workflows, the content script owns page translation and overlays, and the offscreen document handles audio capture that cannot run directly inside the service worker.
+
+```mermaid
+flowchart LR
+  User[User] --> Popup[Popup UI]
+  User --> Options[Settings Page]
+
+  Popup -->|commands| SW[MV3 Service Worker]
+  Options -->|save settings| Storage[(chrome.storage.local)]
+  SW -->|read settings| Storage
+
+  SW -->|translate commands| Content[Content Script]
+  Content -->|DOM text extraction and rendering| Page[Active Webpage]
+  Content -->|progress and state| SW
+
+  SW -->|start capture| Offscreen[Offscreen Audio Document]
+  Offscreen -->|audio chunks and levels| SW
+  SW -->|meeting overlay updates| Content
+
+  SW -->|cloud translation| LLM[OpenAI-Compatible LLM Endpoint]
+  Offscreen -->|realtime audio frames| Relay[Local ASR Relay]
+  Relay -->|authorized WebSocket| StepFun[StepFun ASR Stream]
+```
+
+### Page Translation Flow
+
+```mermaid
+sequenceDiagram
+  participant P as Popup
+  participant SW as Service Worker
+  participant CS as Content Script
+  participant DOM as Active Page DOM
+  participant B as Chrome Translator API
+  participant C as Cloud Model
+
+  P->>SW: Start or stop page translation
+  SW->>CS: Extract translatable text blocks
+  CS->>DOM: Detect stable text nodes and layout containers
+  CS-->>SW: Text blocks and page language
+  alt Chrome built-in engine
+    SW->>B: Translate batches locally
+    B-->>SW: Translated text
+  else Cloud Model engine
+    SW->>C: Chat completion translation batches
+    C-->>SW: Translated text
+  end
+  SW->>CS: Apply translations
+  CS->>DOM: Bilingual append or in-place replacement
+  CS-->>SW: Progress and completion status
+```
+
+### Meeting Assistant Flow
+
+```mermaid
+sequenceDiagram
+  participant P as Popup
+  participant SW as Service Worker
+  participant O as Offscreen Audio Document
+  participant R as Local ASR Relay
+  participant A as StepFun ASR Stream
+  participant CS as Meeting Overlay
+  participant L as Cloud Translation Model
+
+  P->>SW: Start Meeting Assistant
+  SW->>CS: Open resizable meeting overlay
+  SW->>O: Start microphone and/or tab-audio capture
+  O-->>SW: Audio input status and level meters
+  loop Every audio chunk
+    O->>R: WebSocket audio frame
+    R->>A: Authorized realtime WebSocket frame
+    A-->>R: Delta or completed transcript event
+    R-->>O: Realtime transcript event
+    O-->>SW: Partial or completed transcript
+    SW->>L: Translate completed transcript text
+    SW->>CS: Update transcript, summary, and context alignment
+  end
+```
+
+### Realtime ASR Relay
+
+StepFun ASR Stream requires the WebSocket endpoint `wss://api.stepfun.com/v1/realtime/asr/stream` and an `Authorization: Bearer $STEPFUN_API_KEY` header. Browser `WebSocket` does not allow extensions to attach custom request headers, so Infron Translate uses a local relay for realtime ASR authentication.
+
+```mermaid
+flowchart LR
+  Offscreen[Offscreen Audio Document] -->|ws://127.0.0.1:8787/realtime/asr/stream| Relay[Local Node Relay]
+  Relay -->|Authorization header + audio frames| StepFun[wss://api.stepfun.com/v1/realtime/asr/stream]
+  StepFun -->|delta and completed events| Relay
+  Relay -->|same realtime events| Offscreen
+```
 
 ## Installation
 
