@@ -9,12 +9,14 @@ export type TranslateBlock = {
 export type TranslateBatchRequestMsg = {
   type: 'translate-batch'
   pageKey: string
+  sourceLang: string
   blocks: TranslateBlock[]
 }
 
 export type TranslateImageRequestMsg = {
   type: 'translate-image'
   imageUrl: string
+  sourceLang: string
 }
 
 export type TranslateImageResultOk = {
@@ -47,10 +49,8 @@ export type TranslateBatchResultErr = {
 export type GetSettingsMsg = { type: 'get-settings' }
 export type ContentSettings = Pick<
   UserSettings,
-  | 'sourceLang'
   | 'targetLang'
   | 'autoTranslate'
-  | 'translationEngine'
   | 'pageTranslationEngine'
   | 'autoPageTranslation'
   | 'pageTranslationFontSizePx'
@@ -65,7 +65,6 @@ export type ContentSettings = Pick<
   | 'minTextLength'
   | 'batchCharLimit'
   | 'prefetchMarginRatio'
-  | 'hotkey'
   | 'pageTranslationHotkey'
 > & { apiKey: '' }
 

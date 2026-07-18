@@ -81,8 +81,12 @@ export function parseImageTranslationResult(
 }
 
 export function buildTranslateImagePrompt(sourceLang: string, targetLang: string): string {
+  const languageInstruction =
+    sourceLang === 'auto'
+      ? `Detect the source language of visible text in this image and translate it to ${targetLang}.`
+      : `Read visible text in this image and translate it from ${sourceLang} to ${targetLang}.`
   return [
-    `Read visible text in this image and translate it from ${sourceLang} to ${targetLang}.`,
+    languageInstruction,
     'Preserve the original reading order and line breaks where meaningful.',
     'Do not describe the image. If it has no readable text, return an empty translation.',
     'Return ONLY JSON matching: { "translation": string }.',
@@ -94,8 +98,12 @@ export function buildTranslateUserPrompt(
   targetLang: string,
   blocks: TranslateBlock[],
 ): string {
+  const languageInstruction =
+    sourceLang === 'auto'
+      ? `Detect each block's source language and translate it to ${targetLang}.`
+      : `Translate each block from ${sourceLang} to ${targetLang}.`
   return [
-    `Translate each block from ${sourceLang} to ${targetLang}.`,
+    languageInstruction,
     'Return ONLY JSON matching the schema: { "items": [{ "id", "translation" }] }.',
     'Keep meaning faithful. No explanations.',
     'Blocks:',

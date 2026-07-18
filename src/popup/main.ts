@@ -31,19 +31,6 @@ function hostnameFromUrl(url: string | undefined): string {
 
 function renderStatus(settings: UserSettings): void {
   const configured = isConfigured(settings)
-  const api = el<HTMLElement>('apiStatus')
-  if (settings.translationEngine === 'browser') {
-    api.textContent = 'Chrome 内置'
-    api.className = 'pill ok'
-  } else if (configured) {
-    api.textContent = '外部 LLM'
-    api.className = 'pill ok'
-  } else {
-    const miss = missingConfigFields(settings)
-    api.textContent = miss.length ? `缺 ${miss.join('/')}` : '未配置'
-    api.className = 'pill warn'
-  }
-
   const pageEngine = el<HTMLElement>('pageEngineStatus')
   pageEngine.textContent =
     settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '外部 LLM'
@@ -53,21 +40,21 @@ function renderStatus(settings: UserSettings): void {
   const auto = el<HTMLInputElement>('autoToggle')
   auto.checked = settings.autoTranslate
   el<HTMLElement>('modeDesc').textContent = settings.autoTranslate
-    ? '开：进入页面会预译可见区（可能较慢）'
-    : '关：仅透镜对准的块才翻译（推荐）'
+    ? '开：鼠标移到内容上自动翻译'
+    : '关：点击页面内容后翻译'
 
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
   el<HTMLElement>('pageAutoDesc').textContent = settings.autoPageTranslation
-    ? '开：识别到英文页面后自动开启'
+    ? '开：检测到网页语言后自动开启'
     : '关：使用快捷键手动开启'
 
-  const label = formatHotkeyLabel(settings.hotkey)
-  el<HTMLElement>('hotkeyHint').textContent = `${label}：按住临时显示 · 短按保持打开`
+  el<HTMLElement>('modeHint').textContent = settings.autoTranslate
+    ? '自动翻译已开启'
+    : '点击页面内容后翻译'
 
   const tip = el<HTMLElement>('unconfiguredTip')
-  const needsExternal =
-    settings.translationEngine === 'external' || settings.pageTranslationEngine === 'external'
+  const needsExternal = true
   if (configured || !needsExternal) {
     tip.hidden = true
   } else {
@@ -80,7 +67,7 @@ function renderStatus(settings: UserSettings): void {
 
   const pageHotkey = formatHotkeyLabel(settings.pageTranslationHotkey)
   el<HTMLElement>('usageHint').textContent =
-    `${pageHotkey}：切换整页中英双语翻译。图片仍需要外部视觉模型。`
+    `点击页面文本或图片可手动翻译。${pageHotkey}：切换整页中英双语翻译。`
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {

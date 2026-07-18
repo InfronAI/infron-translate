@@ -195,6 +195,7 @@ describe('translation request resilience', () => {
 
     const result = await translateAllBlocks(
       [{ id: 'a', tag: 'p', text: 'Hello world' }],
+      'en',
       DEFAULT_SETTINGS,
       { sleep },
     )

@@ -22,7 +22,7 @@ describe('translateImage', () => {
       )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await translateImage('https://images.example.test/promo.png', {
+    const result = await translateImage('https://images.example.test/promo.png', 'en', {
       ...DEFAULT_SETTINGS,
       apiKey: 'sk-test',
     })
@@ -52,7 +52,7 @@ describe('translateImage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      translateImage('https://images.example.test/vector.svg', {
+      translateImage('https://images.example.test/vector.svg', 'en', {
         ...DEFAULT_SETTINGS,
         apiKey: 'sk-test',
       }),
@@ -72,7 +72,7 @@ describe('translateImage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      translateImage('https://images.example.test/huge.png', {
+      translateImage('https://images.example.test/huge.png', 'en', {
         ...DEFAULT_SETTINGS,
         apiKey: 'sk-test',
       }),

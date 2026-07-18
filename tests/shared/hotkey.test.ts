@@ -9,12 +9,18 @@ import {
 import { DEFAULT_SETTINGS } from '../../src/shared/settings-defaults'
 
 describe('matchesHotkey', () => {
-  const hk = DEFAULT_SETTINGS.hotkey
+  const hk = {
+    altKey: true,
+    shiftKey: true,
+    ctrlKey: false,
+    metaKey: false,
+    code: 'KeyK',
+  }
 
-  it('matches Alt+Shift+L', () => {
+  it('matches a configured chord', () => {
     expect(
       matchesHotkey(
-        { code: 'KeyL', altKey: true, shiftKey: true, ctrlKey: false, metaKey: false },
+        { code: 'KeyK', altKey: true, shiftKey: true, ctrlKey: false, metaKey: false },
         hk,
       ),
     ).toBe(true)
@@ -23,7 +29,7 @@ describe('matchesHotkey', () => {
   it('rejects wrong key', () => {
     expect(
       matchesHotkey(
-        { code: 'KeyK', altKey: true, shiftKey: true, ctrlKey: false, metaKey: false },
+        { code: 'KeyJ', altKey: true, shiftKey: true, ctrlKey: false, metaKey: false },
         hk,
       ),
     ).toBe(false)
@@ -32,7 +38,7 @@ describe('matchesHotkey', () => {
   it('rejects missing modifier', () => {
     expect(
       matchesHotkey(
-        { code: 'KeyL', altKey: false, shiftKey: true, ctrlKey: false, metaKey: false },
+        { code: 'KeyK', altKey: false, shiftKey: true, ctrlKey: false, metaKey: false },
         hk,
       ),
     ).toBe(false)
@@ -41,7 +47,15 @@ describe('matchesHotkey', () => {
 
 describe('formatHotkeyLabel', () => {
   it('uses Option for alt', () => {
-    expect(formatHotkeyLabel(DEFAULT_SETTINGS.hotkey)).toBe('Option+Shift+L')
+    expect(
+      formatHotkeyLabel({
+        altKey: true,
+        shiftKey: true,
+        ctrlKey: false,
+        metaKey: false,
+        code: 'KeyK',
+      }),
+    ).toBe('Option+Shift+K')
   })
 
   it('includes Ctrl and Meta when set', () => {
@@ -63,10 +77,15 @@ describe('formatHotkeyLabel', () => {
 
 describe('hotkeysEqual', () => {
   it('compares the full chord', () => {
-    expect(hotkeysEqual(DEFAULT_SETTINGS.hotkey, { ...DEFAULT_SETTINGS.hotkey })).toBe(true)
-    expect(hotkeysEqual(DEFAULT_SETTINGS.hotkey, DEFAULT_SETTINGS.pageTranslationHotkey)).toBe(
-      false,
-    )
+    const first = {
+      altKey: true,
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      code: 'KeyL',
+    }
+    expect(hotkeysEqual(first, { ...first })).toBe(true)
+    expect(hotkeysEqual(first, DEFAULT_SETTINGS.pageTranslationHotkey)).toBe(false)
   })
 })
 

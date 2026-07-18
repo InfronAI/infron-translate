@@ -20,9 +20,7 @@ import { ImageRegistry, type ImageTranslationEntry } from './image-registry'
 import { makePageKey } from './page-key'
 import { TranslationBatcher } from './translation-batcher'
 import { PageTranslator } from './page-translator'
-import { pageMatchesSourceLanguage } from './page-language'
-
-const TAP_STICKY_MS = 320
+import { detectPageSourceLanguage } from './page-language'
 
 // ---------------------------------------------------------------------------
 // Runtime type guards (no runtime dep, zero alloc on hot path)
@@ -89,10 +87,8 @@ function backgroundError(value: unknown): string | null {
  */
 export function lensTranslationSigOf(s: UserSettings, isConfiguredFlag: boolean): string {
   return [
-    s.translationEngine === 'external' ? isConfiguredFlag : true,
-    s.sourceLang,
+    isConfiguredFlag,
     s.targetLang,
-    s.translationEngine,
     s.minTextLength,
     s.batchCharLimit,
   ].join('\0')
@@ -101,7 +97,6 @@ export function lensTranslationSigOf(s: UserSettings, isConfiguredFlag: boolean)
 export function pageTranslationSigOf(s: UserSettings, isConfiguredFlag: boolean): string {
   return [
     s.pageTranslationEngine === 'external' ? isConfiguredFlag : true,
-    s.sourceLang,
     s.targetLang,
     s.pageTranslationEngine,
     s.minTextLength,
@@ -153,11 +148,11 @@ export class LensController {
   private autoPageStartPending = false
   private settingsGeneration = 0
   private translationGeneration = 0
+  private detectedSourceLang = 'auto'
 
   // --- lens interaction state ---
   private lensActive = false
   private lensSticky = false
-  private hotkeyDownAt = 0
   private lastMouse = { x: 0, y: 0 }
 
   // --- in-flight dedup ---
@@ -185,9 +180,8 @@ export class LensController {
     if (this.listenersBound) return
     this.listenersBound = true
     window.addEventListener('keydown', this.onKeyDown, true)
-    window.addEventListener('keyup', this.onKeyUp, true)
-    window.addEventListener('blur', this.onBlur)
     window.addEventListener('mousemove', this.onMouseMove, true)
+    window.addEventListener('click', this.onClick, true)
 
     const scheduleScan = debounce(() => {
       if (this.settings.autoTranslate) void this.scanVisibleAndTranslate()
@@ -247,7 +241,7 @@ export class LensController {
           return false
         }
         if (this.lensActive) this.deactivateLens()
-        void this.pageTranslator.toggle(this.settings, this.configured)
+        void this.pageTranslator.toggle(this.pageSettings(), this.configured)
         const result: TogglePageTranslationResult = { ok: true }
         sendResponse(result)
         return false
@@ -267,6 +261,7 @@ export class LensController {
       const previousSettings = this.settings
       this.configured = response.configured
       this.settings = mergeSettings(response.settings)
+      this.detectedSourceLang = detectPageSourceLanguage()
       this.settingsGeneration++
       this.pausedHere = response.paused
       if (this.pausedHere) {
@@ -294,7 +289,7 @@ export class LensController {
         this.pageTranslator.deactivate()
       } else if (styleChanged && this.pageTranslator.isActive()) {
         // Appearance-only change: restyle in place instead of losing translations.
-        this.pageTranslator.restyle(this.settings)
+        this.pageTranslator.restyle(this.pageSettings())
       }
 
       if (previousLensSig !== '' && lensChanged) {
@@ -308,7 +303,14 @@ export class LensController {
         this.settings.autoTranslate &&
         (lensChanged || !previousSettings.autoTranslate)
       ) {
+        this.lensActive = true
+        this.lensSticky = false
+        this.ensureMouseSeed()
+        this.updateLens()
         void this.scanVisibleAndTranslate()
+      }
+      if (previousSettings.autoTranslate && !this.settings.autoTranslate && !this.lensSticky) {
+        this.deactivateLens()
       }
       if (this.settings.autoPageTranslation) await this.maybeStartPageTranslation()
     } catch (error) {
@@ -346,7 +348,7 @@ export class LensController {
       this.pausedHere ||
       !this.settings.autoPageTranslation ||
       this.pageTranslator.isActive() ||
-      !pageMatchesSourceLanguage(this.settings.sourceLang)
+      this.detectedSourceLang === this.settings.targetLang
     ) {
       return
     }
@@ -359,7 +361,7 @@ export class LensController {
     try {
       if (settings.pageTranslationEngine === 'browser') {
         const availability = await this.browserTranslator.availability(
-          settings.sourceLang,
+          this.detectedSourceLang,
           settings.targetLang,
         )
         if (availability !== 'available') return
@@ -372,7 +374,10 @@ export class LensController {
       ) {
         return
       }
-      await this.pageTranslator.activate(settings, configured)
+      await this.pageTranslator.activate(
+        { ...settings, sourceLang: this.detectedSourceLang },
+        configured,
+      )
     } finally {
       this.autoPageStartPending = false
       if (
@@ -413,68 +418,30 @@ export class LensController {
       e.preventDefault()
       e.stopPropagation()
       if (this.lensActive) this.deactivateLens()
-      void this.pageTranslator.toggle(this.settings, this.configured)
+      void this.pageTranslator.toggle(this.pageSettings(), this.configured)
       return
     }
-    if (!matchesHotkey(e, this.settings.hotkey)) return
-    if (e.repeat) {
-      e.preventDefault()
-      return
-    }
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (this.lensActive && this.lensSticky) {
-      this.deactivateLens()
-      return
-    }
-
-    if (!this.lensActive) {
-      this.lensActive = true
-      this.lensSticky = false
-      this.hotkeyDownAt = Date.now()
-      this.ensureMouseSeed()
-      if (this.settings.translationEngine === 'browser' && this.browserTranslator.isSupported()) {
-        void this.browserTranslator.prepare(this.settings.sourceLang, this.settings.targetLang)
-      }
-      this.updateLens()
-    }
-  }
-
-  private readonly onKeyUp = (e: KeyboardEvent): void => {
-    if (!this.lensActive || this.lensSticky) return
-
-    // The defining (non-modifier) key was released: this is the only event that
-    // may pin the lens, so tap-vs-hold is judged consistently regardless of the
-    // order in which combo keys are lifted.
-    if (e.code === this.settings.hotkey.code) {
-      const heldMs = Date.now() - this.hotkeyDownAt
-      if (heldMs > 0 && heldMs < TAP_STICKY_MS) {
-        this.lensSticky = true
-        return
-      }
-      this.deactivateLens()
-      return
-    }
-
-    // A required modifier was released before the defining key: the combo is
-    // broken, so drop the preview rather than leaving a dangling lens. Never
-    // auto-pins here, which prevents an out-of-order release from sticking.
-    if (this.isHotkeyModifierRelease(e)) this.deactivateLens()
-  }
-
-  private readonly onBlur = (): void => {
-    if (this.lensActive && !this.lensSticky) this.deactivateLens()
   }
 
   private readonly onMouseMove = (e: MouseEvent): void => {
     if (e.composedPath().includes(this.lens.getHost())) return
     this.lastMouse = { x: e.clientX, y: e.clientY }
-    if (!this.lensActive || this.pointerFrame) return
+    if (!this.settings.autoTranslate || this.lensSticky || this.pointerFrame) return
+    if (this.pausedHere) return
+    this.lensActive = true
     this.pointerFrame = requestAnimationFrame(() => {
       this.pointerFrame = 0
       this.updateLens()
     })
+  }
+
+  private readonly onClick = (e: MouseEvent): void => {
+    if (e.button !== 0 || this.pausedHere) return
+    if (e.composedPath().includes(this.lens.getHost())) return
+    this.lastMouse = { x: e.clientX, y: e.clientY }
+    this.lensActive = true
+    this.lensSticky = true
+    this.updateLens()
   }
 
   private readonly onStickyReposition = (): void => {
@@ -589,7 +556,6 @@ export class LensController {
   private deactivateLens(): void {
     this.lensActive = false
     this.lensSticky = false
-    this.hotkeyDownAt = 0
     this.lens.hide()
   }
 
@@ -606,6 +572,7 @@ export class LensController {
       const result = await chrome.runtime.sendMessage({
         type: 'translate-image',
         imageUrl: entry.url,
+        sourceLang: this.detectedSourceLang,
       })
       if (!isImageTranslationResult(result)) {
         this.imageRegistry.setError(entry.id, '图片翻译服务未返回有效结果')
@@ -623,38 +590,10 @@ export class LensController {
     if (this.lensActive) this.updateLens()
   }
 
-  /**
-   * Translate blocks with Chrome's on-device Translator API. The browser session
-   * is sequential, and no configured API endpoint is contacted.
-   */
-  private async translateWithBrowser(blocks: TranslateBlock[]): Promise<void> {
-    if (!this.browserTranslator.isSupported()) return
-
-    const generation = this.translationGeneration
-    const sourceLang = this.settings.sourceLang
-    const targetLang = this.settings.targetLang
-
-    for (const block of blocks) {
-      if (generation !== this.translationGeneration) return
-      const translation = await this.browserTranslator.translate(
-        block.text,
-        sourceLang,
-        targetLang,
-      )
-      if (generation !== this.translationGeneration) return
-      if (translation) this.registry.setTranslation(block.id, translation)
-    }
-  }
-
-  /**
-   * Translate blocks using only the selected text engine. Engines never fall
-   * back to each other.
-   */
   async translateSpecific(blocks: TranslateBlock[]): Promise<void> {
     if (this.pausedHere) return
 
     const generation = this.translationGeneration
-    const engine = this.settings.translationEngine
     const configured = this.configured
     const todo: TranslateBlock[] = []
     const seenText = new Set<string>()
@@ -681,17 +620,13 @@ export class LensController {
       this.registry.setPending(b.id)
     }
 
-    let error =
-      engine === 'browser'
-        ? 'Chrome 内置翻译不可用或不支持当前语言对'
-        : '外部 API 未配置'
+    let error = '外部 API 未配置'
     try {
-      if (engine === 'browser') {
-        await this.translateWithBrowser(todo)
-      } else if (configured) {
+      if (configured) {
         const response: unknown = await chrome.runtime.sendMessage({
           type: 'translate-batch',
           pageKey: makePageKey(),
+          sourceLang: this.detectedSourceLang,
           blocks: todo,
         })
         if (generation !== this.translationGeneration) return
@@ -731,9 +666,11 @@ export class LensController {
   // -------------------------------------------------------------------------
 
   private canTranslateText(): boolean {
-    return this.settings.translationEngine === 'browser'
-      ? this.browserTranslator.isSupported()
-      : this.configured
+    return this.configured
+  }
+
+  private pageSettings(): UserSettings & { sourceLang: string } {
+    return { ...this.settings, sourceLang: this.detectedSourceLang }
   }
 
   private imageEntryForHit(hit: Element | null): ImageTranslationEntry | undefined {
@@ -744,14 +681,6 @@ export class LensController {
     return this.imageRegistry.upsert(makeBlockId('img', url, coarsePath(hit)), hit, url)
   }
 
-  private isHotkeyModifierRelease(e: KeyboardEvent): boolean {
-    const h = this.settings.hotkey
-    if (h.altKey && (e.code === 'AltLeft' || e.code === 'AltRight')) return true
-    if (h.shiftKey && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) return true
-    if (h.ctrlKey && (e.code === 'ControlLeft' || e.code === 'ControlRight')) return true
-    if (h.metaKey && (e.code === 'MetaLeft' || e.code === 'MetaRight')) return true
-    return false
-  }
 }
 
 // ---------------------------------------------------------------------------

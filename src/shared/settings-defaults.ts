@@ -21,14 +21,11 @@ export type UserSettings = {
    * Default off (or lowest where off is unavailable, e.g. StepFun → low).
    */
   reasoningPref: ReasoningPref
-  sourceLang: string
   targetLang: string
   autoTranslate: boolean
-  /** Text translation uses exactly one engine; image translation always requires the external API. */
-  translationEngine: TranslationEngine
   /** Engine used by the full-page bilingual DOM translation mode. */
   pageTranslationEngine: TranslationEngine
-  /** Automatically enable full-page bilingual mode when the page is identified as English. */
+  /** Automatically enable full-page bilingual mode after detecting the page language. */
   autoPageTranslation: boolean
   pageTranslationFontSizePx: number
   pageTranslationUseCustomColor: boolean
@@ -42,7 +39,6 @@ export type UserSettings = {
   minTextLength: number
   batchCharLimit: number
   prefetchMarginRatio: number // 0.5 = half viewport
-  hotkey: HotkeyConfig
   pageTranslationHotkey: HotkeyConfig
   pausedHostnames: string[]
 }
@@ -53,11 +49,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   model: 'gpt-4o-mini',
   provider: 'auto',
   reasoningPref: 'off',
-  sourceLang: 'en',
   targetLang: 'zh',
   /** Default off: only translate the block under the lens (fast first paint). */
   autoTranslate: false,
-  translationEngine: 'external',
   pageTranslationEngine: 'browser',
   autoPageTranslation: false,
   pageTranslationFontSizePx: 14,
@@ -72,13 +66,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   minTextLength: 10,
   batchCharLimit: 6000,
   prefetchMarginRatio: 0.5,
-  hotkey: {
-    altKey: true,
-    shiftKey: true,
-    ctrlKey: false,
-    metaKey: false,
-    code: 'KeyL',
-  },
   pageTranslationHotkey: {
     altKey: true,
     shiftKey: true,
@@ -142,11 +129,9 @@ export function mergeSettings(partial: unknown): UserSettings {
     model: stringValue(p.model, DEFAULT_SETTINGS.model),
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
-    sourceLang: stringValue(p.sourceLang, DEFAULT_SETTINGS.sourceLang).slice(0, 64),
     targetLang: stringValue(p.targetLang, DEFAULT_SETTINGS.targetLang).slice(0, 64),
     autoTranslate:
       typeof p.autoTranslate === 'boolean' ? p.autoTranslate : DEFAULT_SETTINGS.autoTranslate,
-    translationEngine: asTranslationEngine(p.translationEngine, DEFAULT_SETTINGS.translationEngine),
     pageTranslationEngine: asTranslationEngine(
       p.pageTranslationEngine,
       DEFAULT_SETTINGS.pageTranslationEngine,
@@ -203,7 +188,6 @@ export function mergeSettings(partial: unknown): UserSettings {
       0,
       5,
     ),
-    hotkey: hotkeyValue(p.hotkey, DEFAULT_SETTINGS.hotkey),
     pageTranslationHotkey: hotkeyValue(
       p.pageTranslationHotkey,
       DEFAULT_SETTINGS.pageTranslationHotkey,

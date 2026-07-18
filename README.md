@@ -1,141 +1,165 @@
 # Infron Translate
 
-Infron Translate 是一个 Chrome Manifest V3 沉浸式翻译扩展。网页默认保持原文；启动翻译透镜后，扩展会自动框选鼠标下的文本 DOM 或图片，并在旁边显示原文和译文，不修改网页内容。
+Infron Translate is a Chrome Manifest V3 extension for in-page translation. It detects the source language from the current webpage, lets the user choose a target language, and keeps the original page content visible.
 
-## 功能
+The extension supports two main workflows:
 
-- **按需翻译**：默认只翻译透镜当前指向的文本块，减少请求与等待。
-- **常驻或临时透镜**：短按快捷键保持打开并跟随鼠标；长按则在松键时关闭。
-- **整页中英双语**：一键扫描当前 DOM，保留原文并逐段追加译文，再次按键即可恢复页面。
-- **英文页自动双语**：可选全局开关，识别到英文页面后自动启动整页双语模式。
-- **可直接复制**：鼠标移入透镜后暂停目标更新，可直接选择并复制原文或译文。
-- **多模型支持**：支持 OpenAI、DeepSeek、StepFun 以及兼容 OpenAI Chat Completions 的服务。
-- **可选文本引擎**：可明确选择外部 LLM 或桌面 Chrome 138+ 的内置 Translator API，两者不会互相兜底。
-- **图片文字翻译**：支持视觉模型读取并翻译页面图片中的文字。
-- **缓存与去重**：相同页面、语言和文本复用翻译结果；相同图片 URL 复用图片译文。
-- **站点暂停**：可从扩展弹窗暂停当前站点。
-## 安装
+- **Lens translation** for translating the text or image currently under focus.
+- **Full-page bilingual translation** for appending translated text below the original DOM content.
+
+## Current Capabilities
+
+- Click page text or images to translate them in a floating lens.
+- Enable automatic lens translation so moving the pointer over text or images shows translations immediately.
+- Detect the source language from the current page instead of requiring manual source-language setup.
+- Let users choose the target language from the settings page.
+- Translate full pages while preserving the original page layout and text.
+- Choose the full-page text engine: external LLM or Chrome built-in Translator API.
+- Use an external vision-capable model to translate readable text inside images.
+- Cache repeated text and image translations to avoid duplicate requests.
+- Pause translation per site from the extension popup.
+- Configure typography for inserted full-page translations.
+
+## Installation
 
 ```bash
 npm install
 npm run build
 ```
 
-1. 打开 `chrome://extensions`。
-2. 启用右上角的**开发者模式**。
-3. 点击**加载已解压的扩展程序**，选择构建生成的 `dist/` 目录。
+Then load the extension in Chrome:
 
-## 配置
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked**.
+4. Select the generated `dist/` directory.
 
-从扩展弹窗点击**打开设置**，或右键扩展图标后打开 Options。
+## Configuration
 
-### 云端 API
+Open the extension popup and choose **Open settings**.
 
-| 配置项 | 示例 |
+### Target Language
+
+The source language is detected from the current webpage. The user only chooses the target language.
+
+### External Model
+
+The external model is used for:
+
+- Lens text translation.
+- Image text translation.
+- Full-page translation when the full-page engine is set to external LLM.
+
+Required fields:
+
+| Field | Example |
 |---|---|
-| 服务商 | 自动识别 / OpenAI / DeepSeek / StepFun |
+| Provider | Auto, OpenAI, DeepSeek, StepFun |
 | Base URL | `https://api.openai.com/v1` |
-| API Key | 你的密钥 |
-| 模型 | `gpt-4o-mini` 或其他兼容模型 |
-| 源语言 | `en` |
-| 目标语言 | `zh` |
+| API Key | Your API key |
+| Model | `gpt-4o-mini` |
+| Target language | `zh` |
 
-服务端需兼容 `{baseURL}/chat/completions`。远程接口必须使用 HTTPS；仅 `localhost`、`127.0.0.1` 和 `[::1]` 可使用 HTTP，便于连接本地模型服务。翻译任务默认关闭或降低模型推理强度，以缩短响应时间。
+The configured service must expose an OpenAI-compatible `/chat/completions` endpoint. Remote endpoints must use HTTPS. HTTP is allowed only for loopback hosts such as `localhost`, `127.0.0.1`, and `[::1]`.
 
-### 文本翻译引擎
+### Chrome Built-In Translator
 
-翻译透镜和整页双语模式可以分别选择外部 LLM 或 Chrome 内置翻译。透镜默认使用外部 LLM，整页模式默认使用速度更快的 Chrome 内置翻译；选择后文本只经过对应引擎，不会在失败时自动切换。Translator API 从桌面 Chrome 138 起进入稳定版，但版本满足并不代表当前环境和语言对一定可用。设置页会检测 API 是否暴露，以及语言对处于 `available`、`downloadable`、`downloading` 或 `unavailable` 状态，并在需要时提供由用户触发的语言包下载。该能力仅支持文本翻译，不支持图片 OCR 或视觉理解。
+Full-page translation can use Chrome's on-device Translator API. The settings page checks whether the API is available and whether the language pack for the selected target language can be used.
 
-### 图片翻译
+Chrome Translator is only used for full-page text translation. Lens translation and image translation use the external model.
 
-图片翻译需要当前云端模型支持 OpenAI-compatible `image_url` 多模态输入。扩展支持 JPEG、PNG、WebP、GIF，单张图片最大 4 MB；不支持 SVG 和 `blob:` URL。
+## Usage
 
-## 使用
+### Lens Translation
 
-翻译透镜默认快捷键为 macOS 的 `Option+Shift+L`、Windows/Linux 的 `Alt+Shift+L`。整页双语翻译默认为 macOS 的 `Option+Shift+;`、Windows/Linux 的 `Alt+Shift+;`。两个快捷键均可在设置页重新录制，但不能设置为相同组合。
+Automatic lens translation is off by default.
 
-### 常驻模式
+When automatic translation is off:
 
-1. 短按一次快捷键，透镜保持打开。
-2. 移动鼠标，透镜会跟随并自动框选鼠标下的文本 DOM 或图片。
-3. 鼠标移入透镜，目标更新暂停；此时可选择原文或译文并复制。
-4. 再次短按快捷键或按 `Esc` 关闭。
+1. Click a text block or image on the page.
+2. The lens appears beside the selected content.
+3. The original page remains unchanged.
+4. Press `Esc` to close the lens.
 
-### 临时模式
+When automatic translation is on:
 
-1. 按住快捷键，移动鼠标选择内容。
-2. 松开快捷键，透镜关闭。
+1. Move the pointer over page text or images.
+2. The lens updates automatically.
+3. Click the current target to pin the lens.
+4. Press `Esc` to close the lens.
 
-### 整页双语模式
+### Full-Page Bilingual Translation
 
-1. 按 `Option+Shift+;`（Windows/Linux 为 `Alt+Shift+;`）扫描当前已渲染的 DOM 文本。
-2. 扩展优先翻译当前可见区，并在原文下逐段追加译文；相同文本只翻译一次。
-3. 再次按该快捷键或按 `Esc`，移除扩展插入的译文并恢复页面。
+Use the popup button or the full-page shortcut:
 
-整页模式会持续监听 DOM 节点、文本和可见性属性变化，对无限滚动、弹窗、抽屉和开放 Shadow DOM 中后续出现的文本进行增量翻译。首次扫描覆盖整个页面，后续只扫描发生变化的子树。外部 LLM 模式按字符上限分批请求；Chrome 内置模式复用同一语言会话并在设备侧顺序翻译。
+- macOS: `Option+Shift+;`
+- Windows/Linux: `Alt+Shift+;`
 
-设置页可调整译文字号、自定义文字色、背景色块、加粗、斜体和下划线。关闭自定义文字色时，译文继承页面原有颜色以保持主题兼容。
+Full-page mode scans rendered DOM text, prioritizes visible content, and appends translations below the original text. Press the shortcut again, or press `Esc`, to remove inserted translations.
 
-开启**英文页面自动开启**后，扩展会优先读取页面声明的 BCP 47 语言；页面未声明语言时，再使用本地文本特征判断是否为英文。站点暂停规则优先于自动开启。Chrome 内置模式只在语言包已经就绪时自动启动，避免页面加载时静默下载；可在设置页的 Chrome 能力区下载并测试语言包。外部 LLM 模式下，自动开启会主动发送匹配到的页面文本，因此默认关闭。
+The full-page translator also watches for DOM updates, so it can translate content that appears later through infinite scroll, dialogs, drawers, or open Shadow DOM.
 
-### 自动预译
+### Automatic Bilingual Pages
 
-弹窗中的**自动预译可见区**会在页面初始化、滚动、尺寸变化和 DOM 更新时，使用当前选择的文本引擎主动翻译视口及预取范围内的可见文本。选择外部 LLM 时这些文本会发送到用户配置的翻译服务；选择 Chrome 内置翻译时由设备侧 Translator API 处理。图片不会自动预译，只有直接指向图片时才会请求视觉模型。
+When automatic bilingual pages are enabled, the extension detects the current page language and starts full-page translation when appropriate. Paused sites are always skipped.
 
-### 弹窗功能
+If full-page mode uses Chrome Translator, automatic startup only happens when the detected source language and selected target language are available. If full-page mode uses the external LLM, matched page text is sent to the configured service.
 
-- 显示当前站点和快捷键。
-- 显示透镜与整页模式各自使用的翻译引擎。
-- 暂停或恢复当前站点。
-- 开关自动预译。
-- 开关英文页面自动双语。
-- 打开完整设置页。
+## Image Translation
 
-无法使用时，请确认当前页面是普通 `http/https` 页面，并在安装或修改配置后刷新页面。Chrome 不允许扩展内容脚本运行在 `chrome://` 页面。
+Image translation requires an external multimodal model that supports OpenAI-compatible `image_url` input.
 
-## 隐私与网络
+Supported image formats:
 
-- API Key 保存在 `chrome.storage.local`，不是操作系统钥匙串加密存储。只有后台 Service Worker 和受信任的扩展设置页读取完整密钥；Content Script 只获取翻译交互所需的语言、引擎和快捷键设置，不接收 API Key、Base URL、模型或服务商配置。
-- 选择外部 LLM 时，文本只发送到用户配置的 HTTPS `baseURL`；HTTP 仅允许回环地址上的本地模型。选择 Chrome 内置翻译时，文本只由 Chrome 的设备侧 Translator API 处理。
-- 图片翻译会读取完整图片资源并转换成 `data:` URL，然后发送到用户配置的多模态接口。图片中的人脸、二维码和其他非文字内容也会随整张图片上传。
-- 不支持的图片类型、非 base64 `data:` URL、`blob:` URL 和超过 4 MB 的图片会在本地拒绝；网络图片使用流式大小限制，避免先完整缓冲超大响应。
-- 自动预译或整页双语模式选择外部 LLM 时，会主动上传匹配到的页面文本；整页模式开启期间，动态加载的新文本也会发送。处理敏感页面前应关闭该功能、改用 Chrome 内置翻译或暂停当前站点。
-- 页面级文本与图片状态有容量上限，并优先清理已脱离 DOM 的节点。
-- 扩展不包含第三方分析、遥测或远程代码。
-- `http://*/*` 和 `https://*/*` 主机权限用于在普通网页中读取可见内容和图片资源。
+- JPEG
+- PNG
+- WebP
+- GIF
 
-## 开发
+Limits and exclusions:
+
+- Maximum image size: 4 MB.
+- SVG is not supported.
+- `blob:` image URLs are not supported.
+
+## Privacy and Network Behavior
+
+- API keys are stored in `chrome.storage.local`.
+- Content scripts do not receive the API key, Base URL, model, or provider configuration.
+- External LLM translation sends text only to the configured `baseURL`.
+- Chrome Translator full-page mode processes text on device.
+- Image translation uploads the complete image to the configured multimodal model.
+- Automatic lens translation and external full-page translation can proactively send visible page text to the configured service.
+- Paused sites do not start lens translation, automatic translation, or full-page translation.
+- The extension does not include analytics, telemetry, or remote code.
+
+## Development
 
 ```bash
 npm install
-npm run dev        # Vite 开发模式
-npm run build      # TypeScript 检查 + 生产构建，输出到 dist/
-npm test           # 运行 Vitest 测试
-npm run test:watch
+npm run dev
+npm run build
+npm test
 ```
 
-生产构建后，在 Chrome 扩展管理页加载 `dist/`。
+Scripts:
 
-## 手工验收清单
+- `npm run dev`: start Vite development mode.
+- `npm run build`: run TypeScript checks and build the extension into `dist/`.
+- `npm test`: run the Vitest suite.
+- `npm run test:watch`: run Vitest in watch mode.
 
-- [ ] 设置保存后刷新页面仍然生效。
-- [ ] 短按快捷键后透镜保持打开，并继续跟随鼠标。
-- [ ] 再次短按快捷键或按 `Esc` 能关闭常驻透镜。
-- [ ] 长按快捷键期间透镜跟随鼠标，松开后关闭。
-- [ ] `Option/Alt+Shift+;` 优先翻译可见区，并逐段显示原文与译文。
-- [ ] 再次按整页快捷键或按 `Esc` 后，插入的译文全部移除。
-- [ ] 整页模式分别选择 Chrome 内置翻译和外部 LLM 时，只调用所选引擎。
-- [ ] 打开延迟渲染的弹窗/抽屉或继续滚动加载后，新文本自动出现译文。
-- [ ] 多层 `div/span` 与开放 Shadow DOM 内的正文能够被提取，且父子节点不重复翻译。
-- [ ] 字号、文字色、背景色块、加粗、斜体和下划线设置正确应用。
-- [ ] 文本 DOM 被正确框选，透镜显示原文和译文。
-- [ ] 鼠标进入透镜后可以选择和复制文字。
-- [ ] 错误 API Key 会显示错误，而不是永久停留在加载状态。
-- [ ] 选择 Chrome 内置翻译后，即使未配置外部 API，也能在桌面 Chrome 138+ 翻译受支持语言对。
-- [ ] 设置页能区分 Chrome Translator API 不支持、语言包待下载、下载中、已就绪和语言对不可用状态。
-- [ ] 开启英文页自动双语后，英文页面自动翻译，非英文页面和暂停站点不自动翻译。
-- [ ] 任一文本引擎失败时不会自动切换到另一个引擎。
-- [ ] 多模态模型能翻译 JPEG、PNG、WebP、GIF 中的可读文字。
-- [ ] 相同文本和图片资源不会重复请求。
-- [ ] SVG、`blob:` 图片或超过 4 MB 的图片显示明确错误。
-- [ ] 暂停当前站点后不再显示透镜或发起翻译请求。
+## Manual QA
+
+- Settings persist after saving and reloading a page.
+- Clicking text or an image opens the translation lens when automatic translation is off.
+- Moving over text or an image opens the translation lens when automatic translation is on.
+- Clicking the current target pins the lens.
+- `Esc` closes the lens and exits full-page translation.
+- Full-page mode appends translations below original text without removing source content.
+- Full-page mode can be toggled off cleanly.
+- Chrome Translator full-page mode works for supported detected language pairs.
+- External LLM full-page mode sends batched text requests and does not fall back silently.
+- Image translation works for supported image formats and rejects unsupported images clearly.
+- Repeated text and image resources reuse cached translations.
+- Paused sites do not translate automatically.

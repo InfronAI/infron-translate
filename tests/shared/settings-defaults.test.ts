@@ -9,10 +9,8 @@ import {
 
 describe('DEFAULT_SETTINGS', () => {
   it('defaults to en→zh with on-demand translate (auto off)', () => {
-    expect(DEFAULT_SETTINGS.sourceLang).toBe('en')
     expect(DEFAULT_SETTINGS.targetLang).toBe('zh')
     expect(DEFAULT_SETTINGS.autoTranslate).toBe(false)
-    expect(DEFAULT_SETTINGS.translationEngine).toBe('external')
     expect(DEFAULT_SETTINGS.pageTranslationEngine).toBe('browser')
     expect(DEFAULT_SETTINGS.autoPageTranslation).toBe(false)
     expect(DEFAULT_SETTINGS.pageTranslationFontSizePx).toBe(14)
@@ -21,13 +19,6 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.lensWidthPx).toBe(320)
     expect(DEFAULT_SETTINGS.minTextLength).toBe(10)
     expect(DEFAULT_SETTINGS.batchCharLimit).toBe(6000)
-    expect(DEFAULT_SETTINGS.hotkey).toEqual({
-      altKey: true,
-      shiftKey: true,
-      ctrlKey: false,
-      metaKey: false,
-      code: 'KeyL',
-    })
     expect(DEFAULT_SETTINGS.pageTranslationHotkey).toEqual({
       altKey: true,
       shiftKey: true,
@@ -44,7 +35,6 @@ describe('mergeSettings', () => {
     const merged = mergeSettings({ apiKey: 'sk-test' })
     expect(merged.apiKey).toBe('sk-test')
     expect(merged.autoTranslate).toBe(false)
-    expect(merged.translationEngine).toBe('external')
     expect(merged.pageTranslationEngine).toBe('browser')
     expect(merged.autoPageTranslation).toBe(false)
     expect(merged.pageTranslationHotkey).toEqual(DEFAULT_SETTINGS.pageTranslationHotkey)
@@ -57,13 +47,15 @@ describe('mergeSettings', () => {
     expect(merged.pausedHostnames).toEqual(['example.com'])
   })
 
-  it('accepts only known translation engines from storage', () => {
-    expect(mergeSettings({ translationEngine: 'browser' }).translationEngine).toBe('browser')
-    expect(mergeSettings({ translationEngine: 'external' }).translationEngine).toBe('external')
-    expect(mergeSettings({ translationEngine: 'fallback' }).translationEngine).toBe('external')
-    expect(mergeSettings({ browserTranslatorFallback: true }).translationEngine).toBe('external')
+  it('accepts only known full-page translation engines from storage', () => {
     expect(mergeSettings({ pageTranslationEngine: 'external' }).pageTranslationEngine).toBe(
       'external',
+    )
+    expect(mergeSettings({ pageTranslationEngine: 'browser' }).pageTranslationEngine).toBe(
+      'browser',
+    )
+    expect(mergeSettings({ pageTranslationEngine: 'fallback' }).pageTranslationEngine).toBe(
+      'browser',
     )
   })
 

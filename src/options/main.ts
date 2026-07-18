@@ -8,7 +8,7 @@ import {
   type TranslationEngine,
   type UserSettings,
 } from '../shared/settings'
-import { formatHotkeyLabel, hotkeyFromKeyboardEvent, hotkeysEqual } from '../shared/hotkey'
+import { formatHotkeyLabel, hotkeyFromKeyboardEvent } from '../shared/hotkey'
 import {
   PROVIDER_PRESETS,
   type ProviderId,
@@ -80,20 +80,18 @@ function parsePausedHostnames(raw: string): string[] {
 }
 
 function populateLanguageSelects(): void {
-  for (const id of ['sourceLang', 'targetLang']) {
-    const select = el<HTMLSelectElement>(id)
-    select.replaceChildren(
-      ...LANGUAGE_OPTIONS.map(([code, name]) => {
-        const option = document.createElement('option')
-        option.value = code
-        option.textContent = `${name} · ${code}`
-        return option
-      }),
-    )
-  }
+  const select = el<HTMLSelectElement>('targetLang')
+  select.replaceChildren(
+    ...LANGUAGE_OPTIONS.map(([code, name]) => {
+      const option = document.createElement('option')
+      option.value = code
+      option.textContent = `${name} · ${code}`
+      return option
+    }),
+  )
 }
 
-function setLanguageValue(id: 'sourceLang' | 'targetLang', value: string): void {
+function setLanguageValue(id: 'targetLang', value: string): void {
   const select = el<HTMLSelectElement>(id)
   if (![...select.options].some((option) => option.value === value)) {
     const option = document.createElement('option')
@@ -128,12 +126,11 @@ function writeHotkeyHidden(prefix: string, h: HotkeyConfig): void {
 }
 
 function updateHotkeyHelp(): void {
-  const lensLabel = formatHotkeyLabel(readHotkeyFromHidden('hotkey', DEFAULT_SETTINGS.hotkey))
   const pageLabel = formatHotkeyLabel(
     readHotkeyFromHidden('pageHotkey', DEFAULT_SETTINGS.pageTranslationHotkey),
   )
   el<HTMLElement>('helpHotkey').textContent =
-    `按住 ${lensLabel} 临时显示透镜；短按保持打开。${pageLabel} 切换整页双语翻译。`
+    `开启自动翻译后，鼠标移到文本或图片上会显示翻译；关闭时点击后翻译。${pageLabel} 切换整页双语翻译。`
 }
 
 function fillForm(s: UserSettings): void {
@@ -145,10 +142,8 @@ function fillForm(s: UserSettings): void {
     : 'sk-... 或供应商密钥'
   el<HTMLInputElement>('model').value = s.model
   el<HTMLSelectElement>('reasoningPref').value = s.reasoningPref
-  setLanguageValue('sourceLang', s.sourceLang)
   setLanguageValue('targetLang', s.targetLang)
   el<HTMLInputElement>('autoTranslate').checked = s.autoTranslate
-  el<HTMLSelectElement>('translationEngine').value = s.translationEngine
   el<HTMLSelectElement>('pageTranslationEngine').value = s.pageTranslationEngine
   el<HTMLInputElement>('autoPageTranslation').checked = s.autoPageTranslation
   el<HTMLInputElement>('pageTranslationFontSizePx').value = String(
@@ -165,7 +160,6 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('pageTranslationItalic').checked = s.pageTranslationItalic
   el<HTMLInputElement>('pageTranslationUnderline').checked = s.pageTranslationUnderline
   el<HTMLInputElement>('lensWidthPx').value = String(s.lensWidthPx)
-  writeHotkeyHidden('hotkey', s.hotkey)
   writeHotkeyHidden('pageHotkey', s.pageTranslationHotkey)
   updateHotkeyHelp()
   el<HTMLInputElement>('pausedHostnames').value = s.pausedHostnames.join(', ')
@@ -189,10 +183,8 @@ function readForm(stored: UserSettings): UserSettings {
     baseURL: el<HTMLInputElement>('baseURL').value.trim(),
     apiKey,
     model: el<HTMLInputElement>('model').value.trim(),
-    sourceLang: el<HTMLSelectElement>('sourceLang').value || DEFAULT_SETTINGS.sourceLang,
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
     autoTranslate: el<HTMLInputElement>('autoTranslate').checked,
-    translationEngine: el<HTMLSelectElement>('translationEngine').value as TranslationEngine,
     pageTranslationEngine: el<HTMLSelectElement>('pageTranslationEngine')
       .value as TranslationEngine,
     autoPageTranslation: el<HTMLInputElement>('autoPageTranslation').checked,
@@ -210,7 +202,6 @@ function readForm(stored: UserSettings): UserSettings {
       Number.isFinite(lensWidth) && lensWidth > 0
         ? Math.round(lensWidth)
         : DEFAULT_SETTINGS.lensWidthPx,
-    hotkey: readHotkeyFromHidden('hotkey', DEFAULT_SETTINGS.hotkey),
     pageTranslationHotkey: readHotkeyFromHidden(
       'pageHotkey',
       DEFAULT_SETTINGS.pageTranslationHotkey,
@@ -301,9 +292,8 @@ function updateStyleControlStates(): void {
 }
 
 function updateEngineSummary(settings: UserSettings): void {
-  const lens = settings.translationEngine === 'browser' ? 'Chrome' : '外部 LLM'
   const page = settings.pageTranslationEngine === 'browser' ? 'Chrome' : '外部 LLM'
-  el<HTMLElement>('engineSummary').textContent = `透镜 ${lens} · 整页 ${page}`
+  el<HTMLElement>('engineSummary').textContent = `透镜 外部 LLM · 整页 ${page}`
 }
 
 function browserVersion(): string {
@@ -325,7 +315,7 @@ function renderBrowserCapability(
   const content = {
     checking: ['正在检测 Chrome 内置翻译', '正在检查 API 和当前语言对。'],
     available: ['Chrome 内置翻译已就绪', '当前语言对可直接在设备侧翻译。'],
-    downloadable: ['需要下载语言包', '点击下载并测试；完成后可自动翻译英文页面。'],
+    downloadable: ['需要下载语言包', '点击下载并测试；完成后可用于网页自动翻译。'],
     downloading: ['语言包正在下载', detail || '请保持此页面打开。'],
     unavailable: ['当前语言对不可用', '可更换语言代码，或将对应翻译引擎切换为外部 LLM。'],
     unsupported: [
@@ -342,15 +332,14 @@ function renderBrowserCapability(
 
 async function checkBrowserCapability(prepare = false): Promise<void> {
   const request = ++capabilityRequest
-  const source = el<HTMLSelectElement>('sourceLang').value || DEFAULT_SETTINGS.sourceLang
   const target = el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang
   renderBrowserCapability('checking')
   try {
-    browserCapability = await browserTranslator.availability(source, target)
+    browserCapability = await browserTranslator.availability('en', target)
     if (request !== capabilityRequest) return
     if (prepare && (browserCapability === 'downloadable' || browserCapability === 'downloading')) {
       renderBrowserCapability('downloading', '准备语言包…')
-      const ready = await browserTranslator.prepare(source, target, (progress) => {
+      const ready = await browserTranslator.prepare('en', target, (progress) => {
         if (request !== capabilityRequest) return
         renderBrowserCapability('downloading', `语言包下载进度 ${Math.round(progress * 100)}%`)
       })
@@ -446,7 +435,6 @@ async function init(): Promise<void> {
   fillForm(stored)
   void checkBrowserCapability()
   setupSectionNavigation()
-  setupHotkeyCapture('hotkey', 'captureHotkey', 'captureHint')
   setupHotkeyCapture('pageHotkey', 'capturePageHotkey', 'capturePageHint')
   el<HTMLInputElement>('pageTranslationUseCustomColor').addEventListener(
     'change',
@@ -461,10 +449,8 @@ async function init(): Promise<void> {
       browserCapability === 'downloadable' || browserCapability === 'downloading',
     )
   })
-  for (const id of ['sourceLang', 'targetLang']) {
-    el<HTMLSelectElement>(id).addEventListener('change', () => void checkBrowserCapability())
-  }
-  for (const id of ['translationEngine', 'pageTranslationEngine']) {
+  el<HTMLSelectElement>('targetLang').addEventListener('change', () => void checkBrowserCapability())
+  for (const id of ['pageTranslationEngine']) {
     el<HTMLSelectElement>(id).addEventListener('change', () => {
       updateEngineSummary(readForm(stored))
     })
@@ -480,12 +466,7 @@ async function init(): Promise<void> {
     e.preventDefault()
     try {
       const next = readForm(stored)
-      if (hotkeysEqual(next.hotkey, next.pageTranslationHotkey)) {
-        setStatus('翻译透镜与整页翻译不能使用同一个快捷键', false)
-        return
-      }
-      const usesExternal =
-        next.translationEngine === 'external' || next.pageTranslationEngine === 'external'
+      const usesExternal = true
       const missing = usesExternal ? missingConfigFields(next) : []
       if (missing.length) {
         await saveSettings(next)
@@ -497,8 +478,7 @@ async function init(): Promise<void> {
       await saveSettings(next)
       stored = await loadSettings()
       fillForm(stored)
-      const usesBrowser =
-        stored.translationEngine === 'browser' || stored.pageTranslationEngine === 'browser'
+      const usesBrowser = stored.pageTranslationEngine === 'browser'
       if (usesBrowser && (browserCapability === 'unsupported' || browserCapability === 'unavailable')) {
         setStatus('已保存，但当前 Chrome 内置翻译不可用；请查看能力诊断或改用外部 LLM。', false)
       } else if (

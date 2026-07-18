@@ -171,7 +171,6 @@ function pageStyles(settings: PageSettings): string {
 
 type PageSettings = Pick<
   UserSettings,
-  | 'sourceLang'
   | 'targetLang'
   | 'pageTranslationEngine'
   | 'pageTranslationFontSizePx'
@@ -184,7 +183,7 @@ type PageSettings = Pick<
   | 'pageTranslationUnderline'
   | 'batchCharLimit'
   | 'minTextLength'
->
+> & { sourceLang: string }
 
 type TranslationGroup = {
   representative: TranslateBlock
@@ -592,6 +591,7 @@ export class PageTranslator {
         const response: unknown = await chrome.runtime.sendMessage({
           type: 'translate-batch',
           pageKey,
+          sourceLang: settings.sourceLang,
           blocks: batch,
         })
         if (!this.isCurrent(generation)) return

@@ -87,10 +87,8 @@ async function injectIntoOpenTabs(): Promise<void> {
 /** The only settings shape allowed to cross from the trusted background boundary. */
 function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg {
   const {
-    sourceLang,
     targetLang,
     autoTranslate,
-    translationEngine,
     pageTranslationEngine,
     autoPageTranslation,
     pageTranslationFontSizePx,
@@ -105,16 +103,13 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
     minTextLength,
     batchCharLimit,
     prefetchMarginRatio,
-    hotkey,
     pageTranslationHotkey,
   } = settings
   return {
     type: 'settings',
     settings: {
-      sourceLang,
       targetLang,
       autoTranslate,
-      translationEngine,
       pageTranslationEngine,
       autoPageTranslation,
       pageTranslationFontSizePx,
@@ -129,7 +124,6 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
       minTextLength,
       batchCharLimit,
       prefetchMarginRatio,
-      hotkey,
       pageTranslationHotkey,
       apiKey: '',
     },
@@ -164,6 +158,10 @@ function isTranslateBlock(value: unknown): value is TranslateBlock {
   )
 }
 
+function isLanguageCode(value: unknown): value is string {
+  return typeof value === 'string' && (value === 'auto' || /^[a-z]{2,3}$/u.test(value))
+}
+
 /** Runtime validation prevents internal pages from turning the worker into an unbounded fetch proxy. */
 function isToBackground(value: unknown): value is ToBackground {
   if (!isRecord(value) || typeof value.type !== 'string') return false
@@ -180,13 +178,15 @@ function isToBackground(value: unknown): value is ToBackground {
     return (
       typeof value.imageUrl === 'string' &&
       value.imageUrl.length > 0 &&
-      value.imageUrl.length <= 5_500_000
+      value.imageUrl.length <= 5_500_000 &&
+      isLanguageCode(value.sourceLang)
     )
   }
   if (value.type === 'translate-batch') {
     if (
       typeof value.pageKey !== 'string' ||
       value.pageKey.length > 4096 ||
+      !isLanguageCode(value.sourceLang) ||
       !Array.isArray(value.blocks) ||
       value.blocks.length > 500
     ) {
@@ -254,7 +254,7 @@ async function handle(
     if (!isConfigured(settings)) {
       return { type: 'translate-image-result', ok: false, error: 'API not configured' }
     }
-    const result = await translateImage(message.imageUrl, settings)
+    const result = await translateImage(message.imageUrl, message.sourceLang, settings)
     return result.ok
       ? { type: 'translate-image-result', ok: true, translation: result.translation }
       : { type: 'translate-image-result', ok: false, error: result.error }
@@ -274,7 +274,7 @@ async function handle(
     await ensureCacheHydrated()
     const { cached, missing, textHashToIds, idToText } = filterUncachedByText(
       message.pageKey,
-      settings.sourceLang,
+      message.sourceLang,
       settings.targetLang,
       message.blocks,
     )
@@ -285,14 +285,14 @@ async function handle(
 
     const result = await translateBlocksSingleFlight(
       message.pageKey,
-      settings.sourceLang,
+      message.sourceLang,
       settings.targetLang,
       missing,
       settings,
     )
     const expanded = expandTranslationsToAllIds(
       message.pageKey,
-      settings.sourceLang,
+      message.sourceLang,
       settings.targetLang,
       result.translations,
       idToText,

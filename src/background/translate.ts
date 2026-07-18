@@ -120,6 +120,7 @@ export async function translateBlocksSingleFlight(
       try {
         result = await translateAllBlocks(
           owned.map((entry) => entry.block),
+          sourceLang,
           settings,
         )
       } catch (error) {
@@ -170,12 +171,13 @@ export type TranslateImageResult =
 /** Fetch and upload one complete page image to the configured multimodal endpoint. */
 export async function translateImage(
   imageUrl: string,
+  sourceLang: string,
   settings: UserSettings,
 ): Promise<TranslateImageResult> {
   const imageDataUrl = await loadImageDataUrl(imageUrl)
   if (!imageDataUrl.ok) return imageDataUrl
 
-  const userPrompt = buildTranslateImagePrompt(settings.sourceLang, settings.targetLang)
+  const userPrompt = buildTranslateImagePrompt(sourceLang, settings.targetLang)
   const request: Omit<ChatJsonParams, 'useJsonSchema'> = {
     baseURL: settings.baseURL,
     apiKey: settings.apiKey,
@@ -293,6 +295,7 @@ async function loadImageDataUrl(
 /** Translate batches with bounded retries and preserve partial successes. */
 export async function translateAllBlocks(
   blocks: TranslateBlock[],
+  sourceLang: string,
   settings: UserSettings,
   opts?: { useJsonSchema?: boolean; sleep?: (ms: number) => Promise<void> },
 ): Promise<TranslateAllResult> {
@@ -311,7 +314,7 @@ export async function translateAllBlocks(
     while (attempt < 3 && !batchOk) {
       attempt++
       const userPrompt = buildTranslateUserPrompt(
-        settings.sourceLang,
+        sourceLang,
         settings.targetLang,
         batch,
       )
@@ -415,7 +418,7 @@ function describeUpstreamError(error: string, status?: number): string {
  * Used by the options page's “测试连接” button; never writes to the cache.
  */
 export async function testConnection(settings: UserSettings): Promise<ConnectionTestResult> {
-  const userPrompt = buildTranslateUserPrompt(settings.sourceLang, settings.targetLang, [
+  const userPrompt = buildTranslateUserPrompt('en', settings.targetLang, [
     { id: 't0', tag: 'p', text: 'Hello' },
   ])
   const request = {

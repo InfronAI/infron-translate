@@ -21,16 +21,9 @@ describe('LensController setting boundaries', () => {
     )
   })
 
-  it('keeps lens and full-page engine changes isolated', () => {
-    const lensChanged = { ...DEFAULT_SETTINGS, translationEngine: 'browser' as const }
+  it('keeps full-page engine changes isolated from lens translations', () => {
     const pageChanged = { ...DEFAULT_SETTINGS, pageTranslationEngine: 'external' as const }
 
-    expect(lensTranslationSigOf(lensChanged, false)).not.toBe(
-      lensTranslationSigOf(DEFAULT_SETTINGS, false),
-    )
-    expect(pageTranslationSigOf(lensChanged, false)).toBe(
-      pageTranslationSigOf(DEFAULT_SETTINGS, false),
-    )
     expect(pageTranslationSigOf(pageChanged, true)).not.toBe(
       pageTranslationSigOf(DEFAULT_SETTINGS, true),
     )

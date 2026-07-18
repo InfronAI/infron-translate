@@ -9,7 +9,7 @@
   <body>
     <header class="topbar">
       <div class="brand-lockup">
-        <span class="brand-mark" aria-hidden="true">L</span>
+        <span class="brand-mark" aria-hidden="true">I</span>
         <div class="brand-copy">
           <strong>Infron Translate</strong>
           <span>翻译工作台</span>
@@ -48,21 +48,16 @@
             <header class="section-heading">
               <div>
                 <h2>基础翻译</h2>
-                <p>控制翻译透镜的语言、引擎和交互方式。</p>
+                <p>控制翻译透镜的语言和交互方式。</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>翻译语言</h3>
-                <p>从 Chrome 内置翻译支持的语言中选择；列表同时显示 BCP 47 代码。</p>
+                <h3>目标语言</h3>
+                <p>原文语言会从当前网页自动检测；这里只选择译文语言。</p>
               </div>
-              <div class="control language-pair">
-                <label>
-                  <span>源语言</span>
-                  <select id="sourceLang" name="sourceLang"></select>
-                </label>
-                <span class="language-arrow" aria-hidden="true">→</span>
+              <div class="control">
                 <label>
                   <span>目标语言</span>
                   <select id="targetLang" name="targetLang"></select>
@@ -72,21 +67,8 @@
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>透镜文本引擎</h3>
-                <p>两种引擎互不兜底，失败时会显示所选引擎的具体状态。</p>
-              </div>
-              <div class="control">
-                <select id="translationEngine" name="translationEngine">
-                  <option value="external">外部 LLM</option>
-                  <option value="browser">Chrome 内置翻译</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-copy">
-                <h3>自动预译可见区</h3>
-                <p>滚动或页面更新时预先翻译透镜可能指向的文本。外部模式会主动发送文本。</p>
+                <h3>自动翻译</h3>
+                <p>启用后鼠标移到文本或图片上自动显示翻译；关闭时点击页面内容后翻译。</p>
               </div>
               <label class="switch-control">
                 <input id="autoTranslate" name="autoTranslate" type="checkbox" />
@@ -104,23 +86,6 @@
                 <input id="lensWidthPx" name="lensWidthPx" type="number" min="120" max="800" step="1" />
                 <span>px</span>
               </label>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-copy">
-                <h3>透镜快捷键</h3>
-                <p>短按保持打开，按住时临时查看；Mac 上 Option 对应 Alt。</p>
-              </div>
-              <div class="control hotkey-control">
-                <kbd id="hotkeyPreview">Option+Shift+L</kbd>
-                <button type="button" id="captureHotkey" class="button secondary">录制</button>
-                <span id="captureHint" class="capture-hint" hidden>请按下组合键，Esc 取消</span>
-              </div>
-              <input type="hidden" id="hotkeyAlt" />
-              <input type="hidden" id="hotkeyShift" />
-              <input type="hidden" id="hotkeyCtrl" />
-              <input type="hidden" id="hotkeyMeta" />
-              <input type="hidden" id="hotkeyCode" />
             </div>
           </section>
 
@@ -148,10 +113,10 @@
             <div class="setting-row emphasized-row">
               <div class="setting-copy">
                 <div class="title-with-badge">
-                  <h3>英文页面自动开启</h3>
+                  <h3>网页自动开启</h3>
                   <span class="small-badge">全局</span>
                 </div>
-                <p>页面识别为英文后自动启动整页双语。站点暂停规则仍然优先。</p>
+                <p>检测到网页原文语言后自动启动整页双语。站点暂停规则仍然优先。</p>
                 <p class="privacy-warning">选择外部 LLM 时，匹配到的页面文本会自动发送到所配置服务。</p>
               </div>
               <label class="switch-control">
@@ -254,7 +219,7 @@
             <header class="section-heading">
               <div>
                 <h2>Chrome 内置能力</h2>
-                <p>运行时检测比版本号更可靠，会同时检查 API 和当前语言对。</p>
+                <p>运行时检测比版本号更可靠；此处用英文到目标语言作为语言包样例。</p>
               </div>
             </header>
 
@@ -370,7 +335,7 @@
             <header class="section-heading">
               <div>
                 <h2>网站管理</h2>
-                <p>暂停的网站不会启动透镜、自动预译或整页翻译。</p>
+                <p>暂停的网站不会启动透镜、自动翻译或整页翻译。</p>
               </div>
             </header>
             <div class="setting-row">
