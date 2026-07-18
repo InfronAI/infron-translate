@@ -6,10 +6,7 @@ import type {
   MeetingTranscriptSegmentMsg,
 } from '../shared/messages'
 import type { UserSettings } from '../shared/settings-defaults'
-import {
-  clearStepFunAsrAuthorizationRule,
-  StepFunRealtimeAsrConnection,
-} from '../background/stt-stream'
+import { StepFunRealtimeAsrConnection } from '../background/stt-stream'
 
 const AUDIO_CHUNK_MS = 500
 
@@ -315,7 +312,6 @@ function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']):
     stream.close()
     asrStreams.delete(key)
   }
-  if (!asrStreams.size) void clearStepFunAsrAuthorizationRule().catch(() => undefined)
 }
 
 function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): string {

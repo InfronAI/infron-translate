@@ -75,7 +75,7 @@ export class StepFunRealtimeAsrConnection {
   }
 
   private async open(endpoint: string, apiKey: string, message: MeetingAudioChunkMsg): Promise<void> {
-    await installAuthorizationRule(endpoint, apiKey)
+    await ensureStepFunAsrAuthorizationRule(endpoint, apiKey)
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(endpoint)
       this.ws = ws
@@ -206,7 +206,11 @@ export async function clearStepFunAsrAuthorizationRule(): Promise<void> {
   await updateDnrRules({ removeRuleIds: [DNR_RULE_ID] })
 }
 
-async function installAuthorizationRule(endpoint: string, apiKey: string): Promise<void> {
+export async function ensureStepFunAsrAuthorizationRule(
+  endpoint: string,
+  apiKey: string,
+): Promise<void> {
+  if (!hasDnrApi()) return
   const url = new URL(endpoint)
   await updateDnrRules({
     removeRuleIds: [DNR_RULE_ID],
@@ -237,10 +241,15 @@ async function updateDnrRules(options: {
   removeRuleIds?: number[]
   addRules?: unknown[]
 }): Promise<void> {
-  const dnr = chrome.declarativeNetRequest as unknown as {
+  if (!hasDnrApi()) return
+  const dnr = chrome.declarativeNetRequest as {
     updateDynamicRules(options: unknown): Promise<void>
   }
   await dnr.updateDynamicRules(options)
+}
+
+function hasDnrApi(): boolean {
+  return Boolean(chrome.declarativeNetRequest?.updateDynamicRules)
 }
 
 function asrStreamEndpointError(endpoint: string): string | null {
