@@ -396,6 +396,7 @@ async function handle(
         audioMode: 'mock',
         sourceLang: 'auto',
         targetLang: 'cn',
+        uiLanguage: 'zh',
       },
     }
   }

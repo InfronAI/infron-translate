@@ -2,6 +2,7 @@ import type {
   MeetingContextAlignment,
   MeetingRuntimeState,
   MeetingSummaryState,
+  MeetingUiLanguage,
   TranscriptSegment,
 } from '../shared/meeting'
 import type {
@@ -38,6 +39,95 @@ type DragState = {
   windowX: number
   windowY: number
 }
+
+type MeetingCopy = (typeof MEETING_COPY)[MeetingUiLanguage]
+
+const MEETING_COPY = {
+  zh: {
+    meetingAssistant: '会议助手',
+    restoreWindow: '恢复会议助手窗口',
+    closeWindow: '关闭会议助手',
+    minimizeWindow: '最小化会议助手',
+    maximizeWindow: '最大化会议助手',
+    windowControls: '窗口控制',
+    audioControls: '音频输入控制',
+    systemAudio: '系统音频',
+    systemAudioInput: '系统音频输入',
+    micInput: '麦克风输入',
+    off: '关闭',
+    preMeetingMaterial: '会前材料',
+    noPreMeetingContext: '未提供会前材料',
+    cancel: '取消',
+    edit: '编辑',
+    add: '添加',
+    clear: '清空',
+    saveContext: '保存材料',
+    contextPlaceholder: '粘贴会议议程、目标、客户背景、策略、风险和预期产出。',
+    contextEmpty: '在会议前或会议中添加议程、目标、策略、风险和预期产出。',
+    meetingOutline: '会议实时总结',
+    outline: '会议脉络',
+    decisions: '已确认决策',
+    actionItems: '行动项',
+    openQuestions: '待确认问题',
+    noDecision: '暂未捕获决策。',
+    noActionItem: '暂未捕获行动项。',
+    contextAlignment: '会前材料对齐',
+    completedGoals: '已完成目标',
+    unmetGoals: '未完成目标',
+    courseCorrection: '纠偏建议',
+    evidenceReflection: '证据与反思',
+    noGoalEvidence: '暂未找到足够的转录证据。',
+    liveTranscript: '实时转录',
+    transcriptSubtitle: '原文语音和翻译文本',
+    waitingSpeech: '等待真实语音...',
+    onTrack: '按计划进行',
+    atRisk: '存在偏离风险',
+    offTrack: '已偏离计划',
+    notProvided: '未提供',
+  },
+  en: {
+    meetingAssistant: 'Meeting Assistant',
+    restoreWindow: 'Restore Meeting Assistant',
+    closeWindow: 'Close Meeting Assistant',
+    minimizeWindow: 'Minimize Meeting Assistant',
+    maximizeWindow: 'Maximize Meeting Assistant',
+    windowControls: 'Window controls',
+    audioControls: 'Audio input controls',
+    systemAudio: 'System Audio',
+    systemAudioInput: 'System audio input',
+    micInput: 'Mic Input',
+    off: 'Off',
+    preMeetingMaterial: 'Pre-meeting Material',
+    noPreMeetingContext: 'No pre-meeting context',
+    cancel: 'Cancel',
+    edit: 'Edit',
+    add: 'Add',
+    clear: 'Clear',
+    saveContext: 'Save Context',
+    contextPlaceholder: 'Paste the agenda, planned goals, account context, strategy, risks, and expected outcomes.',
+    contextEmpty: 'Add agenda, goals, strategy, risks, and expected outcomes before or during the meeting.',
+    meetingOutline: 'Meeting Outline',
+    outline: 'Outline',
+    decisions: 'Decisions',
+    actionItems: 'Action Items',
+    openQuestions: 'Open Questions',
+    noDecision: 'No decision captured yet.',
+    noActionItem: 'No action item captured yet.',
+    contextAlignment: 'Context Alignment',
+    completedGoals: 'Completed Goals',
+    unmetGoals: 'Unmet Goals',
+    courseCorrection: 'Course-correction Suggestions',
+    evidenceReflection: 'Evidence and Reflection',
+    noGoalEvidence: 'No goal has enough transcript evidence yet.',
+    liveTranscript: 'Live Transcript',
+    transcriptSubtitle: 'Original speech and translated text',
+    waitingSpeech: 'Waiting for real speech...',
+    onTrack: 'On track',
+    atRisk: 'At risk',
+    offTrack: 'Off track',
+    notProvided: 'Not provided',
+  },
+} as const
 
 export class MeetingOverlay {
   private host: HTMLElement | null = null
@@ -96,6 +186,7 @@ export class MeetingOverlay {
   private render(): void {
     if (!this.root || !this.state || !this.windowState) return
     const { session, segments, summary, audio, transcription } = this.state
+    const copy = MEETING_COPY[session.uiLanguage]
     const micLabel = audio.microphoneLabel || 'Default microphone'
     const outputLabel = audio.outputLabel || 'Current Chrome tab audio'
     this.root.replaceChildren()
@@ -106,10 +197,10 @@ export class MeetingOverlay {
       const dock = document.createElement('button')
       dock.className = 'dock'
       dock.type = 'button'
-      dock.setAttribute('aria-label', 'Restore Meeting Assistant')
+      dock.setAttribute('aria-label', copy.restoreWindow)
       dock.innerHTML = `
         <img class="dock-logo" src="${chrome.runtime.getURL('icons/infron-mark.png')}" alt="" aria-hidden="true" />
-        <span>Meeting Assistant</span>
+        <span>${escapeHtml(copy.meetingAssistant)}</span>
       `
       dock.addEventListener('click', () => {
         this.windowState = { ...this.windowState!, minimized: false }
@@ -121,31 +212,31 @@ export class MeetingOverlay {
 
     const shell = document.createElement('section')
     shell.className = 'overlay'
-    shell.setAttribute('aria-label', 'Infron Translate Meeting Assistant')
+    shell.setAttribute('aria-label', copy.meetingAssistant)
     shell.style.left = `${this.windowState.x}px`
     shell.style.top = `${this.windowState.y}px`
     shell.style.width = `${this.windowState.width}px`
     shell.style.height = `${this.windowState.height}px`
     shell.innerHTML = `
       <header class="topbar">
-        <div class="traffic-lights" role="group" aria-label="Window controls">
-          <button class="traffic close" type="button" aria-label="Close Meeting Assistant"></button>
-          <button class="traffic minimize" type="button" aria-label="Minimize Meeting Assistant"></button>
-          <button class="traffic maximize" type="button" aria-label="${this.windowState.maximized ? 'Restore Meeting Assistant' : 'Maximize Meeting Assistant'}"></button>
+        <div class="traffic-lights" role="group" aria-label="${escapeHtml(copy.windowControls)}">
+          <button class="traffic close" type="button" aria-label="${escapeHtml(copy.closeWindow)}"></button>
+          <button class="traffic minimize" type="button" aria-label="${escapeHtml(copy.minimizeWindow)}"></button>
+          <button class="traffic maximize" type="button" aria-label="${escapeHtml(this.windowState.maximized ? copy.restoreWindow : copy.maximizeWindow)}"></button>
         </div>
-        <div class="input-switches" role="group" aria-label="Audio input controls">
+        <div class="input-switches" role="group" aria-label="${escapeHtml(copy.audioControls)}">
           <button class="input-toggle system-toggle ${audio.output ? 'active' : ''}" type="button" aria-pressed="${audio.output}">
             <span class="toggle-track" aria-hidden="true"><span></span></span>
             <span class="toggle-copy">
-              <strong>System Audio</strong>
-              <em>${audio.output ? escapeHtml(outputLabel) : 'Off'}</em>
+              <strong>${escapeHtml(copy.systemAudio)}</strong>
+              <em>${audio.output ? escapeHtml(outputLabel) : escapeHtml(copy.off)}</em>
             </span>
           </button>
           <button class="input-toggle mic-toggle ${this.isMicActive() ? 'active' : ''}" type="button" aria-pressed="${this.isMicActive()}">
             <span class="toggle-track" aria-hidden="true"><span></span></span>
             <span class="toggle-copy">
-              <strong>Mic Input</strong>
-              <em>${this.isMicActive() ? escapeHtml(micLabel) : 'Off'}</em>
+              <strong>${escapeHtml(copy.micInput)}</strong>
+              <em>${this.isMicActive() ? escapeHtml(micLabel) : escapeHtml(copy.off)}</em>
             </span>
           </button>
         </div>
@@ -155,10 +246,11 @@ export class MeetingOverlay {
           this.contextEditorOpen,
           this.contextEditorOpen ? this.contextDraft : this.state.preMeetingMaterial,
           this.state.contextAlignment,
+          copy,
         )}
         <section class="audio-meters">
-          ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel, micLabel)}
-          ${meterHtml('System audio input', audio.output, audio.outputLevel, outputLabel)}
+          ${meterHtml(copy.micInput, audio.microphone, audio.microphoneLevel, micLabel, copy)}
+          ${meterHtml(copy.systemAudioInput, audio.output, audio.outputLevel, outputLabel, copy)}
         </section>
         <article class="screen summary-screen"></article>
         <article class="screen transcript-screen"></article>
@@ -227,10 +319,10 @@ export class MeetingOverlay {
     })
     shell
       .querySelector<HTMLElement>('.summary-screen')
-      ?.append(renderSummary(summary, this.state.contextAlignment))
+      ?.append(renderSummary(summary, this.state.contextAlignment, copy))
     shell
       .querySelector<HTMLElement>('.transcript-screen')
-      ?.append(renderTranscript(segments, transcription.message))
+      ?.append(renderTranscript(segments, transcription.message, copy))
     this.root.append(style, shell)
   }
 
@@ -347,7 +439,10 @@ export class MeetingOverlay {
       await this.sendAudioStatus({
         active: true,
         source: 'external-stt',
-        message: 'Microphone transcription is streaming to StepFun ASR.',
+        message:
+          session.uiLanguage === 'zh'
+            ? '麦克风正在通过 StepFun ASR 转录。'
+            : 'Microphone transcription is streaming to StepFun ASR.',
       })
       this.render()
       return
@@ -369,7 +464,10 @@ export class MeetingOverlay {
         transcription: {
           active: false,
           source: 'external-stt',
-          message: 'Microphone transcription is stopped.',
+          message:
+            this.state.session.uiLanguage === 'zh'
+              ? '麦克风转录已停止。'
+              : 'Microphone transcription is stopped.',
         },
       } satisfies MeetingAudioStatusMsg)
     }
@@ -421,10 +519,14 @@ export class MeetingOverlay {
         } satisfies MeetingAudioStatusMsg)
       }, 500)
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       await this.sendAudioStatus({
         active: false,
         source: 'external-stt',
-        message: `Microphone access failed: ${error instanceof Error ? error.message : String(error)}`,
+        message:
+          this.state?.session.uiLanguage === 'zh'
+            ? `麦克风访问失败：${message}`
+            : `Microphone access failed: ${message}`,
       })
       throw error
     }
@@ -542,7 +644,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
-function meterHtml(label: string, enabled: boolean, level: number, caption: string): string {
+function meterHtml(
+  label: string,
+  enabled: boolean,
+  level: number,
+  caption: string,
+  copy: MeetingCopy,
+): string {
   const percent = Math.round(clamp(level, 0, 1) * 100)
   const tone = percent >= 55 ? 'hot' : percent >= 18 ? 'live' : 'quiet'
   return `
@@ -552,7 +660,7 @@ function meterHtml(label: string, enabled: boolean, level: number, caption: stri
           <span class="meter-label"><i aria-hidden="true"></i>${escapeHtml(label)}</span>
           <small>${escapeHtml(caption)}</small>
         </div>
-        <strong>${enabled ? `${percent}%` : 'Off'}</strong>
+        <strong>${enabled ? `${percent}%` : escapeHtml(copy.off)}</strong>
       </div>
       <div class="meter-track" aria-hidden="true">
         <span style="width: ${enabled ? percent : 0}%"></span>
@@ -610,32 +718,33 @@ function contextEditorHtml(
   open: boolean,
   material: string,
   alignment: MeetingContextAlignment,
+  copy: MeetingCopy,
 ): string {
   const label = alignment.hasMaterial
-    ? statusLabel(alignment.strategyStatus)
-    : 'No pre-meeting context'
+    ? statusLabel(alignment.strategyStatus, copy)
+    : copy.noPreMeetingContext
   return `
     <section class="context-editor ${open ? 'open' : ''}">
       <div class="context-editor-head">
         <div>
-          <strong>Pre-meeting Material</strong>
+          <strong>${escapeHtml(copy.preMeetingMaterial)}</strong>
           <span class="alignment-pill ${alignment.strategyStatus}">${escapeHtml(label)}</span>
         </div>
-        <button class="context-toggle" type="button">${open ? 'Cancel' : alignment.hasMaterial ? 'Edit' : 'Add'}</button>
+        <button class="context-toggle" type="button">${escapeHtml(open ? copy.cancel : alignment.hasMaterial ? copy.edit : copy.add)}</button>
       </div>
       ${
         open
           ? `
-            <textarea class="context-input" maxlength="20000" placeholder="Paste the agenda, planned goals, account context, strategy, risks, and expected outcomes.">${escapeHtml(material)}</textarea>
+            <textarea class="context-input" maxlength="20000" placeholder="${escapeHtml(copy.contextPlaceholder)}">${escapeHtml(material)}</textarea>
             <div class="context-actions">
-              <button class="context-save" type="button">Save Context</button>
-              <button class="context-clear" type="button">Clear</button>
+              <button class="context-save" type="button">${escapeHtml(copy.saveContext)}</button>
+              <button class="context-clear" type="button">${escapeHtml(copy.clear)}</button>
             </div>
           `
           : `<p>${escapeHtml(
               alignment.hasMaterial
                 ? materialPreview(material)
-                : 'Add agenda, goals, strategy, risks, and expected outcomes before or during the meeting.',
+                : copy.contextEmpty,
             )}</p>`
       }
     </section>
@@ -645,48 +754,53 @@ function contextEditorHtml(
 function renderSummary(
   summary: MeetingSummaryState,
   alignment: MeetingContextAlignment,
+  copy: MeetingCopy,
 ): HTMLElement {
   const wrapper = document.createElement('div')
   wrapper.className = 'screen-inner'
   wrapper.append(
-    titleBlock('1', 'Meeting Outline', summary.currentTopic),
-    renderAlignment(alignment),
-    section('Outline', summary.outline),
-    section('Decisions', summary.decisions.length ? summary.decisions : ['No decision captured yet.']),
+    titleBlock('1', copy.meetingOutline, summary.currentTopic),
+    renderAlignment(alignment, copy),
+    section(copy.outline, summary.outline),
+    section(copy.decisions, summary.decisions.length ? summary.decisions : [copy.noDecision]),
     section(
-      'Action Items',
+      copy.actionItems,
       summary.actionItems.length
         ? summary.actionItems.map((item) => [item.owner, item.task, item.due].filter(Boolean).join(' · '))
-        : ['No action item captured yet.'],
+        : [copy.noActionItem],
     ),
-    section('Open Questions', summary.openQuestions),
+    section(copy.openQuestions, summary.openQuestions),
   )
   return wrapper
 }
 
-function renderAlignment(alignment: MeetingContextAlignment): HTMLElement {
+function renderAlignment(alignment: MeetingContextAlignment, copy: MeetingCopy): HTMLElement {
   const wrapper = document.createElement('section')
   wrapper.className = 'alignment-panel'
   const title = document.createElement('div')
   title.className = 'alignment-title'
   title.innerHTML = `
-    <h4>Context Alignment</h4>
-    <span class="alignment-pill ${alignment.strategyStatus}">${escapeHtml(statusLabel(alignment.strategyStatus))}</span>
+    <h4>${escapeHtml(copy.contextAlignment)}</h4>
+    <span class="alignment-pill ${alignment.strategyStatus}">${escapeHtml(statusLabel(alignment.strategyStatus, copy))}</span>
   `
   wrapper.append(
     title,
-    section('Completed Goals', alignment.completedGoals.length ? alignment.completedGoals : ['No goal has enough transcript evidence yet.']),
-    section('Unmet Goals', alignment.unmetGoals),
-    section('Course-correction Suggestions', alignment.correctiveSuggestions),
-    section('Evidence and Reflection', alignment.evidence),
+    section(copy.completedGoals, alignment.completedGoals.length ? alignment.completedGoals : [copy.noGoalEvidence]),
+    section(copy.unmetGoals, alignment.hasMaterial ? alignment.unmetGoals : [copy.noPreMeetingContext]),
+    section(copy.courseCorrection, alignment.hasMaterial ? alignment.correctiveSuggestions : [copy.contextEmpty]),
+    section(copy.evidenceReflection, alignment.hasMaterial ? alignment.evidence : [copy.waitingSpeech]),
   )
   return wrapper
 }
 
-function renderTranscript(segments: TranscriptSegment[], transcriptionMessage: string): HTMLElement {
+function renderTranscript(
+  segments: TranscriptSegment[],
+  transcriptionMessage: string,
+  copy: MeetingCopy,
+): HTMLElement {
   const wrapper = document.createElement('div')
   wrapper.className = 'screen-inner'
-  wrapper.append(titleBlock('2', 'Live Transcript', 'Original speech and translated text'))
+  wrapper.append(titleBlock('2', copy.liveTranscript, copy.transcriptSubtitle))
   const status = document.createElement('p')
   status.className = 'transcription-status'
   status.textContent = transcriptionMessage
@@ -697,7 +811,7 @@ function renderTranscript(segments: TranscriptSegment[], transcriptionMessage: s
   if (!recent.length) {
     const empty = document.createElement('p')
     empty.className = 'empty'
-    empty.textContent = 'Waiting for real speech...'
+    empty.textContent = copy.waitingSpeech
     list.append(empty)
   }
   for (const segment of recent) {
@@ -745,11 +859,11 @@ function section(title: string, items: string[]): HTMLElement {
   return node
 }
 
-function statusLabel(status: MeetingContextAlignment['strategyStatus']): string {
-  if (status === 'on-track') return 'On track'
-  if (status === 'at-risk') return 'At risk'
-  if (status === 'off-track') return 'Off track'
-  return 'Not provided'
+function statusLabel(status: MeetingContextAlignment['strategyStatus'], copy: MeetingCopy): string {
+  if (status === 'on-track') return copy.onTrack
+  if (status === 'at-risk') return copy.atRisk
+  if (status === 'off-track') return copy.offTrack
+  return copy.notProvided
 }
 
 function materialPreview(material: string): string {

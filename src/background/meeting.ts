@@ -4,6 +4,7 @@ import type {
   MeetingRuntimeState,
   MeetingSession,
   MeetingSummaryState,
+  MeetingUiLanguage,
   MeetingUpdatePayload,
   TranscriptSegment,
 } from '../shared/meeting'
@@ -69,6 +70,8 @@ export class MeetingManager {
     audioMode: MeetingAudioMode
   }): Promise<MeetingSession> {
     await this.stop()
+    const settings = await loadSettings()
+    const uiLanguage = settings.uiLanguage
     const now = Date.now()
     const session: MeetingSession = {
       id: `meeting-${now}-${Math.random().toString(36).slice(2, 8)}`,
@@ -78,8 +81,9 @@ export class MeetingManager {
       audioMode: input.audioMode,
       sourceLang: input.sourceLang,
       targetLang: input.targetLang,
+      uiLanguage,
     }
-    const summary = this.initialSummary(session.id)
+    const summary = this.initialSummary(session.id, uiLanguage)
     this.state = {
       session,
       segments: [],
@@ -99,8 +103,8 @@ export class MeetingManager {
         source: input.audioMode === 'mock' ? 'mock' : 'none',
         message:
           input.audioMode === 'mock'
-            ? 'Demo transcript stream is running.'
-            : 'Mic input and system audio are off. Turn on either input when you are ready to transcribe.',
+            ? meetingMessage(uiLanguage, 'demo')
+            : meetingMessage(uiLanguage, 'inputsOff'),
       },
     }
 
@@ -132,8 +136,7 @@ export class MeetingManager {
         ? {
             active: false,
             source: 'none' as const,
-            message:
-              'System audio input detected. StepFun ASR transcription will start when audio chunks are available.',
+            message: meetingMessage(this.state.session.uiLanguage, 'systemDetected'),
           }
         : this.state.transcription)
     this.state = {
@@ -180,8 +183,8 @@ export class MeetingManager {
         source: message.channel === 'meeting-output' ? 'external-stt' : this.state.transcription.source,
         message:
           message.channel === 'meeting-output'
-            ? 'Live system audio transcription is running through StepFun ASR SSE.'
-            : 'Live microphone transcription is running.',
+            ? meetingMessage(this.state.session.uiLanguage, 'systemRunning')
+            : meetingMessage(this.state.session.uiLanguage, 'micRunning'),
       },
     }
     await this.broadcastUpdate()
@@ -196,7 +199,9 @@ export class MeetingManager {
       transcription: {
         active: true,
         source: 'external-stt',
-        message: `${labelForChannel(message.channel)} PCM audio chunk received; sending to StepFun ASR...`,
+        message: meetingMessage(this.state.session.uiLanguage, 'chunkReceived', {
+          channel: localizedChannel(this.state.session.uiLanguage, message.channel),
+        }),
       },
     })
     const queue = this.sttQueues.get(key) ?? []
@@ -210,7 +215,10 @@ export class MeetingManager {
         transcription: {
           active: true,
           source: 'external-stt',
-          message: `${labelForChannel(message.channel)} audio queued for StepFun ASR (${queue.length} chunk${queue.length === 1 ? '' : 's'}).`,
+          message: meetingMessage(this.state.session.uiLanguage, 'queued', {
+            channel: localizedChannel(this.state.session.uiLanguage, message.channel),
+            count: String(queue.length),
+          }),
         },
       })
       return
@@ -248,7 +256,7 @@ export class MeetingManager {
         transcription: {
           active: false,
           source: 'external-stt',
-          message: 'Configure Speech Recognition with an ASR API Key to enable transcription.',
+          message: meetingMessage(this.state.session.uiLanguage, 'asrKeyMissing'),
         },
       })
       return
@@ -260,7 +268,9 @@ export class MeetingManager {
       transcription: {
         active: true,
         source: 'external-stt',
-        message: `Transcribing ${labelForChannel(message.channel).toLowerCase()} audio with StepFun ASR SSE...`,
+        message: meetingMessage(this.state.session.uiLanguage, 'transcribing', {
+          channel: localizedChannel(this.state.session.uiLanguage, message.channel).toLowerCase(),
+        }),
       },
     })
     const result = await transcribeAudioChunk({
@@ -277,7 +287,9 @@ export class MeetingManager {
         transcription: {
           active: false,
           source: 'external-stt',
-          message: `StepFun ASR failed: ${result.error}`,
+          message: meetingMessage(this.state.session.uiLanguage, 'asrFailed', {
+            error: result.error,
+          }),
         },
       })
       return
@@ -289,7 +301,9 @@ export class MeetingManager {
         transcription: {
           active: true,
           source: 'external-stt',
-          message: `${labelForChannel(message.channel)} audio detected; StepFun ASR returned no speech for this chunk.`,
+          message: meetingMessage(this.state.session.uiLanguage, 'noSpeech', {
+            channel: localizedChannel(this.state.session.uiLanguage, message.channel),
+          }),
         },
       })
       return
@@ -298,7 +312,14 @@ export class MeetingManager {
       type: 'meeting-transcript-segment',
       sessionId: message.sessionId,
       channel: message.channel,
-      speakerLabel: message.channel === 'meeting-output' ? 'System Audio' : 'You',
+      speakerLabel:
+        message.channel === 'meeting-output'
+          ? this.state.session.uiLanguage === 'zh'
+            ? '系统音频'
+            : 'System Audio'
+          : this.state.session.uiLanguage === 'zh'
+            ? '我'
+            : 'You',
       sourceLang: message.sourceLang,
       originalText: result.text,
       startedAt: message.startedAt,
@@ -370,14 +391,19 @@ export class MeetingManager {
     this.state = null
   }
 
-  private initialSummary(sessionId: string): MeetingSummaryState {
+  private initialSummary(sessionId: string, uiLanguage: MeetingUiLanguage): MeetingSummaryState {
+    const zh = uiLanguage === 'zh'
     return {
       sessionId,
-      currentTopic: 'Waiting for real meeting audio',
-      outline: ['No real transcript has been captured yet.'],
+      currentTopic: zh ? '等待真实会议音频' : 'Waiting for real meeting audio',
+      outline: [zh ? '尚未捕获真实转录内容。' : 'No real transcript has been captured yet.'],
       decisions: [],
       actionItems: [],
-      openQuestions: ['Allow microphone permission, then speak to test live transcription.'],
+      openQuestions: [
+        zh
+          ? '开启麦克风或系统音频后，开始讲话以测试实时转录。'
+          : 'Turn on mic or system audio, then speak to test live transcription.',
+      ],
       updatedAt: Date.now(),
     }
   }
@@ -413,23 +439,41 @@ export class MeetingManager {
 
   private summarize(sessionId: string, segments: TranscriptSegment[]): MeetingSummaryState {
     const recent = segments.slice(-6)
+    const zh = this.state?.session.uiLanguage === 'zh'
     return {
       sessionId,
       currentTopic:
-        recent.at(-1)?.originalText.replace(/\.$/u, '') ?? 'Meeting assistant is listening',
+        recent.at(-1)?.originalText.replace(/\.$/u, '') ??
+        (zh ? '会议助手正在监听' : 'Meeting assistant is listening'),
       outline: [
         ...recent.map((segment) => `${segment.speakerLabel}: ${segment.originalText}`),
       ].slice(-5),
       decisions:
-        segments.length >= 3 ? ['Live transcript is being captured from real speech.'] : [],
+        segments.length >= 3
+          ? [zh ? '正在从真实语音中捕获实时转录。' : 'Live transcript is being captured from real speech.']
+          : [],
       actionItems:
         segments.length >= 2
-          ? [{ task: 'Review transcript accuracy and connect production STT for meeting output audio.' }]
+          ? [
+              {
+                task: zh
+                  ? '检查转录准确性，并确认会议音频输出链路稳定。'
+                  : 'Review transcript accuracy and confirm the meeting output audio pipeline is stable.',
+              },
+            ]
           : [],
       openQuestions:
         segments.length >= 4
-          ? ['Should desktop/system audio capture be added through a dedicated STT provider?']
-          : ['Is the microphone permission granted and receiving speech?'],
+          ? [
+              zh
+                ? '是否需要继续扩展桌面级系统音频捕获能力？'
+                : 'Should desktop-level system audio capture be added later?',
+            ]
+          : [
+              zh
+                ? '麦克风或系统音频是否已开启，并正在接收语音？'
+                : 'Is mic or system audio enabled and receiving speech?',
+            ],
       updatedAt: Date.now(),
     }
   }
@@ -684,7 +728,60 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
-function labelForChannel(channel: string): string {
+type MeetingMessageKey =
+  | 'demo'
+  | 'inputsOff'
+  | 'systemDetected'
+  | 'systemRunning'
+  | 'micRunning'
+  | 'chunkReceived'
+  | 'queued'
+  | 'asrKeyMissing'
+  | 'transcribing'
+  | 'asrFailed'
+  | 'noSpeech'
+
+function meetingMessage(
+  language: MeetingUiLanguage,
+  key: MeetingMessageKey,
+  params: Record<string, string> = {},
+): string {
+  const copy: Record<MeetingMessageKey, string> =
+    language === 'zh'
+      ? {
+          demo: '演示转录流正在运行。',
+          inputsOff: '麦克风和系统音频均已关闭。准备转录时请手动开启输入源。',
+          systemDetected: '检测到系统音频输入。收到音频分片后将开始 StepFun ASR 转录。',
+          systemRunning: '系统音频正在通过 StepFun ASR SSE 实时转录。',
+          micRunning: '麦克风正在实时转录。',
+          chunkReceived: '{channel} PCM 音频分片已收到，正在发送到 StepFun ASR...',
+          queued: '{channel} 音频已加入 StepFun ASR 队列（{count} 个分片）。',
+          asrKeyMissing: '请先在“会议转录”中配置 ASR API Key。',
+          transcribing: '正在使用 StepFun ASR SSE 转录{channel}音频...',
+          asrFailed: 'StepFun ASR 失败：{error}',
+          noSpeech: '检测到{channel}音频，但 StepFun ASR 未返回语音文本。',
+        }
+      : {
+          demo: 'Demo transcript stream is running.',
+          inputsOff: 'Mic input and system audio are off. Turn on either input when you are ready to transcribe.',
+          systemDetected: 'System audio input detected. StepFun ASR transcription will start when audio chunks are available.',
+          systemRunning: 'Live system audio transcription is running through StepFun ASR SSE.',
+          micRunning: 'Live microphone transcription is running.',
+          chunkReceived: '{channel} PCM audio chunk received; sending to StepFun ASR...',
+          queued: '{channel} audio queued for StepFun ASR ({count} chunks).',
+          asrKeyMissing: 'Configure Meeting Transcription with an ASR API Key to enable transcription.',
+          transcribing: 'Transcribing {channel} audio with StepFun ASR SSE...',
+          asrFailed: 'StepFun ASR failed: {error}',
+          noSpeech: '{channel} audio detected; StepFun ASR returned no speech for this chunk.',
+        }
+  return Object.entries(params).reduce(
+    (message, [name, value]) => message.replaceAll(`{${name}}`, value),
+    copy[key],
+  )
+}
+
+function localizedChannel(language: MeetingUiLanguage, channel: string): string {
+  if (language === 'zh') return channel === 'meeting-output' ? '系统' : '麦克风'
   return channel === 'meeting-output' ? 'System' : 'Microphone'
 }
 

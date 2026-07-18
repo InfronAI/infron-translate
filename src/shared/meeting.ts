@@ -1,6 +1,7 @@
 export type MeetingStatus = 'idle' | 'starting' | 'listening' | 'stopping' | 'stopped' | 'error'
 export type MeetingAudioMode = 'tab-and-mic' | 'tab-only' | 'mock'
 export type MeetingChannel = 'microphone' | 'meeting-output'
+export type MeetingUiLanguage = 'zh' | 'en'
 
 export type MeetingSession = {
   id: string
@@ -11,6 +12,7 @@ export type MeetingSession = {
   audioMode: MeetingAudioMode
   sourceLang: string
   targetLang: string
+  uiLanguage: MeetingUiLanguage
   error?: string
 }
 
