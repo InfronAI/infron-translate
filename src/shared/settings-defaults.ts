@@ -7,11 +7,11 @@ export type UserSettings = {
   baseURL: string
   apiKey: string
   model: string
-  /** auto | openai | deepseek | stepfun */
+  /** openai | infron | openrouter */
   provider: ProviderId
   /**
-   * Thinking / reasoning for providers that support it.
-   * Default off (or lowest where off is unavailable, e.g. StepFun → low).
+   * Thinking / reasoning preference for compatible providers.
+   * Current presets do not inject provider-specific reasoning parameters.
    */
   reasoningPref: ReasoningPref
   /** auto means use the detected language for the active webpage. */
@@ -37,10 +37,10 @@ export type UserSettings = {
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
-  baseURL: 'https://api.openai.com/v1',
+  baseURL: 'https://llm.onerouter.pro/v1',
   apiKey: '',
-  model: 'gpt-4o-mini',
-  provider: 'auto',
+  model: 'deepseek/deepseek-v3.2',
+  provider: 'infron',
   reasoningPref: 'off',
   sourceLang: 'auto',
   targetLang: 'cn',
@@ -61,7 +61,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
 }
 
 function asProviderId(v: unknown): ProviderId {
-  if (v === 'openai' || v === 'deepseek' || v === 'stepfun' || v === 'auto') return v
+  if (v === 'openai' || v === 'infron' || v === 'openrouter') return v
+  if (v === 'auto' || v === 'deepseek' || v === 'stepfun') return 'openai'
   return DEFAULT_SETTINGS.provider
 }
 

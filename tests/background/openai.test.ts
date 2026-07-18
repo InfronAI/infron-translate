@@ -48,36 +48,38 @@ describe('chatCompletionsJson', () => {
     expect(body.response_format.type).toBe('json_schema')
   })
 
-  it('sends DeepSeek thinking disabled when provider=deepseek and reasoning off', async () => {
+  it('does not inject provider-specific fields for Infron', async () => {
     await chatCompletionsJson({
-      baseURL: 'https://api.deepseek.com',
+      baseURL: 'https://llm.onerouter.pro/v1',
       apiKey: 'sk-x',
-      model: 'deepseek-chat',
+      model: 'deepseek/deepseek-v3.2',
       systemPrompt: 'sys',
       userPrompt: 'user',
       useJsonSchema: false,
-      provider: 'deepseek',
+      provider: 'infron',
       reasoningPref: 'off',
     })
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body.thinking).toEqual({ type: 'disabled' })
+    expect(body.thinking).toBeUndefined()
+    expect(body.reasoning_effort).toBeUndefined()
   })
 
-  it('sends StepFun reasoning_effort=low when off', async () => {
+  it('does not inject provider-specific fields for OpenRouter', async () => {
     await chatCompletionsJson({
-      baseURL: 'https://api.stepfun.com/v1',
+      baseURL: 'https://openrouter.ai/api/v1',
       apiKey: 'sk-x',
-      model: 'step-3.5-flash',
+      model: 'openai/gpt-4o-mini',
       systemPrompt: 'sys',
       userPrompt: 'user',
       useJsonSchema: false,
-      provider: 'stepfun',
+      provider: 'openrouter',
       reasoningPref: 'off',
     })
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body.reasoning_effort).toBe('low')
+    expect(body.thinking).toBeUndefined()
+    expect(body.reasoning_effort).toBeUndefined()
   })
 
   it('returns error on non-OK', async () => {

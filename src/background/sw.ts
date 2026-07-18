@@ -192,10 +192,9 @@ function isToBackground(value: unknown): value is ToBackground {
       value.apiKey.length <= 512 &&
       typeof value.model === 'string' &&
       value.model.length <= 256 &&
-      (value.provider === 'auto' ||
-        value.provider === 'openai' ||
-        value.provider === 'deepseek' ||
-        value.provider === 'stepfun') &&
+      (value.provider === 'openai' ||
+        value.provider === 'infron' ||
+        value.provider === 'openrouter') &&
       (value.reasoningPref === 'off' ||
         value.reasoningPref === 'low' ||
         value.reasoningPref === 'medium' ||

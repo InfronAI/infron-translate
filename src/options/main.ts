@@ -200,16 +200,12 @@ async function normalizeUnavailableEngine(settings: UserSettings): Promise<UserS
 
 function updateProviderHint(provider: string): void {
   const hint = el<HTMLElement>('providerHint')
-  if (provider === 'deepseek') {
-    hint.textContent =
-      'Uses thinking.type=disabled by default. Common Base URL: https://api.deepseek.com'
-  } else if (provider === 'stepfun') {
-    hint.textContent =
-      'Uses reasoning_effort=low by default. Common Base URL: https://api.stepfun.com/v1'
-  } else if (provider === 'openai') {
-    hint.textContent = 'Generic OpenAI-compatible endpoint.'
+  if (provider === 'infron') {
+    hint.textContent = 'Infron OpenAI-compatible endpoint. Common Base URL: https://llm.onerouter.pro/v1'
+  } else if (provider === 'openrouter') {
+    hint.textContent = 'OpenRouter OpenAI-compatible endpoint. Common Base URL: https://openrouter.ai/api/v1'
   } else {
-    hint.textContent = 'Auto-detect provider parameters from the endpoint and model.'
+    hint.textContent = 'Use any OpenAI-compatible endpoint, model, and API key.'
   }
 }
 
@@ -290,10 +286,10 @@ function applyProviderPreset(id: string): void {
   const base = el<HTMLInputElement>('baseURL')
   const model = el<HTMLInputElement>('model')
   // Only fill empty or previous default-looking fields
-  if (!base.value.trim() || /openai\.com|deepseek\.com|stepfun\./i.test(base.value)) {
+  if (!base.value.trim() || /openai\.com|onerouter\.pro|openrouter\.ai/i.test(base.value)) {
     base.value = preset.baseURL
   }
-  if (!model.value.trim() || /gpt-4o-mini|deepseek|step-/i.test(model.value)) {
+  if (!model.value.trim() || /gpt-4o-mini|deepseek\/deepseek|openai\/gpt/i.test(model.value)) {
     model.value = preset.modelHint
   }
 }
@@ -359,7 +355,7 @@ async function init(): Promise<void> {
   el<HTMLSelectElement>('provider').addEventListener('change', () => {
     const v = el<HTMLSelectElement>('provider').value
     updateProviderHint(v)
-    if (v !== 'auto') applyProviderPreset(v)
+    applyProviderPreset(v)
   })
 
   el<HTMLFormElement>('settings-form').addEventListener('submit', async (e) => {

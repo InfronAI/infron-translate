@@ -45,10 +45,10 @@ Required fields:
 
 | Field | Example |
 |---|---|
-| Provider | Auto, OpenAI, DeepSeek, StepFun |
-| Base URL | `https://api.openai.com/v1` |
+| Provider | OpenAI Compatible, Infron.ai, OpenRouter.ai |
+| Base URL | `https://llm.onerouter.pro/v1` |
 | API Key | Your API key |
-| Model | `gpt-4o-mini` |
+| Model | `deepseek/deepseek-v3.2` |
 | Target language | `cn` |
 
 The configured service must expose an OpenAI-compatible `/chat/completions` endpoint. Remote endpoints must use HTTPS. HTTP is allowed only for loopback hosts such as `localhost`, `127.0.0.1`, and `[::1]`.

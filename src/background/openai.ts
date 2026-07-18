@@ -21,7 +21,7 @@ export type ChatJsonParams = {
   userContent?: ChatUserContent
   useJsonSchema: boolean
   jsonSchema?: Readonly<Record<string, unknown>>
-  /** auto / openai / deepseek / stepfun */
+  /** openai / infron / openrouter */
   provider?: ProviderId
   /** off = disable or lowest reasoning (default) */
   reasoningPref?: ReasoningPref

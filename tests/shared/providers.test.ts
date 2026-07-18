@@ -6,37 +6,21 @@ import {
 } from '../../src/shared/providers'
 
 describe('detectProvider', () => {
-  it('detects deepseek from host', () => {
-    expect(detectProvider('https://api.deepseek.com', 'deepseek-chat')).toBe('deepseek')
+  it('detects infron from host', () => {
+    expect(detectProvider('https://llm.onerouter.pro/v1', 'deepseek/deepseek-v3.2')).toBe(
+      'infron',
+    )
   })
 
-  it('detects stepfun from host or model', () => {
-    expect(detectProvider('https://api.stepfun.com/v1', 'step-3.5-flash')).toBe('stepfun')
-    expect(detectProvider('https://api.stepfun.ai/v1', 'foo')).toBe('stepfun')
-    expect(detectProvider('https://other.example/v1', 'step-3.7-flash')).toBe('stepfun')
+  it('detects openrouter from host', () => {
+    expect(detectProvider('https://openrouter.ai/api/v1', 'openai/gpt-4o-mini')).toBe(
+      'openrouter',
+    )
   })
 })
 
 describe('applyProviderRequestBody', () => {
-  it('disables deepseek thinking when off', () => {
-    const body: Record<string, unknown> = { model: 'deepseek-chat' }
-    applyProviderRequestBody(body, 'deepseek', 'off')
-    expect(body.thinking).toEqual({ type: 'disabled' })
-  })
-
-  it('sets stepfun reasoning_effort low when off', () => {
-    const body: Record<string, unknown> = { model: 'step-3.5-flash' }
-    applyProviderRequestBody(body, 'stepfun', 'off')
-    expect(body.reasoning_effort).toBe('low')
-  })
-
-  it('sets stepfun medium/high', () => {
-    const body: Record<string, unknown> = {}
-    applyProviderRequestBody(body, 'stepfun', 'high')
-    expect(body.reasoning_effort).toBe('high')
-  })
-
-  it('leaves openai body alone', () => {
+  it('leaves OpenAI-compatible request bodies unchanged', () => {
     const body: Record<string, unknown> = { model: 'gpt-4o-mini' }
     applyProviderRequestBody(body, 'openai', 'off')
     expect(body.thinking).toBeUndefined()
@@ -46,6 +30,8 @@ describe('applyProviderRequestBody', () => {
 
 describe('resolveProvider', () => {
   it('respects explicit preference', () => {
-    expect(resolveProvider('deepseek', 'https://api.openai.com/v1', 'gpt')).toBe('deepseek')
+    expect(resolveProvider('openrouter', 'https://api.openai.com/v1', 'gpt')).toBe(
+      'openrouter',
+    )
   })
 })
