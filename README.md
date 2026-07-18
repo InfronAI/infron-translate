@@ -80,6 +80,9 @@ Current implementation:
 - Opens a two-panel overlay on the active webpage.
 - Uses an offscreen document for tab-audio capture setup.
 - Shows microphone and system-audio capture state plus live input level meters in the overlay.
+- Provides a Pre-meeting Material entry in the overlay for agenda, goals, planned strategy, risks, and expected outcomes.
+- Cross-checks the live transcript against the pre-meeting material throughout the call.
+- Shows context alignment in the live summary panel, including plan status, completed goals, unmet goals, evidence, and course-correction suggestions.
 - Automatically streams microphone audio chunks to Infron Whisper STT when Cloud Model is configured.
 - Automatically streams captured system-audio chunks to Infron Whisper STT when Cloud Model is configured.
 - Uses `openai/whisper-1/audio-to-text` through the OpenAI-compatible `/audio/transcriptions` endpoint.

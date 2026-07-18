@@ -128,6 +128,12 @@ export type SetMeetingSystemAudioMsg = {
   enabled: boolean
 }
 
+export type SetMeetingContextMsg = {
+  type: 'set-meeting-context'
+  sessionId: string
+  material: string
+}
+
 export type GetMeetingAssistantStateMsg = { type: 'get-meeting-assistant-state' }
 
 export type MeetingTranscriptSegmentMsg = {
@@ -200,6 +206,7 @@ export type ToBackground =
   | StartMeetingAssistantMsg
   | StopMeetingAssistantMsg
   | SetMeetingSystemAudioMsg
+  | SetMeetingContextMsg
   | GetMeetingAssistantStateMsg
   | MeetingTranscriptSegmentMsg
   | MeetingAudioChunkMsg

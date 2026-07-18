@@ -40,6 +40,16 @@ export type MeetingSummaryState = {
   updatedAt: number
 }
 
+export type MeetingContextAlignment = {
+  hasMaterial: boolean
+  strategyStatus: 'not-provided' | 'on-track' | 'at-risk' | 'off-track'
+  completedGoals: string[]
+  unmetGoals: string[]
+  correctiveSuggestions: string[]
+  evidence: string[]
+  updatedAt: number
+}
+
 export type MeetingUpdatePayload = {
   session: MeetingSession
   segments: TranscriptSegment[]
@@ -58,4 +68,6 @@ export type MeetingRuntimeState = MeetingUpdatePayload & {
     source: 'browser-speech' | 'external-stt' | 'mock' | 'none'
     message: string
   }
+  preMeetingMaterial: string
+  contextAlignment: MeetingContextAlignment
 }

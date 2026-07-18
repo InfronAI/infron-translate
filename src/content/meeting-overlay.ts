@@ -1,4 +1,5 @@
 import type {
+  MeetingContextAlignment,
   MeetingRuntimeState,
   MeetingSummaryState,
   TranscriptSegment,
@@ -6,6 +7,7 @@ import type {
 import type {
   MeetingAudioStatusMsg,
   MeetingAudioChunkMsg,
+  SetMeetingContextMsg,
   SetMeetingSystemAudioMsg,
   StopMeetingAssistantMsg,
 } from '../shared/messages'
@@ -51,6 +53,8 @@ export class MeetingOverlay {
   private micChunkStartedAt = 0
   private maxMicLevelSinceChunk = 0
   private autoMicAttempted = false
+  private contextEditorOpen = false
+  private contextDraft = ''
 
   show(state: MeetingRuntimeState): void {
     this.state = state
@@ -138,6 +142,11 @@ export class MeetingOverlay {
         </div>
       </header>
       <main class="screens">
+        ${contextEditorHtml(
+          this.contextEditorOpen,
+          this.contextEditorOpen ? this.contextDraft : this.state.preMeetingMaterial,
+          this.state.contextAlignment,
+        )}
         <section class="audio-meters">
           ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel, 'Local microphone signal')}
           ${meterHtml('System audio input', audio.output, audio.outputLevel, 'Audio captured from the active Chrome tab')}
@@ -172,13 +181,44 @@ export class MeetingOverlay {
         enabled: !audio.output,
       } satisfies SetMeetingSystemAudioMsg)
     })
+    shell.querySelector<HTMLButtonElement>('.context-toggle')?.addEventListener('click', () => {
+      this.contextDraft = this.state?.preMeetingMaterial ?? ''
+      this.contextEditorOpen = !this.contextEditorOpen
+      this.render()
+    })
+    shell.querySelector<HTMLTextAreaElement>('.context-input')?.addEventListener('input', (event) => {
+      this.contextDraft = (event.target as HTMLTextAreaElement).value
+    })
+    shell.querySelector<HTMLButtonElement>('.context-save')?.addEventListener('click', () => {
+      if (!this.state) return
+      void chrome.runtime.sendMessage({
+        type: 'set-meeting-context',
+        sessionId: this.state.session.id,
+        material: this.contextDraft,
+      } satisfies SetMeetingContextMsg)
+      this.contextEditorOpen = false
+      this.render()
+    })
+    shell.querySelector<HTMLButtonElement>('.context-clear')?.addEventListener('click', () => {
+      if (!this.state) return
+      this.contextDraft = ''
+      void chrome.runtime.sendMessage({
+        type: 'set-meeting-context',
+        sessionId: this.state.session.id,
+        material: '',
+      } satisfies SetMeetingContextMsg)
+      this.contextEditorOpen = false
+      this.render()
+    })
     shell.querySelector<HTMLButtonElement>('.traffic.close')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
         type: 'stop-meeting-assistant',
         sessionId: session.id,
       } satisfies StopMeetingAssistantMsg)
     })
-    shell.querySelector<HTMLElement>('.summary-screen')?.append(renderSummary(summary))
+    shell
+      .querySelector<HTMLElement>('.summary-screen')
+      ?.append(renderSummary(summary, this.state.contextAlignment))
     shell
       .querySelector<HTMLElement>('.transcript-screen')
       ?.append(renderTranscript(segments, transcription.message))
@@ -509,11 +549,51 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary)
 }
 
-function renderSummary(summary: MeetingSummaryState): HTMLElement {
+function contextEditorHtml(
+  open: boolean,
+  material: string,
+  alignment: MeetingContextAlignment,
+): string {
+  const label = alignment.hasMaterial
+    ? statusLabel(alignment.strategyStatus)
+    : 'No pre-meeting context'
+  return `
+    <section class="context-editor ${open ? 'open' : ''}">
+      <div class="context-editor-head">
+        <div>
+          <strong>Pre-meeting Material</strong>
+          <span class="alignment-pill ${alignment.strategyStatus}">${escapeHtml(label)}</span>
+        </div>
+        <button class="context-toggle" type="button">${open ? 'Cancel' : alignment.hasMaterial ? 'Edit' : 'Add'}</button>
+      </div>
+      ${
+        open
+          ? `
+            <textarea class="context-input" maxlength="20000" placeholder="Paste the agenda, planned goals, account context, strategy, risks, and expected outcomes.">${escapeHtml(material)}</textarea>
+            <div class="context-actions">
+              <button class="context-save" type="button">Save Context</button>
+              <button class="context-clear" type="button">Clear</button>
+            </div>
+          `
+          : `<p>${escapeHtml(
+              alignment.hasMaterial
+                ? materialPreview(material)
+                : 'Add agenda, goals, strategy, risks, and expected outcomes before or during the meeting.',
+            )}</p>`
+      }
+    </section>
+  `
+}
+
+function renderSummary(
+  summary: MeetingSummaryState,
+  alignment: MeetingContextAlignment,
+): HTMLElement {
   const wrapper = document.createElement('div')
   wrapper.className = 'screen-inner'
   wrapper.append(
     titleBlock('1', 'Meeting Outline', summary.currentTopic),
+    renderAlignment(alignment),
     section('Outline', summary.outline),
     section('Decisions', summary.decisions.length ? summary.decisions : ['No decision captured yet.']),
     section(
@@ -523,6 +603,25 @@ function renderSummary(summary: MeetingSummaryState): HTMLElement {
         : ['No action item captured yet.'],
     ),
     section('Open Questions', summary.openQuestions),
+  )
+  return wrapper
+}
+
+function renderAlignment(alignment: MeetingContextAlignment): HTMLElement {
+  const wrapper = document.createElement('section')
+  wrapper.className = 'alignment-panel'
+  const title = document.createElement('div')
+  title.className = 'alignment-title'
+  title.innerHTML = `
+    <h4>Context Alignment</h4>
+    <span class="alignment-pill ${alignment.strategyStatus}">${escapeHtml(statusLabel(alignment.strategyStatus))}</span>
+  `
+  wrapper.append(
+    title,
+    section('Completed Goals', alignment.completedGoals.length ? alignment.completedGoals : ['No goal has enough transcript evidence yet.']),
+    section('Unmet Goals', alignment.unmetGoals),
+    section('Course-correction Suggestions', alignment.correctiveSuggestions),
+    section('Evidence and Reflection', alignment.evidence),
   )
   return wrapper
 }
@@ -587,6 +686,18 @@ function section(title: string, items: string[]): HTMLElement {
   }
   node.append(heading, list)
   return node
+}
+
+function statusLabel(status: MeetingContextAlignment['strategyStatus']): string {
+  if (status === 'on-track') return 'On track'
+  if (status === 'at-risk') return 'At risk'
+  if (status === 'off-track') return 'Off track'
+  return 'Not provided'
+}
+
+function materialPreview(material: string): string {
+  const normalized = material.replace(/\s+/gu, ' ').trim()
+  return normalized.length > 180 ? `${normalized.slice(0, 180)}...` : normalized
 }
 
 function timeLabel(timestamp: number): string {
@@ -833,9 +944,112 @@ ul {
 .screens {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   grid-template-columns: minmax(320px, 0.92fr) minmax(360px, 1.08fr);
   gap: 14px;
+}
+
+.context-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 66%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+.context-editor-head,
+.context-editor-head > div,
+.context-actions,
+.alignment-title {
+  display: flex;
+  align-items: center;
+}
+
+.context-editor-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.context-editor-head > div {
+  min-width: 0;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.context-editor strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.context-editor p {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.context-input {
+  width: 100%;
+  min-height: 86px;
+  max-height: 180px;
+  resize: vertical;
+  border: 1px solid rgb(15 23 42 / 10%);
+  border-radius: 12px;
+  padding: 10px 11px;
+  background: rgb(255 255 255 / 82%);
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.context-input:focus {
+  border-color: rgb(15 118 110 / 45%);
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 12%);
+}
+
+.context-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.context-toggle,
+.context-save,
+.context-clear {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 740;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.context-toggle,
+.context-clear {
+  background: rgb(15 23 42 / 8%);
+  color: #334155;
+}
+
+.context-save {
+  background: #0f766e;
+  color: #fff;
+}
+
+.context-toggle:hover,
+.context-clear:hover {
+  transform: translateY(-1px);
+  background: rgb(15 118 110 / 12%);
+  color: #0f766e;
+}
+
+.context-save:hover {
+  transform: translateY(-1px);
+  background: #115e59;
 }
 
 .audio-meters {
@@ -987,6 +1201,73 @@ h3 {
 .summary-section {
   display: grid;
   gap: 7px;
+}
+
+.alignment-panel {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid rgb(15 118 110 / 14%);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgb(240 253 250 / 76%), rgb(255 255 255 / 62%));
+}
+
+.alignment-title {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.alignment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgb(100 116 139 / 12%);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.alignment-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgb(148 163 184 / 14%);
+}
+
+.alignment-pill.on-track {
+  background: rgb(16 185 129 / 12%);
+  color: #047857;
+}
+
+.alignment-pill.on-track::before {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 16%);
+}
+
+.alignment-pill.at-risk {
+  background: rgb(245 158 11 / 13%);
+  color: #92400e;
+}
+
+.alignment-pill.at-risk::before {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgb(245 158 11 / 16%);
+}
+
+.alignment-pill.off-track {
+  background: rgb(239 68 68 / 12%);
+  color: #b91c1c;
+}
+
+.alignment-pill.off-track::before {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 16%);
 }
 
 h4 {

@@ -54,7 +54,8 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
   if (
     message.type === 'meeting-transcript-segment' ||
     message.type === 'meeting-audio-chunk' ||
-    message.type === 'meeting-audio-status'
+    message.type === 'meeting-audio-status' ||
+    message.type === 'set-meeting-context'
   ) {
     return { type: 'meeting-internal-result', ok: false }
   }
@@ -243,6 +244,14 @@ function isToBackground(value: unknown): value is ToBackground {
       typeof value.enabled === 'boolean'
     )
   }
+  if (value.type === 'set-meeting-context') {
+    return (
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length <= 128 &&
+      typeof value.material === 'string' &&
+      value.material.length <= 20_000
+    )
+  }
   if (value.type === 'get-meeting-assistant-state') return true
   if (value.type === 'meeting-transcript-segment') {
     return (
@@ -393,6 +402,11 @@ async function handle(
 
   if (message.type === 'set-meeting-system-audio') {
     await meetingManager.setSystemAudioEnabled(message.sessionId, message.enabled)
+    return { type: 'meeting-internal-result', ok: true }
+  }
+
+  if (message.type === 'set-meeting-context') {
+    await meetingManager.setPreMeetingMaterial(message.sessionId, message.material)
     return { type: 'meeting-internal-result', ok: true }
   }
 

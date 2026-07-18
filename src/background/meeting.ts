@@ -1,5 +1,6 @@
 import type {
   MeetingAudioMode,
+  MeetingContextAlignment,
   MeetingRuntimeState,
   MeetingSession,
   MeetingSummaryState,
@@ -83,6 +84,8 @@ export class MeetingManager {
       session,
       segments: [],
       summary,
+      preMeetingMaterial: '',
+      contextAlignment: emptyContextAlignment(),
       audio: { microphone: false, output: false, microphoneLevel: 0, outputLevel: 0 },
       transcription: {
         active: input.audioMode === 'mock',
@@ -158,10 +161,12 @@ export class MeetingManager {
     }
     const segments = [...this.state.segments, segment].slice(-120)
     const summary = this.summarize(this.state.summary.sessionId, segments)
+    const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
     this.state = {
       ...this.state,
       segments,
       summary,
+      contextAlignment,
       transcription: {
         active: true,
         source: message.channel === 'meeting-output' ? 'external-stt' : this.state.transcription.source,
@@ -309,6 +314,17 @@ export class MeetingManager {
     await this.broadcastUpdate()
   }
 
+  async setPreMeetingMaterial(sessionId: string, material: string): Promise<void> {
+    if (!this.state || this.state.session.id !== sessionId) return
+    const preMeetingMaterial = material.trim().slice(0, 20_000)
+    this.state = {
+      ...this.state,
+      preMeetingMaterial,
+      contextAlignment: analyzeContextAlignment(preMeetingMaterial, this.state.segments),
+    }
+    await this.broadcastUpdate()
+  }
+
   async stop(): Promise<void> {
     if (!this.state) return
     if (this.timer) globalThis.clearInterval(this.timer)
@@ -363,7 +379,8 @@ export class MeetingManager {
     }
     const segments = [...this.state.segments, segment].slice(-80)
     const summary = this.summarize(this.state.summary.sessionId, segments)
-    this.state = { ...this.state, segments, summary }
+    const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
+    this.state = { ...this.state, segments, summary, contextAlignment }
     void this.broadcastUpdate()
   }
 
@@ -490,6 +507,163 @@ function clampLevel(value: number): number {
   return Math.min(1, Math.max(0, value))
 }
 
+function emptyContextAlignment(): MeetingContextAlignment {
+  return {
+    hasMaterial: false,
+    strategyStatus: 'not-provided',
+    completedGoals: [],
+    unmetGoals: ['Add pre-meeting material to compare the live discussion against the planned agenda.'],
+    correctiveSuggestions: ['Paste the agenda, goals, talking points, and expected outcomes before the meeting starts.'],
+    evidence: [],
+    updatedAt: Date.now(),
+  }
+}
+
+function analyzeContextAlignment(
+  material: string,
+  segments: TranscriptSegment[],
+): MeetingContextAlignment {
+  const normalizedMaterial = material.trim()
+  if (!normalizedMaterial) return emptyContextAlignment()
+
+  const goals = extractGoals(normalizedMaterial).slice(0, 8)
+  const transcript = segments.map((segment) => segment.originalText).join('\n')
+  const recentTranscript = segments.slice(-10).map((segment) => segment.originalText).join('\n')
+  const completedGoals: string[] = []
+  const unmetGoals: string[] = []
+  const evidence: string[] = []
+
+  for (const goal of goals) {
+    const score = goalMatchScore(goal, transcript)
+    if (score >= 0.38) {
+      completedGoals.push(goal)
+      const support = matchingEvidence(goal, segments)
+      if (support) evidence.push(support)
+    } else {
+      unmetGoals.push(goal)
+    }
+  }
+
+  const hasDiscussion = segments.length > 0
+  const completionRate = goals.length ? completedGoals.length / goals.length : 0
+  const driftSignals = goalMatchScore(normalizedMaterial, recentTranscript)
+  const strategyStatus: MeetingContextAlignment['strategyStatus'] =
+    completionRate >= 0.7
+      ? 'on-track'
+      : completionRate >= 0.34 || driftSignals >= 0.2 || segments.length < 3
+        ? 'at-risk'
+        : 'off-track'
+
+  const useChinese = containsCjk(normalizedMaterial)
+  const correctiveSuggestions = unmetGoals.length
+    ? unmetGoals.slice(0, 4).map((goal) =>
+        useChinese
+          ? `请把讨论拉回到：${goal}`
+          : `Bring the discussion back to: ${goal}`,
+      )
+    : [
+        useChinese
+          ? '已覆盖主要会前目标，请继续推动决策、负责人和下一步计划落地。'
+          : 'The main pre-meeting goals are covered; keep pushing decisions, owners, and next steps.',
+      ]
+
+  return {
+    hasMaterial: true,
+    strategyStatus: hasDiscussion ? strategyStatus : 'at-risk',
+    completedGoals,
+    unmetGoals: unmetGoals.length
+      ? unmetGoals
+      : [useChinese ? '暂无明显未完成目标。' : 'No obvious unmet goal yet.'],
+    correctiveSuggestions,
+    evidence: evidence.length
+      ? [...new Set(evidence)].slice(0, 5)
+      : [
+          useChinese
+            ? '等待更多实时转写，用于和会前材料交叉印证。'
+            : 'Waiting for more live transcript to cross-check against the pre-meeting material.',
+        ],
+    updatedAt: Date.now(),
+  }
+}
+
+function extractGoals(material: string): string[] {
+  const priorityPattern =
+    /(goal|objective|agenda|plan|strategy|decision|decide|confirm|deliver|outcome|risk|align|目标|议程|计划|打法|决策|确认|输出|风险|对齐|待完成|关键)/iu
+  const lines = material
+    .split(/[\n\r;；。]+/u)
+    .map((line) => line.replace(/^\s*[-*•\d.)、]+/u, '').trim())
+    .filter((line) => line.length >= 4)
+  const prioritized = lines.filter((line) => priorityPattern.test(line))
+  return uniqueStrings(prioritized.length ? prioritized : lines).slice(0, 8)
+}
+
+function goalMatchScore(goal: string, text: string): number {
+  if (!goal.trim() || !text.trim()) return 0
+  const lowerText = text.toLocaleLowerCase()
+  const terms = goalTerms(goal)
+  if (!terms.length) return 0
+  const matched = terms.filter((term) => lowerText.includes(term.toLocaleLowerCase()))
+  return matched.length / terms.length
+}
+
+function goalTerms(goal: string): string[] {
+  const alphaNumeric = goal
+    .toLocaleLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .map((term) => term.trim())
+    .filter((term) => term.length > 2 && !STOP_WORDS.has(term))
+  const cjk = [...goal.matchAll(/[\u3400-\u9fff]{2,}/gu)]
+    .flatMap((match) => cjkBigrams(match[0]))
+    .filter((term) => !CJK_STOP_TERMS.has(term))
+  return uniqueStrings([...alphaNumeric, ...cjk]).slice(0, 24)
+}
+
+function cjkBigrams(value: string): string[] {
+  const result: string[] = []
+  for (let index = 0; index < value.length - 1; index += 1) {
+    result.push(value.slice(index, index + 2))
+  }
+  return result
+}
+
+function matchingEvidence(goal: string, segments: TranscriptSegment[]): string {
+  const terms = goalTerms(goal)
+  const match = [...segments]
+    .reverse()
+    .find((segment) =>
+      terms.some((term) => segment.originalText.toLocaleLowerCase().includes(term.toLocaleLowerCase())),
+    )
+  if (!match) return ''
+  return `${match.speakerLabel}: ${match.originalText}`.slice(0, 220)
+}
+
+function containsCjk(value: string): boolean {
+  return /[\u3400-\u9fff]/u.test(value)
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+}
+
 function labelForChannel(channel: string): string {
   return channel === 'meeting-output' ? 'System' : 'Microphone'
 }
+
+const STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'from',
+  'that',
+  'this',
+  'then',
+  'than',
+  'will',
+  'should',
+  'need',
+  'needs',
+  'meeting',
+])
+
+const CJK_STOP_TERMS = new Set(['我们', '需要', '进行', '当前', '会议', '这个', '一个', '以及'])
