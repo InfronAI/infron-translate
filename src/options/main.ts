@@ -13,7 +13,7 @@ import {
   type ProviderId,
   type ReasoningPref,
 } from '../shared/providers'
-import { LANGUAGE_OPTIONS } from '../shared/languages'
+import { browserLanguageCode, LANGUAGE_OPTIONS } from '../shared/languages'
 import {
   BrowserTranslator,
   type BrowserTranslatorAvailability,
@@ -246,7 +246,9 @@ function renderBrowserCapability(
 
 async function checkBrowserCapability(prepare = false): Promise<void> {
   const request = ++capabilityRequest
-  const target = el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang
+  const target = browserLanguageCode(
+    el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
+  )
   renderBrowserCapability('checking')
   try {
     browserCapability = await browserTranslator.availability('en', target)
