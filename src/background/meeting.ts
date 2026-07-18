@@ -27,6 +27,8 @@ import {
 
 const OFFSCREEN_URL = 'src/offscreen/meeting-audio.html'
 const TRANSCRIPT_HISTORY_LIMIT = 500
+const SUMMARY_INTERVAL_MS = 60_000
+const SUMMARY_SEGMENT_INTERVAL = 6
 const MOCK_LINES = [
   {
     channel: 'meeting-output',
@@ -58,6 +60,8 @@ export class MeetingManager {
   private state: MeetingRuntimeState | null = null
   private timer: ReturnType<typeof setInterval> | null = null
   private cursor = 0
+  private lastSummaryAt = 0
+  private segmentsAtLastSummary = 0
 
   getState(): MeetingRuntimeState | null {
     return this.state
@@ -70,6 +74,8 @@ export class MeetingManager {
     audioMode: MeetingAudioMode
   }): Promise<MeetingSession> {
     await this.stop()
+    this.lastSummaryAt = 0
+    this.segmentsAtLastSummary = 0
     const settings = await loadSettings()
     const uiLanguage = settings.uiLanguage
     const now = Date.now()
@@ -204,14 +210,13 @@ export class MeetingManager {
       translatedText,
     }
     const segments = [...this.state.segments, segment].slice(-TRANSCRIPT_HISTORY_LIMIT)
-    const summary = this.summarize(this.state.summary.sessionId, segments)
-    const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
+    const insight = this.nextMeetingInsight(segments)
     this.state = {
       ...this.state,
       partials,
       segments,
-      summary,
-      contextAlignment,
+      summary: insight.summary,
+      contextAlignment: insight.contextAlignment,
       transcription: {
         active: true,
         source: message.channel === 'meeting-output' ? 'external-stt' : this.state.transcription.source,
@@ -323,6 +328,8 @@ export class MeetingManager {
     if (!this.state) return
     if (this.timer) globalThis.clearInterval(this.timer)
     this.timer = null
+    this.lastSummaryAt = 0
+    this.segmentsAtLastSummary = 0
     this.closeAllAsrStreams()
     const stopped: MeetingRuntimeState = {
       ...this.state,
@@ -392,10 +399,46 @@ export class MeetingManager {
       translatedText: line.translatedText,
     }
     const segments = [...this.state.segments, segment].slice(-TRANSCRIPT_HISTORY_LIMIT)
-    const summary = this.summarize(this.state.summary.sessionId, segments)
-    const contextAlignment = analyzeContextAlignment(this.state.preMeetingMaterial, segments)
-    this.state = { ...this.state, segments, summary, contextAlignment }
+    const insight = this.nextMeetingInsight(segments)
+    this.state = {
+      ...this.state,
+      segments,
+      summary: insight.summary,
+      contextAlignment: insight.contextAlignment,
+    }
     void this.broadcastUpdate()
+  }
+
+  private nextMeetingInsight(segments: TranscriptSegment[]): {
+    summary: MeetingSummaryState
+    contextAlignment: MeetingContextAlignment
+  } {
+    if (!this.state) {
+      return {
+        summary: this.initialSummary('unknown', 'zh'),
+        contextAlignment: emptyContextAlignment(),
+      }
+    }
+    const shouldRefresh = this.shouldRefreshMeetingInsight(segments)
+    if (!shouldRefresh) {
+      return {
+        summary: this.state.summary,
+        contextAlignment: this.state.contextAlignment,
+      }
+    }
+    this.lastSummaryAt = Date.now()
+    this.segmentsAtLastSummary = segments.length
+    return {
+      summary: this.summarize(this.state.summary.sessionId, segments),
+      contextAlignment: analyzeContextAlignment(this.state.preMeetingMaterial, segments),
+    }
+  }
+
+  private shouldRefreshMeetingInsight(segments: TranscriptSegment[]): boolean {
+    if (!segments.length) return false
+    if (!this.lastSummaryAt || !this.segmentsAtLastSummary) return true
+    if (segments.length - this.segmentsAtLastSummary >= SUMMARY_SEGMENT_INTERVAL) return true
+    return Date.now() - this.lastSummaryAt >= SUMMARY_INTERVAL_MS
   }
 
   private summarize(sessionId: string, segments: TranscriptSegment[]): MeetingSummaryState {
