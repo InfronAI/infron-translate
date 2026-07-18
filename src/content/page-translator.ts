@@ -18,6 +18,7 @@ import {
 import { makePageKey } from './page-key'
 import { BrowserTranslator } from './browser-translator'
 import { browserLanguageCode } from '../shared/languages'
+import { uiText } from '../shared/i18n'
 
 const TRANSLATED_ATTR = 'data-infron-page-translated'
 const TRANSLATION_TEXT_ATTR = 'data-infron-page-translation-text'
@@ -270,6 +271,7 @@ function pageStyles(settings: PageSettings): string {
 type PageSettings = Pick<
   UserSettings,
   | 'targetLang'
+  | 'uiLanguage'
   | 'pageTranslationEngine'
   | 'translationDisplayMode'
   | 'pageTranslationFontSizePx'
@@ -598,7 +600,7 @@ export class PageTranslator {
       this.dirtyRoots.clear()
       this.observePageRoots(scanRoots)
       this.cleanupDisconnectedHosts()
-      if (initial) this.showStatus('Analyzing page text', { progress: null })
+      if (initial) this.showStatus(uiText(settings.uiLanguage, 'statusAnalyzing'), { progress: null })
 
       const blocksByElement = new Map<Element, ExtractedBlock>()
       for (const root of scanRoots) {
@@ -624,17 +626,17 @@ export class PageTranslator {
           // content is picked up immediately) and retry the initial scan until the
           // grace window elapses, only then declaring the page empty.
           if (Date.now() < this.activationDeadline) {
-            this.showStatus('Waiting for page content', { progress: null })
+            this.showStatus(uiText(settings.uiLanguage, 'statusWaiting'), { progress: null })
             this.scheduleInitialRetry(generation)
           } else {
-            this.failActivation('No translatable text found on this page')
+            this.failActivation(uiText(settings.uiLanguage, 'statusNoText'))
           }
         } else {
           document.getElementById(STATUS_ID)?.remove()
         }
         return
       }
-      if (!initial) this.showStatus('Translating new content', { progress: null })
+      if (!initial) this.showStatus(uiText(settings.uiLanguage, 'statusTranslatingNew'), { progress: null })
       for (const group of groups) {
         for (const block of group.blocks) {
           this.attemptedTextByHost.set(block.el, block.text)
@@ -664,25 +666,33 @@ export class PageTranslator {
       if (!this.isCurrent(generation)) return
 
       if (initial && this.translatedCount === 0 && this.translatedHosts.size === 0) {
-        this.failActivation('Page translation failed. The current language pair may be unavailable.')
+        this.failActivation(uiText(settings.uiLanguage, 'statusFailedPair'))
         return
       }
       const failed = this.totalCount - this.translatedCount
-      this.showStatus(failed > 0 ? 'Translation partially complete' : 'Translation complete', {
+      this.showStatus(
+        failed > 0
+          ? uiText(settings.uiLanguage, 'statusPartialComplete')
+          : uiText(settings.uiLanguage, 'statusComplete'),
+        {
         state: failed > 0 ? 'error' : 'success',
         detail:
           failed > 0
-            ? `${this.translatedCount} translated, ${failed} failed`
-            : `${this.translatedCount} translated`,
+            ? uiText(settings.uiLanguage, 'statusTranslatedFailed', {
+                success: this.translatedCount,
+                failed,
+              })
+            : uiText(settings.uiLanguage, 'statusTranslated', { count: this.translatedCount }),
         progress: 1,
-      })
+        },
+      )
       this.scheduleStatusRemoval()
     } catch (error) {
       if (!this.isCurrent(generation)) return
       const message = error instanceof Error ? error.message : String(error)
       if (initial && this.translatedHosts.size === 0) this.failActivation(message)
       else {
-        this.showStatus('Page translation partially failed', {
+        this.showStatus(uiText(settings.uiLanguage, 'statusPartialFailed'), {
           state: 'error',
           detail: message,
           progress: this.totalCount > 0 ? this.processedCount / this.totalCount : undefined,
@@ -1118,7 +1128,7 @@ export class PageTranslator {
 
   private updateProgress(): void {
     const done = Math.min(this.processedCount, this.totalCount)
-    this.showStatus('Translating page', {
+    this.showStatus(uiText(this.currentSettings?.uiLanguage ?? 'zh', 'statusTranslatingPage'), {
       detail: `${done}/${this.totalCount}`,
       progress: this.totalCount > 0 ? done / this.totalCount : null,
     })

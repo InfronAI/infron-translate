@@ -70,7 +70,14 @@
 
           <section class="menu-item card language-card">
             <label class="select-row">
-              <span class="label">Display mode</span>
+              <span id="uiLanguageLabel" class="label">Interface language</span>
+              <select id="uiLanguageSelect" class="select">
+                <option value="zh">中文界面</option>
+                <option value="en">English UI</option>
+              </select>
+            </label>
+            <label class="select-row">
+              <span id="displayModeLabel" class="label">Display mode</span>
               <select id="displayModeSelect" class="select">
                 <option value="bilingual">Bilingual</option>
                 <option value="translation-only">Translation only</option>

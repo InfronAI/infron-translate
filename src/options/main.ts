@@ -20,11 +20,123 @@ import {
   type BrowserTranslatorAvailability,
 } from '../content/browser-translator'
 import type { TestConnectionResult } from '../shared/messages'
+import { uiText } from '../shared/i18n'
 
 const browserTranslator = new BrowserTranslator()
 let browserCapability: BrowserTranslatorAvailability = 'unsupported'
 let capabilityRequest = 0
 let remoteModelCandidates: string[] = []
+
+const OPTIONS_COPY = {
+  zh: {
+    navTranslation: '翻译',
+    navPageMode: '页面模式',
+    navChrome: 'Chrome 支持',
+    navCloud: 'Cloud Model',
+    navRules: '网站规则',
+    privacyTitle: '隐私',
+    privacyText: 'Chrome 在设备本地处理。Cloud Model 只会把文本发送到你配置的端点。',
+    preferences: '偏好设置',
+    settings: '设置',
+    help: '设置语言、页面行为和云端翻译凭证。',
+    translationTitle: '翻译',
+    translationHelp: '设置默认翻译语言。',
+    targetTitle: '目标语言',
+    targetHelp: '源语言会按页面自动检测。请选择默认输出语言。',
+    uiHelp: '选择扩展页面和网页内控件使用的语言。',
+    pageModeTitle: '页面模式',
+    pageModeHelp: '选择整页翻译的运行方式和展示方式。',
+    engineHelp: '使用 Chrome 获得本地速度，或使用 Cloud Model 获得更广的模型能力。',
+    autoTitle: '自动翻译页面',
+    global: '全局',
+    autoHelp: '自动翻译支持的页面，或在弹框中手动控制。',
+    privacyWarn: 'Cloud Model 会把匹配到的页面文本发送到你配置的端点。',
+    enabled: '已启用',
+    displayHelp: '同时显示原文和译文，或直接用译文替换原文。',
+    styleTitle: '译文样式',
+    styleHelp: '调整插入页面的译文字号、颜色和格式。',
+    fontSize: '字号',
+    customColor: '自定义文字颜色',
+    backgroundColor: '显示背景色',
+    chromeTitle: 'Chrome 内置支持',
+    chromeHelp: '检查 Chrome 是否支持从英语翻译到你的目标语言。',
+    cloudTitle: 'Cloud Model',
+    cloudHelp: '仅当翻译引擎设置为 Cloud Model 时需要配置。',
+    provider: 'Provider',
+    providerHelp: '选择一个服务商预设，然后确认端点和模型。',
+    endpoint: 'Endpoint',
+    endpointHelp: '远程端点需使用 HTTPS。本地 localhost HTTP 可用。',
+    baseUrl: 'Base URL',
+    model: 'Model',
+    models: '模型',
+    apiKey: 'API Key',
+    apiKeyHelp: '存储在 chrome.storage.local。保存时留空会保留已保存的 key。',
+    show: '显示',
+    hide: '隐藏',
+    reasoning: 'Reasoning effort',
+    reasoningHelp: '较低 reasoning 通常能提升翻译速度。',
+    rulesTitle: '网站规则',
+    rulesHelp: '管理不应启动页面翻译的网站。',
+    pausedSites: '暂停网站',
+    pausedHelp: '使用英文逗号分隔域名，也可在扩展弹框中暂停当前网站。',
+    reset: '恢复默认',
+    save: '保存设置',
+  },
+  en: {
+    navTranslation: 'Translation',
+    navPageMode: 'Page mode',
+    navChrome: 'Chrome support',
+    navCloud: 'Cloud Model',
+    navRules: 'Site rules',
+    privacyTitle: 'Privacy',
+    privacyText: 'Chrome stays on device. Cloud Model sends text only to your endpoint.',
+    preferences: 'PREFERENCES',
+    settings: 'Settings',
+    help: 'Set languages, page behavior, and cloud translation credentials.',
+    translationTitle: 'Translation',
+    translationHelp: 'Set the default translation language.',
+    targetTitle: 'Target language',
+    targetHelp: 'Source is detected per page. Choose the default output language.',
+    uiHelp: 'Choose the language used by extension pages and in-page controls.',
+    pageModeTitle: 'Page Mode',
+    pageModeHelp: 'Choose how full-page translation runs and appears.',
+    engineHelp: 'Use Chrome for on-device speed, or Cloud Model for broader model coverage.',
+    autoTitle: 'Auto-translate pages',
+    global: 'Global',
+    autoHelp: 'Translate supported pages automatically, or keep manual control in the popup.',
+    privacyWarn: 'Cloud Model sends matched page text to your configured endpoint.',
+    enabled: 'Enabled',
+    displayHelp: 'Show source and translation together, or replace source text in place.',
+    styleTitle: 'Translation style',
+    styleHelp: 'Adjust the appearance of inserted page translations.',
+    fontSize: 'Font size',
+    customColor: 'Custom text color',
+    backgroundColor: 'Show background color',
+    chromeTitle: 'Chrome Built-in Support',
+    chromeHelp: 'Check whether Chrome supports English to your target language.',
+    cloudTitle: 'Cloud Model',
+    cloudHelp: 'Required only when Translation engine is set to Cloud Model.',
+    provider: 'Provider',
+    providerHelp: 'Choose a provider preset, then confirm the endpoint and model.',
+    endpoint: 'Endpoint',
+    endpointHelp: 'Use HTTPS for remote endpoints. Localhost HTTP is allowed.',
+    baseUrl: 'Base URL',
+    model: 'Model',
+    models: 'Models',
+    apiKey: 'API Key',
+    apiKeyHelp: 'Stored in chrome.storage.local. Leave blank to keep the saved key.',
+    show: 'Show',
+    hide: 'Hide',
+    reasoning: 'Reasoning effort',
+    reasoningHelp: 'Lower reasoning usually improves translation speed.',
+    rulesTitle: 'Site Rules',
+    rulesHelp: 'Manage sites where page translation should stay off.',
+    pausedSites: 'Paused sites',
+    pausedHelp: 'Use comma-separated hostnames, or pause the current site from the popup.',
+    reset: 'Reset defaults',
+    save: 'Save settings',
+  },
+} as const
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id)
@@ -96,6 +208,7 @@ function syncTranslationEngineAvailability(settings: UserSettings): void {
 }
 
 function fillForm(s: UserSettings): void {
+  el<HTMLSelectElement>('uiLanguage').value = s.uiLanguage
   el<HTMLSelectElement>('provider').value = s.provider
   el<HTMLInputElement>('baseURL').value = s.baseURL
   el<HTMLInputElement>('apiKey').value = s.apiKey
@@ -126,6 +239,7 @@ function fillForm(s: UserSettings): void {
   syncTranslationEngineAvailability(s)
   updateConfigBadge(s)
   updateProviderHint(s.provider)
+  applyStaticI18n(s)
   updateStyleControlStates()
   updateEngineSummary(readForm(s))
 }
@@ -143,6 +257,7 @@ function readForm(stored: UserSettings): UserSettings {
     baseURL: el<HTMLInputElement>('baseURL').value.trim(),
     apiKey,
     model: el<HTMLInputElement>('model').value.trim(),
+    uiLanguage: el<HTMLSelectElement>('uiLanguage').value as UserSettings['uiLanguage'],
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
     pageTranslationEngine: el<HTMLSelectElement>('pageTranslationEngine')
       .value as TranslationEngine,
@@ -224,9 +339,9 @@ async function runConnectionTest(settings: UserSettings): Promise<void> {
 
 function updateConfigBadge(s: UserSettings): void {
   if (isConfigured(s)) {
-    setCloudConnectionStatus('Configured', 'ok')
+    setCloudConnectionStatus(uiText(s.uiLanguage, 'configured'), 'ok')
   } else {
-    setCloudConnectionStatus('Setup required', 'warn')
+    setCloudConnectionStatus(uiText(s.uiLanguage, 'setupRequired'), 'warn')
   }
 }
 
@@ -313,8 +428,109 @@ function updateStyleControlStates(): void {
 }
 
 function updateEngineSummary(settings: UserSettings): void {
-  const page = settings.pageTranslationEngine === 'browser' ? 'Chrome built-in' : 'Cloud Model'
-  el<HTMLElement>('engineSummary').textContent = `Engine: ${page}`
+  const page =
+    settings.pageTranslationEngine === 'browser'
+      ? uiText(settings.uiLanguage, 'browserEngine')
+      : uiText(settings.uiLanguage, 'cloudEngine')
+  el<HTMLElement>('engineSummary').textContent = uiText(settings.uiLanguage, 'engineSummary', {
+    engine: page,
+  })
+}
+
+function applyStaticI18n(settings: UserSettings): void {
+  const lang = settings.uiLanguage
+  const copy = OPTIONS_COPY[lang]
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+  el<HTMLElement>('uiLanguageTitle').textContent = uiText(lang, 'interfaceLanguage')
+  el<HTMLElement>('uiLanguageLabel').textContent = uiText(lang, 'interfaceLanguage')
+  el<HTMLElement>('uiLanguageHelp').textContent = copy.uiHelp
+  el<HTMLElement>('engineSummary').textContent = uiText(lang, 'engineSummary', {
+    engine:
+      settings.pageTranslationEngine === 'browser'
+        ? uiText(lang, 'browserEngine')
+        : uiText(lang, 'cloudEngine'),
+  })
+  const brandSub = document.querySelector<HTMLElement>('.brand-copy span')
+  if (brandSub) brandSub.textContent = uiText(lang, 'extensionSettings')
+  const nav = document.querySelectorAll<HTMLAnchorElement>('.section-nav a')
+  if (nav[0]) nav[0].textContent = copy.navTranslation
+  if (nav[1]) nav[1].textContent = copy.navPageMode
+  if (nav[2]) nav[2].textContent = copy.navChrome
+  if (nav[3]) nav[3].textContent = copy.navCloud
+  if (nav[4]) nav[4].textContent = copy.navRules
+  const sidebarTitle = document.querySelector<HTMLElement>('.sidebar-note span')
+  const sidebarText = document.querySelector<HTMLElement>('.sidebar-note p')
+  if (sidebarTitle) sidebarTitle.textContent = copy.privacyTitle
+  if (sidebarText) sidebarText.textContent = copy.privacyText
+  const heading = document.querySelector<HTMLElement>('.content-heading')
+  if (heading) {
+    heading.querySelector<HTMLElement>('.eyebrow')!.textContent = copy.preferences
+    heading.querySelector<HTMLElement>('h1')!.textContent = copy.settings
+    heading.querySelector<HTMLElement>('#helpSummary')!.textContent = copy.help
+  }
+  const sections = document.querySelectorAll<HTMLElement>('.settings-section')
+  const sectionHeaders = [
+    [copy.translationTitle, copy.translationHelp],
+    [copy.pageModeTitle, copy.pageModeHelp],
+    [copy.chromeTitle, copy.chromeHelp],
+    [copy.cloudTitle, copy.cloudHelp],
+    [copy.rulesTitle, copy.rulesHelp],
+  ] as const
+  sections.forEach((section, index) => {
+    const title = section.querySelector<HTMLElement>('.section-heading h2')
+    const help = section.querySelector<HTMLElement>('.section-heading p')
+    if (title && sectionHeaders[index]) title.textContent = sectionHeaders[index][0]
+    if (help && sectionHeaders[index]) help.textContent = sectionHeaders[index][1]
+  })
+  const rows = document.querySelectorAll<HTMLElement>('.setting-row')
+  const rowCopy = [
+    [copy.targetTitle, copy.targetHelp],
+    [uiText(lang, 'interfaceLanguage'), copy.uiHelp],
+    [uiText(lang, 'translationEngine'), copy.engineHelp],
+    [copy.autoTitle, copy.autoHelp],
+    [uiText(lang, 'displayMode'), copy.displayHelp],
+    [copy.styleTitle, copy.styleHelp],
+    [copy.provider, copy.providerHelp],
+    [copy.endpoint, copy.endpointHelp],
+    [copy.apiKey, copy.apiKeyHelp],
+    [copy.reasoning, copy.reasoningHelp],
+    [copy.pausedSites, copy.pausedHelp],
+  ] as const
+  rows.forEach((row, index) => {
+    const title = row.querySelector<HTMLElement>('.setting-copy h3')
+    const help = row.querySelector<HTMLElement>('.setting-copy p')
+    if (title && rowCopy[index]) title.textContent = rowCopy[index][0]
+    if (help && rowCopy[index]) help.textContent = rowCopy[index][1]
+  })
+  const smallBadge = document.querySelector<HTMLElement>('.small-badge')
+  if (smallBadge) smallBadge.textContent = copy.global
+  const switchLabel = document.querySelector<HTMLElement>('.switch-label')
+  if (switchLabel) switchLabel.textContent = copy.enabled
+  const privacyWarning = document.querySelector<HTMLElement>('.privacy-warning')
+  if (privacyWarning) privacyWarning.textContent = copy.privacyWarn
+  const labels = document.querySelectorAll<HTMLElement>('label > span')
+  for (const node of labels) {
+    if (node.id === 'uiLanguageLabel') continue
+    const text = node.textContent ?? ''
+    if (/Target language|目标语言/u.test(text)) node.textContent = uiText(lang, 'targetLanguage')
+    else if (/Font size|字号/u.test(text)) node.textContent = copy.fontSize
+    else if (/Base URL/u.test(text)) node.textContent = copy.baseUrl
+    else if (/Model/u.test(text)) node.textContent = copy.model
+  }
+  const colorLabels = document.querySelectorAll<HTMLElement>('.color-option > span')
+  if (colorLabels[0]) colorLabels[0].textContent = copy.customColor
+  if (colorLabels[1]) colorLabels[1].textContent = copy.backgroundColor
+  el<HTMLButtonElement>('fetchModels').textContent = copy.models
+  const apiToggle = el<HTMLButtonElement>('toggleApiKey')
+  apiToggle.textContent = el<HTMLInputElement>('apiKey').type === 'text' ? copy.hide : copy.show
+  el<HTMLButtonElement>('reset').textContent = copy.reset
+  el<HTMLButtonElement>('save').textContent = copy.save
+  const displayMode = el<HTMLSelectElement>('translationDisplayMode')
+  displayMode.options[0].textContent = uiText(lang, 'bilingual')
+  displayMode.options[1].textContent = uiText(lang, 'translationOnly')
+  const engine = el<HTMLSelectElement>('pageTranslationEngine')
+  engine.options[0].textContent = uiText(lang, 'browserEngine')
+  engine.options[1].textContent = uiText(lang, 'cloudEngine')
 }
 
 function browserVersion(): string {
@@ -442,6 +658,13 @@ async function init(): Promise<void> {
     })
   }
 
+  el<HTMLSelectElement>('uiLanguage').addEventListener('change', () => {
+    const next = readForm(stored)
+    applyStaticI18n(next)
+    updateConfigBadge(next)
+    updateEngineSummary(next)
+  })
+
   for (const id of ['baseURL', 'apiKey', 'model']) {
     el<HTMLInputElement>(id).addEventListener('input', () => {
       const next = readForm(stored)
@@ -492,16 +715,16 @@ async function init(): Promise<void> {
       fillForm(stored)
       const usesBrowser = stored.pageTranslationEngine === 'browser'
       if (usesBrowser && (browserCapability === 'unsupported' || browserCapability === 'unavailable')) {
-        setStatus('Saved. Chrome translation is unavailable for this language pair.', false)
+        setStatus(uiText(stored.uiLanguage, 'chromeUnavailable'), false)
       } else if (
         usesBrowser &&
         (browserCapability === 'downloadable' || browserCapability === 'downloading')
       ) {
         setStatus('Saved. Download the Chrome language pack before auto-translation.', false)
       } else if (isConfigured(stored)) {
-        setStatus('Saved. Open pages are synced.', true)
+        setStatus(uiText(stored.uiLanguage, 'settingsSaved'), true)
       } else if (!usesExternal) {
-        setStatus('Saved. Chrome translation is ready.', true)
+        setStatus(uiText(stored.uiLanguage, 'engineBrowserReady'), true)
       } else {
         setStatus('Saved, but Cloud Model still needs a valid API key.', false)
       }

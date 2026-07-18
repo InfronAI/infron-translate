@@ -36,6 +36,7 @@ export type ContentSettings = Pick<
   | 'pageTranslationEngine'
   | 'translationDisplayMode'
   | 'autoPageTranslation'
+  | 'uiLanguage'
   | 'pageTranslationFontSizePx'
   | 'pageTranslationUseCustomColor'
   | 'pageTranslationTextColor'
@@ -62,6 +63,11 @@ export type PauseHostnameMsg = {
   type: 'set-hostname-paused'
   hostname: string
   paused: boolean
+}
+
+export type SetAutoPageTranslationMsg = {
+  type: 'set-auto-page-translation'
+  enabled: boolean
 }
 
 export type OpenOptionsMsg = { type: 'open-options' }
@@ -107,6 +113,7 @@ export type ToBackground =
   | TranslateBatchRequestMsg
   | GetSettingsMsg
   | PauseHostnameMsg
+  | SetAutoPageTranslationMsg
   | OpenOptionsMsg
   | TestConnectionMsg
 export type FromBackground =

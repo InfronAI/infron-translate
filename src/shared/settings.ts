@@ -23,4 +23,5 @@ export type {
   UserSettings,
   TranslationEngine,
   TranslationDisplayMode,
+  UiLanguage,
 } from './settings-defaults'

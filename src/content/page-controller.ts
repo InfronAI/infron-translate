@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, mergeSettings } from '../shared/settings-defaults'
 import type {
   OpenOptionsMsg,
   PageLanguageResult,
+  SetAutoPageTranslationMsg,
   SettingsMsg,
   TogglePageTranslationResult,
 } from '../shared/messages'
@@ -10,6 +11,7 @@ import { BrowserTranslator } from './browser-translator'
 import { PageTranslator } from './page-translator'
 import { detectPageSourceLanguage } from './page-language'
 import { browserLanguageCode } from '../shared/languages'
+import { uiText } from '../shared/i18n'
 
 function isSettingsMessage(value: unknown): value is SettingsMsg {
   if (!value || typeof value !== 'object') return false
@@ -57,6 +59,8 @@ function pageStyleSigOf(s: UserSettings): string {
 
 type PageSettings = UserSettings & { sourceLang: string }
 
+const AUTO_TOGGLE_HOST_ID = 'infron-translate-auto-toggle'
+
 export class PageController {
   private readonly browserTranslator = new BrowserTranslator()
   private readonly pageTranslator = new PageTranslator(this.browserTranslator)
@@ -70,6 +74,9 @@ export class PageController {
   private detectedSourceLang = 'auto'
   private listenersBound = false
   private externalConfigPrompted = false
+  private autoToggleRoot: ShadowRoot | null = null
+  private autoToggleButton: HTMLButtonElement | null = null
+  private autoToggleBusy = false
 
   bindListeners(): void {
     if (this.listenersBound) return
@@ -119,6 +126,8 @@ export class PageController {
       this.detectedSourceLang = detectPageSourceLanguage()
       this.settingsGeneration++
       this.pausedHere = response.paused
+      this.ensureAutoToggle()
+      this.renderAutoToggle()
       if (this.settings.pageTranslationEngine !== 'external' || this.configured) {
         this.externalConfigPrompted = false
       }
@@ -232,6 +241,183 @@ export class PageController {
       await chrome.runtime.sendMessage({ type: 'open-options' } satisfies OpenOptionsMsg)
     } catch {
       // Opening the options page is a guide; translation validation still returns the real error.
+    }
+  }
+
+  private ensureAutoToggle(): void {
+    if (this.autoToggleRoot && this.autoToggleButton) return
+    let host = document.getElementById(AUTO_TOGGLE_HOST_ID)
+    if (!host) {
+      host = document.createElement('div')
+      host.id = AUTO_TOGGLE_HOST_ID
+      host.setAttribute('data-infron-ignore', '')
+      document.documentElement.append(host)
+    }
+    this.autoToggleRoot = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
+    if (this.autoToggleRoot.childElementCount === 0) {
+      const style = document.createElement('style')
+      style.textContent = `
+:host {
+  all: initial;
+  position: fixed;
+  z-index: 2147483646;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+button {
+  all: unset;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 118px;
+  max-width: 168px;
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid rgb(255 255 255 / 58%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 22% 12%, rgb(255 255 255 / 92%), transparent 34%),
+    linear-gradient(135deg, rgb(25 113 235 / 96%), rgb(0 180 160 / 94%));
+  color: #fff;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 22%), inset 0 1px 0 rgb(255 255 255 / 42%);
+  cursor: pointer;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease, opacity 0.16s ease;
+}
+
+button:hover {
+  transform: translateX(-2px);
+  filter: saturate(1.08) brightness(1.04);
+  box-shadow: 0 18px 42px rgb(15 23 42 / 26%), inset 0 1px 0 rgb(255 255 255 / 48%);
+}
+
+button:active {
+  transform: translateX(-1px) scale(0.98);
+}
+
+button:focus-visible {
+  outline: 3px solid rgb(59 130 246 / 34%);
+  outline-offset: 3px;
+}
+
+button[data-enabled="false"] {
+  background:
+    radial-gradient(circle at 22% 12%, rgb(255 255 255 / 86%), transparent 34%),
+    linear-gradient(135deg, rgb(71 85 105 / 94%), rgb(100 116 139 / 92%));
+}
+
+button[data-busy="true"] {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #bbf7d0;
+  box-shadow: 0 0 0 4px rgb(187 247 208 / 24%);
+}
+
+button[data-enabled="false"] .dot {
+  background: #e2e8f0;
+  box-shadow: 0 0 0 4px rgb(226 232 240 / 22%);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  :host { right: 10px; }
+  button {
+    min-width: 42px;
+    width: 42px;
+    padding: 10px;
+    grid-template-columns: auto;
+    justify-content: center;
+  }
+  .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+`
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="label"></span>'
+      button.addEventListener('click', () => {
+        void this.toggleAutoTranslation()
+      })
+      this.autoToggleRoot.append(style, button)
+      this.autoToggleButton = button
+    } else {
+      this.autoToggleButton = this.autoToggleRoot.querySelector('button')
+    }
+  }
+
+  private renderAutoToggle(): void {
+    if (!this.autoToggleButton) return
+    const enabled = this.settings.autoPageTranslation
+    const label = uiText(this.settings.uiLanguage, enabled ? 'autoStop' : 'autoStart')
+    this.autoToggleButton.dataset.enabled = String(enabled)
+    this.autoToggleButton.dataset.busy = String(this.autoToggleBusy)
+    this.autoToggleButton.disabled = this.autoToggleBusy
+    this.autoToggleButton.title = label
+    this.autoToggleButton.setAttribute('aria-label', label)
+    const labelNode = this.autoToggleButton.querySelector<HTMLElement>('.label')
+    if (labelNode) {
+      labelNode.textContent = this.autoToggleBusy
+        ? uiText(this.settings.uiLanguage, 'updating')
+        : label
+    }
+  }
+
+  private async toggleAutoTranslation(): Promise<void> {
+    if (this.autoToggleBusy) return
+    this.autoToggleBusy = true
+    this.renderAutoToggle()
+    try {
+      const nextEnabled = !this.settings.autoPageTranslation
+      const response: unknown = await chrome.runtime.sendMessage({
+        type: 'set-auto-page-translation',
+        enabled: nextEnabled,
+      } satisfies SetAutoPageTranslationMsg)
+      const responseError = backgroundError(response)
+      if (responseError) throw new Error(responseError)
+      if (!isSettingsMessage(response)) throw new Error('Invalid settings response')
+      this.configured = response.configured
+      this.settings = mergeSettings(response.settings)
+      this.pausedHere = response.paused
+      this.settingsGeneration++
+      this.renderAutoToggle()
+      if (this.settings.autoPageTranslation) await this.maybeStartPageTranslation()
+      else if (this.pageTranslator.isActive()) this.pageTranslator.deactivate()
+    } catch (error) {
+      console.warn(
+        '[Infron Translate] auto translation toggle failed',
+        error instanceof Error ? error.message : String(error),
+      )
+    } finally {
+      this.autoToggleBusy = false
+      this.renderAutoToggle()
     }
   }
 }

@@ -20,6 +20,7 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.minTextLength).toBe(10)
     expect(DEFAULT_SETTINGS.batchCharLimit).toBe(6000)
     expect(DEFAULT_SETTINGS.pausedHostnames).toEqual([])
+    expect(DEFAULT_SETTINGS.uiLanguage).toBe('zh')
   })
 })
 
@@ -33,6 +34,7 @@ describe('mergeSettings', () => {
     expect(merged.sourceLang).toBe('auto')
     expect(merged.pageTranslationFontSizePx).toBe(14)
     expect(merged.model).toBe(DEFAULT_SETTINGS.model)
+    expect(merged.uiLanguage).toBe('zh')
   })
 
   it('preserves pausedHostnames when provided', () => {
@@ -67,6 +69,12 @@ describe('mergeSettings', () => {
   it('validates the global automatic full-page setting', () => {
     expect(mergeSettings({ autoPageTranslation: true }).autoPageTranslation).toBe(true)
     expect(mergeSettings({ autoPageTranslation: 'yes' }).autoPageTranslation).toBe(false)
+  })
+
+  it('accepts only supported UI languages from storage', () => {
+    expect(mergeSettings({ uiLanguage: 'en' }).uiLanguage).toBe('en')
+    expect(mergeSettings({ uiLanguage: 'zh' }).uiLanguage).toBe('zh')
+    expect(mergeSettings({ uiLanguage: 'fr' }).uiLanguage).toBe('zh')
   })
 
   it('coerces non-string fields from storage', () => {

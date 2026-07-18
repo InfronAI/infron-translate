@@ -2,6 +2,7 @@ import type { ProviderId, ReasoningPref } from './providers'
 
 export type TranslationEngine = 'external' | 'browser'
 export type TranslationDisplayMode = 'bilingual' | 'translation-only'
+export type UiLanguage = 'zh' | 'en'
 
 export type UserSettings = {
   baseURL: string
@@ -34,6 +35,8 @@ export type UserSettings = {
   minTextLength: number
   batchCharLimit: number
   pausedHostnames: string[]
+  /** UI language for extension pages and in-page controls. */
+  uiLanguage: UiLanguage
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -58,6 +61,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   minTextLength: 10,
   batchCharLimit: 6000,
   pausedHostnames: [],
+  uiLanguage: 'zh',
 }
 
 function asProviderId(v: unknown): ProviderId {
@@ -80,6 +84,10 @@ function asTranslationDisplayMode(
   fallback: TranslationDisplayMode,
 ): TranslationDisplayMode {
   return v === 'bilingual' || v === 'translation-only' ? v : fallback
+}
+
+function asUiLanguage(v: unknown): UiLanguage {
+  return v === 'en' || v === 'zh' ? v : DEFAULT_SETTINGS.uiLanguage
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -174,6 +182,7 @@ export function mergeSettings(partial: unknown): UserSettings {
           .filter((hostname): hostname is string => typeof hostname === 'string')
           .slice(0, 1000)
       : DEFAULT_SETTINGS.pausedHostnames,
+    uiLanguage: asUiLanguage(p.uiLanguage),
   }
 }
 

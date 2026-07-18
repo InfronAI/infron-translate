@@ -15,6 +15,7 @@ import type {
   TogglePageTranslationMsg,
   TogglePageTranslationResult,
 } from '../shared/messages'
+import { uiText } from '../shared/i18n'
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id)
@@ -65,12 +66,51 @@ function setLanguageSelectValue(id: string, value: string, fallback: string): vo
   const select = el<HTMLSelectElement>(id)
   const nextValue = value || fallback
   if (![...select.options].some((item) => item.value === nextValue)) {
-    select.append(option(nextValue, `Custom · ${nextValue}`))
+      select.append(option(nextValue, `${uiText(DEFAULT_SETTINGS.uiLanguage, 'customLanguage')} · ${nextValue}`))
   }
   select.value = nextValue
 }
 
+function applyPopupI18n(settings: UserSettings): void {
+  const lang = settings.uiLanguage
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+  el<HTMLElement>('uiLanguageLabel').textContent = uiText(lang, 'interfaceLanguage')
+  el<HTMLElement>('displayModeLabel').textContent = uiText(lang, 'displayMode')
+  el<HTMLElement>('hostname').setAttribute('aria-label', uiText(lang, 'popupCurrentSite'))
+  const rows = document.querySelectorAll<HTMLElement>('.row .label')
+  if (rows[0]) rows[0].textContent = uiText(lang, 'popupCurrentSite')
+  if (rows[1]) rows[1].textContent = uiText(lang, 'popupDetectedLanguage')
+  const switches = document.querySelectorAll<HTMLElement>('.switch-text')
+  if (switches[0]) switches[0].textContent = uiText(lang, 'pauseThisSite')
+  if (switches[1]) switches[1].textContent = uiText(lang, 'autoStart')
+  const labels = document.querySelectorAll<HTMLElement>('.select-row .label')
+  for (const node of labels) {
+    if (node.id === 'uiLanguageLabel' || node.id === 'displayModeLabel') continue
+    if (/Source language|源语言/u.test(node.textContent ?? '')) {
+      node.textContent = uiText(lang, 'sourceLanguage')
+    } else if (/Target language|目标语言/u.test(node.textContent ?? '')) {
+      node.textContent = uiText(lang, 'targetLanguage')
+    } else if (/Translation engine|翻译引擎/u.test(node.textContent ?? '')) {
+      node.textContent = uiText(lang, 'translationEngine')
+    }
+  }
+  const display = el<HTMLSelectElement>('displayModeSelect')
+  display.options[0].textContent = uiText(lang, 'bilingual')
+  display.options[1].textContent = uiText(lang, 'translationOnly')
+  const engine = el<HTMLSelectElement>('pageEngineSelect')
+  engine.options[0].textContent = uiText(lang, 'browserEngine')
+  engine.options[1].textContent = uiText(lang, 'cloudEngine')
+  el<HTMLButtonElement>('configureCloudModel').textContent =
+    `${uiText(lang, 'cloudConfigNeeded')} · ${uiText(lang, 'openSettings')}`
+  el<HTMLButtonElement>('translatePage').querySelector('span')!.textContent =
+    uiText(lang, 'translateThisPage')
+  el<HTMLButtonElement>('openOptions').querySelector('span')!.textContent =
+    uiText(lang, 'openSettings')
+  el<HTMLSelectElement>('uiLanguageSelect').value = lang
+}
+
 function renderStatus(settings: UserSettings): void {
+  applyPopupI18n(settings)
   const configured = isConfigured(settings)
   const pageEngineSelect = el<HTMLSelectElement>('pageEngineSelect')
   const externalOption = pageEngineSelect.querySelector<HTMLOptionElement>('option[value="external"]')
@@ -83,21 +123,21 @@ function renderStatus(settings: UserSettings): void {
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
   el<HTMLElement>('pageAutoDesc').textContent = settings.autoPageTranslation
-    ? 'On: translate pages automatically'
-    : 'Off: translate after clicking the button'
+    ? uiText(settings.uiLanguage, 'autoOnDesc')
+    : uiText(settings.uiLanguage, 'autoOffDesc')
 
   el<HTMLElement>('modeHint').textContent =
     settings.translationDisplayMode === 'translation-only'
-      ? 'Full-page translation only'
-      : 'Full-page bilingual'
+      ? uiText(settings.uiLanguage, 'fullPageTranslationOnly')
+      : uiText(settings.uiLanguage, 'fullPageBilingual')
 
   const configureCloudModel = el<HTMLButtonElement>('configureCloudModel')
   configureCloudModel.hidden = configured
 
   el<HTMLElement>('usageHint').textContent =
     settings.translationDisplayMode === 'translation-only'
-      ? 'Use the button below to replace page text with translations.'
-      : 'Use the button below to toggle full-page bilingual translation.'
+      ? uiText(settings.uiLanguage, 'popupUsageTranslationOnly')
+      : uiText(settings.uiLanguage, 'popupUsageBilingual')
   setSourceLanguageValue(settings.sourceLang)
   setTargetLanguageValue(settings.targetLang)
   el<HTMLSelectElement>('displayModeSelect').value = settings.translationDisplayMode
@@ -207,7 +247,9 @@ async function init(): Promise<void> {
   const targetLangSelect = el<HTMLSelectElement>('targetLangSelect')
   const displayModeSelect = el<HTMLSelectElement>('displayModeSelect')
   const pageEngineSelect = el<HTMLSelectElement>('pageEngineSelect')
+  const uiLanguageSelect = el<HTMLSelectElement>('uiLanguageSelect')
   const configureCloudModel = el<HTMLButtonElement>('configureCloudModel')
+  let settings = await normalizeUnavailableEngine(await loadSettings())
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
@@ -221,7 +263,7 @@ async function init(): Promise<void> {
         pageLanguage.detectedSourceLang,
       )
     } else {
-      el<HTMLElement>('detectedSourceLang').textContent = 'Unavailable'
+      el<HTMLElement>('detectedSourceLang').textContent = uiText(settings.uiLanguage, 'unavailable')
     }
     translatePageBtn.addEventListener('click', async () => {
       try {
@@ -238,15 +280,14 @@ async function init(): Promise<void> {
   }
 
   if (!hostname) {
-    hostnameEl.textContent = '(cannot read this page)'
-    el<HTMLElement>('detectedSourceLang').textContent = 'Unavailable'
+    hostnameEl.textContent = `(${uiText(settings.uiLanguage, 'cannotReadPage')})`
+    el<HTMLElement>('detectedSourceLang').textContent = uiText(settings.uiLanguage, 'unavailable')
     pauseToggle.disabled = true
   } else {
     hostnameEl.textContent = hostname
     pauseToggle.disabled = false
   }
 
-  let settings = await normalizeUnavailableEngine(await loadSettings())
   renderStatus(settings)
 
   if (hostname) {
@@ -289,6 +330,7 @@ async function init(): Promise<void> {
       Pick<
         UserSettings,
         'sourceLang' | 'targetLang' | 'translationDisplayMode' | 'pageTranslationEngine'
+        | 'uiLanguage'
       >
     >,
   ): Promise<void> {
@@ -329,6 +371,12 @@ async function init(): Promise<void> {
   displayModeSelect.addEventListener('change', () => {
     void saveLanguageSetting({
       translationDisplayMode: displayModeSelect.value as TranslationDisplayMode,
+    })
+  })
+
+  uiLanguageSelect.addEventListener('change', () => {
+    void saveLanguageSetting({
+      uiLanguage: uiLanguageSelect.value as UserSettings['uiLanguage'],
     })
   })
 

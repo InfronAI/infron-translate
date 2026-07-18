@@ -99,6 +99,7 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
     pageTranslationEngine,
     translationDisplayMode,
     autoPageTranslation,
+    uiLanguage,
     pageTranslationFontSizePx,
     pageTranslationUseCustomColor,
     pageTranslationTextColor,
@@ -118,6 +119,7 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
       pageTranslationEngine,
       translationDisplayMode,
       autoPageTranslation,
+      uiLanguage,
       pageTranslationFontSizePx,
       pageTranslationUseCustomColor,
       pageTranslationTextColor,
@@ -177,6 +179,9 @@ function isToBackground(value: unknown): value is ToBackground {
       typeof value.paused === 'boolean'
     )
   }
+  if (value.type === 'set-auto-page-translation') {
+    return typeof value.enabled === 'boolean'
+  }
   if (value.type === 'translate-batch') {
     if (
       typeof value.pageKey !== 'string' ||
@@ -232,6 +237,13 @@ async function handle(
     const next = { ...settings, pausedHostnames: [...set] }
     await saveSettings(next)
     return settingsForContent(next, message.hostname)
+  }
+
+  if (message.type === 'set-auto-page-translation') {
+    const settings = await loadSettings()
+    const next = { ...settings, autoPageTranslation: message.enabled }
+    await saveSettings(next)
+    return settingsForContent(next, senderHostname(sender))
   }
 
   if (message.type === 'open-options') {
