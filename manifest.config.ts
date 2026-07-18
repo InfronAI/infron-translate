@@ -30,6 +30,10 @@ export default defineManifest({
     service_worker: 'src/background/sw.ts',
     type: 'module',
   },
+  content_security_policy: {
+    extension_pages:
+      "script-src 'self'; object-src 'self'; connect-src 'self' https://* wss://api.stepfun.com",
+  },
   content_scripts: [
     {
       matches: ['http://*/*', 'https://*/*'],

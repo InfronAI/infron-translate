@@ -90,20 +90,25 @@ export class StepFunRealtimeAsrConnection {
         fail(new Error('StepFun ASR WebSocket connection timed out'))
         ws.close()
       }, WS_CONNECT_TIMEOUT_MS)
+      let errorFallback: ReturnType<typeof setTimeout> | null = null
 
       ws.addEventListener('open', () => {
         opened = true
         settled = true
         globalThis.clearTimeout(timeout)
+        if (errorFallback) globalThis.clearTimeout(errorFallback)
         this.configureSession(message)
         this.callbacks.onReady(message)
         resolve()
       })
       ws.addEventListener('message', (event) => this.handleMessage(event))
       ws.addEventListener('error', () => {
-        fail(new Error('StepFun ASR WebSocket connection failed'))
+        errorFallback = globalThis.setTimeout(() => {
+          fail(new Error('StepFun ASR WebSocket connection failed before close details were available'))
+        }, 750)
       })
       ws.addEventListener('close', (event) => {
+        if (errorFallback) globalThis.clearTimeout(errorFallback)
         const detail = closeDetail(event)
         if (!opened) {
           globalThis.clearTimeout(timeout)
