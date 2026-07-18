@@ -8,9 +8,9 @@ import {
 } from '../../src/shared/settings-defaults'
 
 describe('DEFAULT_SETTINGS', () => {
-  it('defaults to zh full-page translation with automatic page mode off', () => {
+  it('defaults to cn full-page translation with automatic page mode off', () => {
     expect(DEFAULT_SETTINGS.sourceLang).toBe('auto')
-    expect(DEFAULT_SETTINGS.targetLang).toBe('zh')
+    expect(DEFAULT_SETTINGS.targetLang).toBe('cn')
     expect(DEFAULT_SETTINGS.pageTranslationEngine).toBe('browser')
     expect(DEFAULT_SETTINGS.translationDisplayMode).toBe('bilingual')
     expect(DEFAULT_SETTINGS.autoPageTranslation).toBe(false)
@@ -82,6 +82,12 @@ describe('mergeSettings', () => {
 
   it('preserves a manual source language from storage', () => {
     expect(mergeSettings({ sourceLang: 'ja' }).sourceLang).toBe('ja')
+  })
+
+  it('migrates legacy zh language settings to cn', () => {
+    const merged = mergeSettings({ sourceLang: 'zh', targetLang: 'zh' })
+    expect(merged.sourceLang).toBe('cn')
+    expect(merged.targetLang).toBe('cn')
   })
 
   it('validates full-page translation appearance settings', () => {

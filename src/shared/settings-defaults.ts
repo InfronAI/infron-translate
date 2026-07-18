@@ -43,7 +43,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   provider: 'auto',
   reasoningPref: 'off',
   sourceLang: 'auto',
-  targetLang: 'zh',
+  targetLang: 'cn',
   pageTranslationEngine: 'browser',
   translationDisplayMode: 'bilingual',
   autoPageTranslation: false,
@@ -95,6 +95,11 @@ function stringValue(value: unknown, fallback: string): string {
   return value === null || value === undefined ? fallback : String(value)
 }
 
+function languageValue(value: unknown, fallback: string): string {
+  const language = stringValue(value, fallback).slice(0, 64)
+  return language === 'zh' ? 'cn' : language
+}
+
 function colorValue(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback
 }
@@ -108,8 +113,8 @@ export function mergeSettings(partial: unknown): UserSettings {
     model: stringValue(p.model, DEFAULT_SETTINGS.model),
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
-    sourceLang: stringValue(p.sourceLang, DEFAULT_SETTINGS.sourceLang).slice(0, 64),
-    targetLang: stringValue(p.targetLang, DEFAULT_SETTINGS.targetLang).slice(0, 64),
+    sourceLang: languageValue(p.sourceLang, DEFAULT_SETTINGS.sourceLang),
+    targetLang: languageValue(p.targetLang, DEFAULT_SETTINGS.targetLang),
     pageTranslationEngine: asTranslationEngine(
       p.pageTranslationEngine,
       DEFAULT_SETTINGS.pageTranslationEngine,

@@ -1,4 +1,4 @@
-import { isConfigured, loadSettings, saveSettings, missingConfigFields, type UserSettings } from '../shared/settings'
+import { DEFAULT_SETTINGS, isConfigured, loadSettings, saveSettings, missingConfigFields, type UserSettings } from '../shared/settings'
 import { LANGUAGE_OPTIONS, languageLabel } from '../shared/languages'
 import type { TranslationDisplayMode } from '../shared/settings-defaults'
 import type {
@@ -51,7 +51,7 @@ function setSourceLanguageValue(value: string): void {
 }
 
 function setTargetLanguageValue(value: string): void {
-  setLanguageSelectValue('targetLangSelect', value, 'zh')
+  setLanguageSelectValue('targetLangSelect', value, DEFAULT_SETTINGS.targetLang)
 }
 
 function setLanguageSelectValue(id: string, value: string, fallback: string): void {
@@ -293,7 +293,7 @@ async function init(): Promise<void> {
   })
 
   targetLangSelect.addEventListener('change', () => {
-    void saveLanguageSetting({ targetLang: targetLangSelect.value || 'zh' })
+    void saveLanguageSetting({ targetLang: targetLangSelect.value || DEFAULT_SETTINGS.targetLang })
   })
 
   displayModeSelect.addEventListener('change', () => {

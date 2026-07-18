@@ -36,12 +36,17 @@ export const LANGUAGE_OPTIONS = [
   ['tr', '土耳其语'],
   ['uk', '乌克兰语'],
   ['vi', '越南语'],
-  ['zh', '简体中文'],
+  ['cn', '中文'],
   ['zh-Hant', '繁体中文'],
 ] as const
 
 export function languageLabel(code: string): string {
   if (code === 'auto') return '自动检测'
+  if (code === 'zh') return '中文 · cn'
   const option = LANGUAGE_OPTIONS.find(([value]) => value === code)
   return option ? `${option[1]} · ${option[0]}` : code
+}
+
+export function browserLanguageCode(code: string): string {
+  return code === 'cn' ? 'zh' : code
 }

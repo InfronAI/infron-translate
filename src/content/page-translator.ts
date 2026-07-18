@@ -17,6 +17,7 @@ import {
 } from './extract'
 import { makePageKey } from './page-key'
 import { BrowserTranslator } from './browser-translator'
+import { browserLanguageCode } from '../shared/languages'
 
 const TRANSLATED_ATTR = 'data-infron-page-translated'
 const TRANSLATION_TEXT_ATTR = 'data-infron-page-translation-text'
@@ -538,15 +539,17 @@ export class PageTranslator {
     settings: PageSettings,
     generation: number,
   ): Promise<void> {
-    const ready = await this.browserTranslator.prepare(settings.sourceLang, settings.targetLang)
+    const sourceLang = browserLanguageCode(settings.sourceLang)
+    const targetLang = browserLanguageCode(settings.targetLang)
+    const ready = await this.browserTranslator.prepare(sourceLang, targetLang)
     if (!this.isCurrent(generation)) return
     if (!ready) throw new Error('Chrome 内置翻译不支持当前语言对')
     for (const group of groups) {
       if (!this.isCurrent(generation)) return
       const translation = await this.browserTranslator.translate(
         group.representative.text,
-        settings.sourceLang,
-        settings.targetLang,
+        sourceLang,
+        targetLang,
       )
       if (!this.isCurrent(generation)) return
       if (translation) this.renderGroup(group, translation, settings)

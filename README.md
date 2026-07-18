@@ -49,7 +49,7 @@ Required fields:
 | Base URL | `https://api.openai.com/v1` |
 | API Key | Your API key |
 | Model | `gpt-4o-mini` |
-| Target language | `zh` |
+| Target language | `cn` |
 
 The configured service must expose an OpenAI-compatible `/chat/completions` endpoint. Remote endpoints must use HTTPS. HTTP is allowed only for loopback hosts such as `localhost`, `127.0.0.1`, and `[::1]`.
 

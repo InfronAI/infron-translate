@@ -8,6 +8,7 @@ import type {
 import { BrowserTranslator } from './browser-translator'
 import { PageTranslator } from './page-translator'
 import { detectPageSourceLanguage } from './page-language'
+import { browserLanguageCode } from '../shared/languages'
 
 function isSettingsMessage(value: unknown): value is SettingsMsg {
   if (!value || typeof value !== 'object') return false
@@ -152,7 +153,8 @@ export class PageController {
       this.pausedHere ||
       !this.settings.autoPageTranslation ||
       this.pageTranslator.isActive() ||
-      this.effectiveSourceLang() === this.settings.targetLang
+      browserLanguageCode(this.effectiveSourceLang()) ===
+        browserLanguageCode(this.settings.targetLang)
     ) {
       return
     }
@@ -166,8 +168,8 @@ export class PageController {
     try {
       if (settings.pageTranslationEngine === 'browser') {
         const availability = await this.browserTranslator.availability(
-          sourceLang,
-          settings.targetLang,
+          browserLanguageCode(sourceLang),
+          browserLanguageCode(settings.targetLang),
         )
         if (availability !== 'available') return
       }
