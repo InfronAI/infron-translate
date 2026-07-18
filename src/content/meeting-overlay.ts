@@ -79,18 +79,21 @@ export class MeetingOverlay {
   private micStream: MediaStream | null = null
   private micAudioContext: AudioContext | null = null
   private micLevelTimer: ReturnType<typeof setInterval> | null = null
+  private autoMicAttempted = false
 
   show(state: MeetingRuntimeState): void {
     this.state = state
     this.ensureRoot()
     this.windowState ??= defaultWindowState()
     this.render()
+    this.ensureAutomaticTranscription()
   }
 
   update(update: MeetingRuntimeState): void {
     if (!this.state) return
     this.state = update
     this.render()
+    this.ensureAutomaticTranscription()
   }
 
   hide(): void {
@@ -167,7 +170,7 @@ export class MeetingOverlay {
           <div class="toolbar" role="group" aria-label="Meeting Assistant controls">
             <button class="mic-pill ${this.recognition ? 'recording' : ''} mic-toggle" type="button">
               <span aria-hidden="true"></span>
-              ${this.recognition ? 'Stop Mic' : 'Start Mic'}
+              ${this.recognition ? 'Stop Mic' : this.autoMicAttempted ? 'Retry Mic' : 'Mic Auto'}
             </button>
           </div>
         </div>
@@ -198,7 +201,7 @@ export class MeetingOverlay {
     })
     shell.querySelector<HTMLButtonElement>('.mic-toggle')?.addEventListener('click', () => {
       if (this.recognition) this.stopLocalSpeechRecognition()
-      else void this.startLocalSpeechRecognition()
+      else void this.startLocalSpeechRecognition(false)
     })
     shell.querySelector<HTMLButtonElement>('.traffic.close')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
@@ -316,14 +319,27 @@ export class MeetingOverlay {
     this.render()
   }
 
-  private async startLocalSpeechRecognition(): Promise<void> {
+  private ensureAutomaticTranscription(): void {
+    if (
+      !this.state ||
+      this.state.session.status !== 'listening' ||
+      this.recognition ||
+      this.autoMicAttempted
+    ) {
+      return
+    }
+    this.autoMicAttempted = true
+    void this.startLocalSpeechRecognition(true)
+  }
+
+  private async startLocalSpeechRecognition(automatic: boolean): Promise<void> {
     if (!this.state) return
     const Recognition = speechRecognitionConstructor()
     if (!Recognition) {
       await this.sendAudioStatus({
         active: false,
         source: 'none',
-        message: 'This Chrome context does not expose browser speech recognition. Use a supported Chrome build or connect an external STT provider.',
+        message: 'Browser speech recognition is unavailable. Connect an external STT provider for automatic transcription.',
       })
       return
     }
@@ -390,7 +406,9 @@ export class MeetingOverlay {
       await this.sendAudioStatus({
         active: true,
         source: 'browser-speech',
-        message: 'Microphone transcription is listening. Speak into your microphone; desktop/system audio is not transcribed by this mode.',
+        message: automatic
+          ? 'Automatic microphone transcription is listening. System audio is detected separately and requires external STT for transcription.'
+          : 'Microphone transcription is listening. System audio is detected separately and requires external STT for transcription.',
       })
     } catch (error) {
       this.recognitionShouldRun = false

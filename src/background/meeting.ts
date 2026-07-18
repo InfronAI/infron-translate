@@ -111,6 +111,18 @@ export class MeetingManager {
 
   async updateAudioStatus(message: MeetingAudioStatusMsg): Promise<void> {
     if (!this.state || this.state.session.id !== message.sessionId) return
+    const nextTranscription =
+      message.transcription ??
+      (message.outputLevel !== undefined &&
+      message.outputLevel > 0.03 &&
+      !this.state.transcription.active
+        ? {
+            active: false,
+            source: 'none' as const,
+            message:
+              'System audio input detected. Automatic system-audio transcription requires an external STT adapter.',
+          }
+        : this.state.transcription)
     this.state = {
       ...this.state,
       audio: {
@@ -119,7 +131,7 @@ export class MeetingManager {
         microphoneLevel: clampLevel(message.microphoneLevel ?? this.state.audio.microphoneLevel),
         outputLevel: clampLevel(message.outputLevel ?? this.state.audio.outputLevel),
       },
-      transcription: message.transcription ?? this.state.transcription,
+      transcription: nextTranscription,
     }
     await this.broadcastUpdate()
   }
