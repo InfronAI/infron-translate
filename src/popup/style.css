@@ -42,7 +42,7 @@ body {
 }
 
 .shell {
-  padding: 10px;
+  padding: 0;
   animation: rise 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
@@ -64,16 +64,7 @@ body {
   display: flex;
   overflow: hidden;
   padding: 0.7rem;
-  border-radius: 2rem;
-  box-shadow:
-    0 6px 6px rgba(0, 0, 0, 0.16),
-    0 0 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.liquidGlass-wrapper:hover {
-  padding: 0.85rem;
-  border-radius: 2.2rem;
+  border-radius: 1.25rem;
 }
 
 .liquidGlass-effect {
@@ -116,11 +107,6 @@ body {
   position: relative;
   z-index: 3;
   width: 100%;
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.liquidGlass-wrapper:hover .liquidGlass-text {
-  transform: scale(0.985);
 }
 
 .menu-item {
