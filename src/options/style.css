@@ -534,18 +534,53 @@ input[type='color'] {
 
 .model-picker {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.model-picker:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(23 105 224 / 12%);
+}
+
+.model-picker input {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.model-picker input:focus {
+  box-shadow: none;
 }
 
 .button.compact {
-  min-height: 40px;
-  padding: 8px 10px;
+  min-height: 100%;
+  padding: 8px 9px;
+  border-width: 0 0 0 1px;
+  border-color: var(--border);
+  border-radius: 0;
+  background: var(--surface-muted);
+  color: #344054;
+  font-size: 11px;
   white-space: nowrap;
+}
+
+.button.compact:hover {
+  background: var(--accent-soft);
+  color: #114f9f;
+}
+
+.button.compact:disabled {
+  background: var(--surface-muted);
 }
 
 .field-status {
   min-height: 15px;
+  margin-top: -2px;
   color: var(--subtle);
   font-size: 11px;
   line-height: 1.35;
