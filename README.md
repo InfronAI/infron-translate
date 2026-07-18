@@ -1,19 +1,33 @@
 # Infron Translate
 
-Infron Translate is a Chrome Manifest V3 extension for full-page translation. It detects the source language from the current webpage, lets the user choose a target language, and can either show bilingual text or replace the original text with translations.
+Infron Translate is a Chrome Manifest V3 extension for full-page webpage translation. It detects the source language of the current page, lets the user choose both source and target languages, and supports either bilingual comparison text or translation-only replacement.
 
-## Current Capabilities
+The default extension UI language is Chinese. Users can switch the extension interface between Chinese and English from the popup or settings page.
 
-- Detect the source language from the current page and allow a manual source-language override from the popup.
-- Let users choose the target language from the popup or settings page.
-- Translate rendered DOM text as bilingual comparison text or translation-only replacement.
-- Toggle full-page translation from the popup.
-- Automatically start full-page translation on eligible pages.
-- Choose the full-page translation engine: Chrome built-in Translator API or a cloud AI model.
-- Process dynamically added content from infinite scroll, dialogs, drawers, and open Shadow DOM.
+## Features
+
+- Detect the source language of the active webpage.
+- Let users manually override the source language and target language.
+- Translate full pages in two display modes:
+  - **Bilingual**: keep original text and append the translation.
+  - **Translation only**: replace source text in place without rebuilding the page DOM.
+- Toggle translation manually from the popup.
+- Enable or disable automatic page translation globally.
+- Use a right-side floating logo button to toggle automatic page translation from any supported page.
+- Choose the translation engine:
+  - **Chrome built-in Translator API** for on-device translation.
+  - **Cloud Model** for OpenAI-compatible providers.
+- Configure Cloud Model providers:
+  - OpenAI Compatible
+  - Infron.ai
+  - OpenRouter.ai
+- Fetch model lists from provider `/v1/models` endpoints.
+- Test Cloud Model connectivity from the settings status indicator.
+- Show translation progress with an in-page progress panel.
+- Translate dynamically added content from infinite scroll, dialogs, drawers, and open Shadow DOM.
 - Cache repeated text translations to avoid duplicate requests.
-- Pause translation per site from the extension popup.
-- Configure typography for inserted translations.
+- Pause translation per site from the popup.
+- Configure inserted translation typography, color, background, and formatting.
 
 ## Installation
 
@@ -29,63 +43,83 @@ Then load the extension in Chrome:
 3. Click **Load unpacked**.
 4. Select the generated `dist/` directory.
 
-## Configuration
+## Usage
 
-Open the extension popup and choose **Open settings**.
+### Popup
 
-### Target Language
+Click the Infron Translate extension icon to open the popup. The popup shows:
 
-The source language is detected from the current webpage. The popup shows the detected language and lets the user keep automatic detection or choose a manual source language. The target language can also be changed directly from the popup.
+- Current site hostname.
+- Detected page language.
+- Source language selector.
+- Target language selector.
+- Display mode selector.
+- Translation engine selector.
+- Automatic page translation switch.
+- Site pause switch.
+- Interface language selector.
 
-### External Model
+Use **Translate this page** to start or stop manual full-page translation.
 
-The external model is used when the full-page engine is set to cloud AI model.
+### Floating Auto-Translation Button
+
+Supported webpages show a small Infron logo button on the right side of the screen. It contains no visible text.
+
+- Colorful logo with a highlight ring: automatic page translation is enabled.
+- Gray, muted logo: automatic page translation is disabled.
+- Subtle pulse: the setting is being updated.
+
+Clicking the logo toggles automatic page translation globally.
+
+### Settings Page
+
+Open the settings page from the popup. The settings page includes:
+
+- Default target language.
+- Interface language: Chinese or English.
+- Translation engine selection.
+- Automatic page translation.
+- Display mode.
+- Translation appearance controls.
+- Chrome built-in translation support check.
+- Cloud Model provider, endpoint, API key, model, and reasoning preference.
+- Model list fetching from the configured endpoint.
+- Cloud Model connection status and test action.
+- Paused site list.
+
+## Translation Engines
+
+### Chrome Built-In
+
+Chrome built-in translation uses Chrome's on-device Translator API. The settings page checks runtime support and the selected language pair.
+
+Chrome built-in translation requires a supported desktop Chrome version and may require language packs. Some Chromium-based browsers may not expose the required API.
+
+### Cloud Model
+
+Cloud Model uses OpenAI-compatible chat completion APIs. The configured service must expose a compatible `/chat/completions` endpoint. Model fetching uses the provider's `/models` endpoint derived from the configured Base URL.
 
 Required fields:
 
 | Field | Example |
 |---|---|
-| Provider | OpenAI Compatible, Infron.ai, OpenRouter.ai |
+| Provider | Infron.ai |
 | Base URL | `https://llm.onerouter.pro/v1` |
-| API Key | Your API key |
+| API Key | Your provider key |
 | Model | `deepseek/deepseek-v3.2` |
-| Target language | `cn` |
 
-The configured service must expose an OpenAI-compatible `/chat/completions` endpoint. Remote endpoints must use HTTPS. HTTP is allowed only for loopback hosts such as `localhost`, `127.0.0.1`, and `[::1]`.
+Remote endpoints must use HTTPS. HTTP is allowed only for loopback hosts such as `localhost`, `127.0.0.1`, and `[::1]`.
 
-### Chrome Built-In Translator
-
-Full-page translation can use Chrome's on-device Translator API. The settings page checks whether the API is available and whether the language pack for the selected target language can be used.
-
-## Usage
-
-### Full-Page Translation
-
-Use the popup button to start or stop full-page translation.
-
-Full-page mode scans rendered DOM text and prioritizes visible content. The translation preference controls how text is shown:
-
-- Bilingual comparison: keep the original text and append the translation below it.
-- Translation only: replace the original text with the translation.
-
-Use the popup button again to remove inserted translations or restore replaced source text.
-
-The full-page translator watches DOM updates, so it can translate content that appears later through infinite scroll, dialogs, drawers, or open Shadow DOM.
-
-### Automatic Page Translation
-
-When automatic page translation is enabled, the extension detects the current page language and starts full-page translation when appropriate. Paused sites are always skipped.
-
-If full-page mode uses Chrome Translator, automatic startup only happens when the detected source language and selected target language are available. If full-page mode uses the cloud AI model, matched page text is sent to the configured service.
+If Cloud Model is selected before it is fully configured, the extension opens the settings page and guides the user to complete setup.
 
 ## Privacy and Network Behavior
 
 - API keys are stored in `chrome.storage.local`.
 - Content scripts do not receive the API key, Base URL, model, or provider configuration.
-- Cloud AI model translation sends text only to the configured `baseURL`.
-- Chrome Translator full-page mode processes text on device.
-- External full-page translation can proactively send visible page text to the configured service.
-- Paused sites do not start full-page translation.
+- Chrome built-in translation processes text on device.
+- Cloud Model sends matched page text only to the configured endpoint.
+- The settings page connection test can only be started from the extension settings page.
+- Paused sites do not start automatic page translation.
 - The extension does not include analytics, telemetry, or remote code.
 
 ## Development
@@ -104,14 +138,19 @@ Scripts:
 - `npm test`: run the Vitest suite.
 - `npm run test:watch`: run Vitest in watch mode.
 
-## Manual QA
+## Manual QA Checklist
 
-- Settings persist after saving and reloading a page.
-- The popup button starts and stops full-page translation.
-- Bilingual comparison mode appends translations below original text without removing source content.
-- Translation-only mode replaces original text and restores it when toggled off.
-- Full-page mode can be toggled off cleanly.
-- Chrome Translator full-page mode works for supported detected language pairs.
-- Cloud AI model full-page mode sends batched text requests and does not fall back silently.
+- Popup loads on supported webpages without scrollbars.
+- Popup displays detected source language and allows source/target language changes.
+- Interface language can switch between Chinese and English from popup and settings.
+- Manual full-page translation starts and stops from the popup.
+- Bilingual mode appends translations without hiding original text.
+- Bilingual mode expands clipped containers when needed without damaging page readability.
+- Translation-only mode replaces source text in place and restores it when toggled off.
+- Floating logo toggles automatic page translation globally with no visible text.
+- Chrome built-in support check reports available, downloadable, unavailable, or unsupported states.
+- Cloud Model cannot be selected until required configuration is complete.
+- Cloud Model connection status updates after a successful test.
+- Model fetching populates model candidates from the configured endpoint.
 - Repeated text reuses cached translations.
-- Paused sites do not translate automatically.
+- Paused sites do not auto-translate.
