@@ -19,6 +19,13 @@ type MeetingWindowState = {
   width: number
   height: number
   minimized: boolean
+  maximized: boolean
+  restore?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 type DragState = {
@@ -141,6 +148,11 @@ export class MeetingOverlay {
     shell.style.height = `${this.windowState.height}px`
     shell.innerHTML = `
       <header class="topbar">
+        <div class="traffic-lights" role="group" aria-label="Window controls">
+          <button class="traffic close" type="button" aria-label="Close Meeting Assistant"></button>
+          <button class="traffic minimize" type="button" aria-label="Minimize Meeting Assistant"></button>
+          <button class="traffic maximize" type="button" aria-label="${this.windowState.maximized ? 'Restore Meeting Assistant' : 'Maximize Meeting Assistant'}"></button>
+        </div>
         <div class="brand">
           <img class="logo" src="${chrome.runtime.getURL('icons/infron-mark.png')}" alt="" aria-hidden="true" />
           <div>
@@ -153,10 +165,10 @@ export class MeetingOverlay {
           <span class="badge ${audio.microphone ? 'ok' : ''}">Mic</span>
           <span class="badge ${audio.output ? 'ok' : ''}">System audio</span>
           <div class="toolbar" role="group" aria-label="Meeting Assistant controls">
-            <button class="window-btn primary mic-toggle" type="button">${this.recognition ? 'Stop mic' : 'Start mic'}</button>
-            <button class="window-btn minimize" type="button" aria-label="Send Meeting Assistant to background">Background</button>
-            <button class="window-btn focus" type="button" aria-label="Focus Meeting Assistant">Focus</button>
-            <button class="window-btn close" type="button" aria-label="Close Meeting Assistant">Close</button>
+            <button class="mic-pill ${this.recognition ? 'recording' : ''} mic-toggle" type="button">
+              <span aria-hidden="true"></span>
+              ${this.recognition ? 'Stop Mic' : 'Start Mic'}
+            </button>
           </div>
         </div>
       </header>
@@ -176,19 +188,19 @@ export class MeetingOverlay {
       if ((event.target as HTMLElement).closest('button')) return
       this.startDrag(event, shell)
     })
-    shell.querySelector<HTMLButtonElement>('.minimize')?.addEventListener('click', () => {
+    shell.querySelector<HTMLButtonElement>('.traffic.minimize')?.addEventListener('click', () => {
       this.syncWindowRect(shell)
       this.windowState = { ...this.windowState!, minimized: true }
       this.render()
     })
-    shell.querySelector<HTMLButtonElement>('.focus')?.addEventListener('click', () => {
-      this.focusWindow()
+    shell.querySelector<HTMLButtonElement>('.traffic.maximize')?.addEventListener('click', () => {
+      this.toggleMaximize(shell)
     })
     shell.querySelector<HTMLButtonElement>('.mic-toggle')?.addEventListener('click', () => {
       if (this.recognition) this.stopLocalSpeechRecognition()
       else void this.startLocalSpeechRecognition()
     })
-    shell.querySelector<HTMLButtonElement>('.close')?.addEventListener('click', () => {
+    shell.querySelector<HTMLButtonElement>('.traffic.close')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
         type: 'stop-meeting-assistant',
         sessionId: session.id,
@@ -208,6 +220,19 @@ export class MeetingOverlay {
 
   private startDrag(event: PointerEvent, shell: HTMLElement): void {
     if (!this.windowState) return
+    if (this.windowState.maximized && this.windowState.restore) {
+      this.windowState = {
+        ...this.windowState.restore,
+        x: event.clientX - Math.round(this.windowState.restore.width / 2),
+        y: 8,
+        minimized: false,
+        maximized: false,
+      }
+      shell.style.left = `${this.windowState.x}px`
+      shell.style.top = `${this.windowState.y}px`
+      shell.style.width = `${this.windowState.width}px`
+      shell.style.height = `${this.windowState.height}px`
+    }
     event.preventDefault()
     shell.setPointerCapture(event.pointerId)
     this.dragState = {
@@ -261,6 +286,34 @@ export class MeetingOverlay {
     shell.style.top = `${y}px`
     shell.style.width = `${width}px`
     shell.style.height = `${height}px`
+  }
+
+  private toggleMaximize(shell: HTMLElement): void {
+    if (!this.windowState) return
+    if (this.windowState.maximized && this.windowState.restore) {
+      this.windowState = {
+        ...this.windowState.restore,
+        minimized: false,
+        maximized: false,
+      }
+    } else {
+      const rect = shell.getBoundingClientRect()
+      this.windowState = {
+        x: 8,
+        y: 8,
+        width: Math.max(MIN_WIDTH, window.innerWidth - 16),
+        height: Math.max(MIN_HEIGHT, window.innerHeight - 16),
+        minimized: false,
+        maximized: true,
+        restore: {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+      }
+    }
+    this.render()
   }
 
   private async startLocalSpeechRecognition(): Promise<void> {
@@ -453,6 +506,7 @@ function defaultWindowState(): MeetingWindowState {
     width,
     height,
     minimized: false,
+    maximized: false,
   }
 }
 
@@ -675,6 +729,7 @@ const css = `
 .topbar,
 .status,
 .brand,
+.traffic-lights,
 .title-block,
 .segment-head {
   display: flex;
@@ -683,7 +738,7 @@ const css = `
 
 .topbar {
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -693,9 +748,66 @@ const css = `
   cursor: grabbing;
 }
 
+.traffic-lights {
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 0 2px;
+  cursor: default;
+}
+
+.traffic {
+  all: unset;
+  position: relative;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 1px rgb(15 23 42 / 10%),
+    inset 0 1px 0 rgb(255 255 255 / 52%);
+  cursor: pointer;
+}
+
+.traffic.close {
+  background: #ff5f57;
+}
+
+.traffic.minimize {
+  background: #febc2e;
+}
+
+.traffic.maximize {
+  background: #28c840;
+}
+
+.traffic::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgb(15 23 42 / 58%);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.traffic-lights:hover .traffic::after {
+  opacity: 1;
+}
+
+.traffic.close::after { content: "x"; }
+.traffic.minimize::after { content: "-"; }
+.traffic.maximize::after { content: "+"; }
+
+.traffic:hover {
+  filter: saturate(1.06) brightness(0.98);
+}
+
 .brand {
   gap: 11px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .logo {
@@ -749,56 +861,68 @@ h2 {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px;
+  gap: 8px;
+  padding: 0;
   border: 1px solid rgb(15 23 42 / 7%);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 48%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 54%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 62%);
+  cursor: default;
 }
 
-.window-btn {
+.mic-pill {
   border: 0;
-  border-radius: 9px;
-  padding: 7px 10px;
-  background: transparent;
-  color: #334155;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #0f766e;
+  color: #fff;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 8px 18px rgb(15 118 110 / 20%);
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.window-btn:hover {
+.mic-pill:hover {
   transform: translateY(-1px);
-  background: rgb(15 118 110 / 10%);
-  color: #0f766e;
-}
-
-.window-btn:active {
-  transform: translateY(0) scale(0.98);
-}
-
-.window-btn.primary {
-  background: #0f766e;
-  color: #fff;
-  box-shadow: 0 8px 18px rgb(15 118 110 / 20%);
-}
-
-.window-btn.primary:hover {
   background: #115e59;
   color: #fff;
   box-shadow: 0 10px 22px rgb(15 118 110 / 26%);
 }
 
-.window-btn.close {
-  color: #991b1b;
+.mic-pill:active {
+  transform: translateY(0) scale(0.98);
 }
 
-.window-btn.close:hover {
-  background: rgb(220 38 38 / 10%);
-  color: #b91c1c;
+.mic-pill span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 72%);
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 16%);
+}
+
+.mic-pill.recording {
+  background: #b91c1c;
+  box-shadow: 0 8px 18px rgb(185 28 28 / 18%);
+}
+
+.mic-pill.recording:hover {
+  background: #991b1b;
+  box-shadow: 0 10px 22px rgb(185 28 28 / 24%);
+}
+
+.mic-pill.recording span {
+  animation: micPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.86); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
 .dock {
