@@ -7,15 +7,36 @@ import type {
 import type { StopMeetingAssistantMsg } from '../shared/messages'
 
 const HOST_ID = 'infron-meeting-assistant-root'
+const MIN_WIDTH = 520
+const MIN_HEIGHT = 360
+
+type MeetingWindowState = {
+  x: number
+  y: number
+  width: number
+  height: number
+  minimized: boolean
+}
+
+type DragState = {
+  pointerId: number
+  startX: number
+  startY: number
+  windowX: number
+  windowY: number
+}
 
 export class MeetingOverlay {
   private host: HTMLElement | null = null
   private root: ShadowRoot | null = null
   private state: MeetingRuntimeState | null = null
+  private windowState: MeetingWindowState | null = null
+  private dragState: DragState | null = null
 
   show(state: MeetingRuntimeState): void {
     this.state = state
     this.ensureRoot()
+    this.windowState ??= defaultWindowState()
     this.render()
   }
 
@@ -51,15 +72,37 @@ export class MeetingOverlay {
   }
 
   private render(): void {
-    if (!this.root || !this.state) return
+    if (!this.root || !this.state || !this.windowState) return
     const { session, segments, summary, audio } = this.state
     this.root.replaceChildren()
     const style = document.createElement('style')
     style.textContent = css
 
+    if (this.windowState.minimized) {
+      const dock = document.createElement('button')
+      dock.className = 'dock'
+      dock.type = 'button'
+      dock.setAttribute('aria-label', 'Restore Meeting Assistant')
+      dock.innerHTML = `
+        <img class="dock-logo" src="${chrome.runtime.getURL('icons/infron-mark.png')}" alt="" aria-hidden="true" />
+        <span>Meeting Assistant</span>
+        <strong>${statusLabel(session.status)}</strong>
+      `
+      dock.addEventListener('click', () => {
+        this.windowState = { ...this.windowState!, minimized: false }
+        this.render()
+      })
+      this.root.append(style, dock)
+      return
+    }
+
     const shell = document.createElement('section')
     shell.className = 'overlay'
     shell.setAttribute('aria-label', 'Infron Translate Meeting Assistant')
+    shell.style.left = `${this.windowState.x}px`
+    shell.style.top = `${this.windowState.y}px`
+    shell.style.width = `${this.windowState.width}px`
+    shell.style.height = `${this.windowState.height}px`
     shell.innerHTML = `
       <header class="topbar">
         <div class="brand">
@@ -73,7 +116,9 @@ export class MeetingOverlay {
           <span class="badge ${session.status === 'listening' ? 'ok' : ''}">${statusLabel(session.status)}</span>
           <span class="badge ${audio.microphone ? 'ok' : ''}">Mic</span>
           <span class="badge ${audio.output ? 'ok' : ''}">Meeting audio</span>
-          <button class="stop" type="button">Stop</button>
+          <button class="window-btn minimize" type="button" aria-label="Send Meeting Assistant to background">Background</button>
+          <button class="window-btn focus" type="button" aria-label="Focus Meeting Assistant">Focus</button>
+          <button class="window-btn close" type="button" aria-label="Close Meeting Assistant">Close</button>
         </div>
       </header>
       <main class="screens">
@@ -81,7 +126,22 @@ export class MeetingOverlay {
         <article class="screen transcript-screen"></article>
       </main>
     `
-    shell.querySelector<HTMLButtonElement>('.stop')?.addEventListener('click', () => {
+    shell.addEventListener('pointerdown', () => this.focusWindow())
+    shell.addEventListener('mouseup', () => this.syncWindowRect(shell))
+    shell.addEventListener('touchend', () => this.syncWindowRect(shell))
+    shell.querySelector<HTMLElement>('.topbar')?.addEventListener('pointerdown', (event) => {
+      if ((event.target as HTMLElement).closest('button')) return
+      this.startDrag(event, shell)
+    })
+    shell.querySelector<HTMLButtonElement>('.minimize')?.addEventListener('click', () => {
+      this.syncWindowRect(shell)
+      this.windowState = { ...this.windowState!, minimized: true }
+      this.render()
+    })
+    shell.querySelector<HTMLButtonElement>('.focus')?.addEventListener('click', () => {
+      this.focusWindow()
+    })
+    shell.querySelector<HTMLButtonElement>('.close')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
         type: 'stop-meeting-assistant',
         sessionId: session.id,
@@ -91,6 +151,84 @@ export class MeetingOverlay {
     shell.querySelector<HTMLElement>('.transcript-screen')?.append(renderTranscript(segments))
     this.root.append(style, shell)
   }
+
+  private focusWindow(): void {
+    if (!this.host) return
+    this.host.style.zIndex = '2147483645'
+  }
+
+  private startDrag(event: PointerEvent, shell: HTMLElement): void {
+    if (!this.windowState) return
+    event.preventDefault()
+    shell.setPointerCapture(event.pointerId)
+    this.dragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      windowX: this.windowState.x,
+      windowY: this.windowState.y,
+    }
+    const move = (nextEvent: PointerEvent) => this.drag(nextEvent, shell)
+    const stop = (nextEvent: PointerEvent) => {
+      if (nextEvent.pointerId !== this.dragState?.pointerId) return
+      shell.releasePointerCapture(nextEvent.pointerId)
+      shell.removeEventListener('pointermove', move)
+      shell.removeEventListener('pointerup', stop)
+      shell.removeEventListener('pointercancel', stop)
+      this.syncWindowRect(shell)
+      this.dragState = null
+    }
+    shell.addEventListener('pointermove', move)
+    shell.addEventListener('pointerup', stop)
+    shell.addEventListener('pointercancel', stop)
+  }
+
+  private drag(event: PointerEvent, shell: HTMLElement): void {
+    if (!this.dragState || !this.windowState || event.pointerId !== this.dragState.pointerId) return
+    const x = clamp(
+      this.dragState.windowX + event.clientX - this.dragState.startX,
+      8,
+      Math.max(8, window.innerWidth - this.windowState.width - 8),
+    )
+    const y = clamp(
+      this.dragState.windowY + event.clientY - this.dragState.startY,
+      8,
+      Math.max(8, window.innerHeight - this.windowState.height - 8),
+    )
+    this.windowState = { ...this.windowState, x, y }
+    shell.style.left = `${x}px`
+    shell.style.top = `${y}px`
+  }
+
+  private syncWindowRect(shell: HTMLElement): void {
+    if (!this.windowState) return
+    const rect = shell.getBoundingClientRect()
+    const width = clamp(rect.width, MIN_WIDTH, Math.max(MIN_WIDTH, window.innerWidth - 16))
+    const height = clamp(rect.height, MIN_HEIGHT, Math.max(MIN_HEIGHT, window.innerHeight - 16))
+    const x = clamp(rect.left, 8, Math.max(8, window.innerWidth - width - 8))
+    const y = clamp(rect.top, 8, Math.max(8, window.innerHeight - height - 8))
+    this.windowState = { ...this.windowState, x, y, width, height }
+    shell.style.left = `${x}px`
+    shell.style.top = `${y}px`
+    shell.style.width = `${width}px`
+    shell.style.height = `${height}px`
+  }
+}
+
+function defaultWindowState(): MeetingWindowState {
+  const width = clamp(Math.round(window.innerWidth * 0.82), MIN_WIDTH, window.innerWidth - 40)
+  const height = clamp(Math.round(window.innerHeight * 0.78), MIN_HEIGHT, window.innerHeight - 40)
+  return {
+    x: Math.max(20, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(20, Math.round((window.innerHeight - height) / 2)),
+    width,
+    height,
+    minimized: false,
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
 }
 
 function renderSummary(summary: MeetingSummaryState): HTMLElement {
@@ -202,7 +340,8 @@ const css = `
   all: initial;
   position: fixed;
   z-index: 2147483645;
-  inset: 20px;
+  inset: 0;
+  pointer-events: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   color: #111827;
 }
@@ -210,8 +349,11 @@ const css = `
 * { box-sizing: border-box; }
 
 .overlay {
-  width: 100%;
-  height: 100%;
+  position: fixed;
+  min-width: ${MIN_WIDTH}px;
+  min-height: ${MIN_HEIGHT}px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
@@ -222,6 +364,9 @@ const css = `
   box-shadow: 0 26px 80px rgb(15 23 42 / 26%);
   backdrop-filter: blur(16px) saturate(155%);
   -webkit-backdrop-filter: blur(16px) saturate(155%);
+  pointer-events: auto;
+  resize: both;
+  overflow: hidden;
 }
 
 .topbar,
@@ -236,6 +381,13 @@ const css = `
 .topbar {
   justify-content: space-between;
   gap: 16px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.topbar:active {
+  cursor: grabbing;
 }
 
 .brand {
@@ -291,12 +443,12 @@ h2 {
   color: #047857;
 }
 
-.stop {
+.window-btn {
   border: 0;
   border-radius: 10px;
   padding: 7px 12px;
-  background: #111827;
-  color: #fff;
+  background: rgb(15 23 42 / 8%);
+  color: #334155;
   font: inherit;
   font-size: 13px;
   font-weight: 700;
@@ -304,10 +456,60 @@ h2 {
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.stop:hover {
+.window-btn:hover {
   transform: translateY(-1px);
+  background: rgb(15 118 110 / 12%);
+  color: #0f766e;
+}
+
+.window-btn.close {
+  background: #111827;
+  color: #fff;
+}
+
+.window-btn.close:hover {
   background: #0f766e;
   box-shadow: 0 10px 22px rgb(15 118 110 / 26%);
+}
+
+.dock {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 9px 12px;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 16px 42px rgb(15 23 42 / 22%);
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 720;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+.dock:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 50px rgb(15 23 42 / 26%);
+}
+
+.dock-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.dock strong {
+  color: #0f766e;
+  font-size: 12px;
 }
 
 .screens {
@@ -430,7 +632,15 @@ ul {
 }
 
 @media (max-width: 820px) {
-  :host { inset: 10px; }
+  :host { inset: 0; }
+  .overlay {
+    left: 8px !important;
+    top: 8px !important;
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 16px) !important;
+    min-width: 0;
+    resize: none;
+  }
   .screens { grid-template-columns: 1fr; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .status { justify-content: flex-start; }
