@@ -31,8 +31,8 @@ body {
 }
 
 body {
-  width: 300px;
-  min-width: 300px;
+  width: 336px;
+  min-width: 336px;
   color: var(--text);
 }
 
@@ -65,8 +65,8 @@ body {
   position: relative;
   display: flex;
   overflow: hidden;
-  padding: 0.55rem;
-  border-radius: 1.1rem;
+  padding: 0.38rem;
+  border-radius: 1rem;
 }
 
 .liquidGlass-effect {
@@ -112,8 +112,8 @@ body {
 }
 
 .menu-item {
-  padding: 0.36rem 0.55rem;
-  border-radius: 0.78rem;
+  padding: 0.28rem 0.46rem;
+  border-radius: 0.68rem;
   transition: all 0.15s ease-in;
 }
 
@@ -125,18 +125,18 @@ body {
 }
 
 .menu-item.nested {
-  margin: 0 -0.15rem;
-  padding: 0.3rem 0.45rem;
+  margin: 0 -0.12rem;
+  padding: 0.22rem 0.38rem;
 }
 
 .popup-inner {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .header {
-  padding: 0.05rem 0.25rem 0.12rem;
+  padding: 0 0.22rem 0.05rem;
 }
 
 .brand {
@@ -146,9 +146,9 @@ body {
 }
 
 .logo {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   background: #fff;
   object-fit: cover;
   box-shadow:
@@ -159,21 +159,21 @@ body {
 
 h1 {
   margin: 0;
-  font-size: 1.04rem;
+  font-size: 0.98rem;
   font-weight: 650;
   letter-spacing: -0.02em;
 }
 
 .subtitle {
   margin: 1px 0 0;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   color: var(--text-secondary);
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .row {
@@ -181,20 +181,20 @@ h1 {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   padding: 0 0.1rem;
 }
 
 .label {
   color: var(--text-secondary);
   flex-shrink: 0;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
 }
 
 .value {
   text-align: right;
   word-break: break-all;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
 }
 
 .select-row {
@@ -217,12 +217,12 @@ h1 {
   min-width: 0;
   appearance: none;
   border: none;
-  border-radius: 0.65rem;
+  border-radius: 0.58rem;
   background: rgba(255, 255, 255, 0.58);
   color: var(--text);
   box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
-  padding: 0.38rem 1.55rem 0.38rem 0.56rem;
-  font-size: 0.76rem;
+  padding: 0.29rem 1.45rem 0.29rem 0.5rem;
+  font-size: 0.72rem;
   line-height: 1.2;
 }
 
@@ -268,20 +268,20 @@ h1 {
 }
 
 .switch-text {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 500;
 }
 
 .switch-desc {
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   color: var(--text-tertiary);
   line-height: 1.2;
 }
 
 .switch {
   appearance: none;
-  width: 40px;
-  height: 24px;
+  width: 36px;
+  height: 21px;
   border-radius: 999px;
   background: rgba(120, 120, 128, 0.2);
   position: relative;
@@ -298,8 +298,8 @@ h1 {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
@@ -311,7 +311,7 @@ h1 {
 }
 
 .switch:checked::after {
-  transform: translateX(16px);
+  transform: translateX(15px);
 }
 
 .switch:disabled {
@@ -320,41 +320,38 @@ h1 {
 }
 
 .hint {
-  margin: 0;
-  padding: 0 0.35rem;
-  font-size: 0.66rem;
-  line-height: 1.25;
-  color: var(--text-tertiary);
+  display: none;
 }
 
 .meeting-card {
-  gap: 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .meeting-title {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 680;
 }
 
 .meeting-hint {
-  margin: 2px 0 0;
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  line-height: 1.32;
+  display: none;
 }
 
 .meeting-btn {
-  width: 100%;
-  padding: 0.46rem 0.72rem;
-  border-radius: 0.78rem;
+  width: auto;
+  white-space: nowrap;
+  padding: 0.34rem 0.62rem;
+  border-radius: 0.65rem;
 }
 
 .btn {
   appearance: none;
   border: 1px solid rgba(0, 122, 255, 0.2);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   width: 100%;
@@ -372,8 +369,8 @@ h1 {
 }
 
 .btn.primary {
-  padding: 0.52rem 0.9rem;
-  border-radius: 0.86rem;
+  padding: 0.42rem 0.8rem;
+  border-radius: 0.72rem;
 }
 
 .btn:not(.primary) {
