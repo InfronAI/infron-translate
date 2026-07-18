@@ -3,7 +3,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 export default defineManifest({
   manifest_version: 3,
   name: 'Infron Translate',
-  description: 'Automatically detect webpage language and add bilingual full-page translations.',
+  description: 'Full-page translation and meeting assistant for live summaries and bilingual transcripts.',
   version: '0.2.0',
   icons: {
     16: 'icons/icon16.png',
@@ -37,7 +37,7 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ['storage', 'tabs', 'scripting'],
+  permissions: ['storage', 'tabs', 'scripting', 'offscreen', 'tabCapture', 'audioCapture'],
   host_permissions: ['http://*/*', 'https://*/*'],
   web_accessible_resources: [
     {

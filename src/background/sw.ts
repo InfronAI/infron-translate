@@ -14,6 +14,9 @@ import {
   ensureCacheHydrated,
   persistTranslationCache,
 } from './translate'
+import { MeetingManager } from './meeting'
+
+const meetingManager = new MeetingManager()
 
 chrome.runtime.onMessage.addListener((rawMessage: unknown, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id || !isToBackground(rawMessage)) {
@@ -41,6 +44,12 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
   }
   if (message.type === 'open-options') {
     return { type: 'open-options-result', ok: false }
+  }
+  if (
+    message.type === 'start-meeting-assistant' ||
+    message.type === 'stop-meeting-assistant'
+  ) {
+    return { type: 'meeting-assistant-control-result', ok: false, error: detail }
   }
   return {
     type: 'background-error',
@@ -182,6 +191,24 @@ function isToBackground(value: unknown): value is ToBackground {
   if (value.type === 'set-auto-page-translation') {
     return typeof value.enabled === 'boolean'
   }
+  if (value.type === 'start-meeting-assistant') {
+    return (
+      typeof value.tabId === 'number' &&
+      Number.isInteger(value.tabId) &&
+      value.tabId >= 0 &&
+      typeof value.sourceLang === 'string' &&
+      value.sourceLang.length <= 64 &&
+      typeof value.targetLang === 'string' &&
+      value.targetLang.length <= 64 &&
+      (value.audioMode === 'tab-and-mic' ||
+        value.audioMode === 'tab-only' ||
+        value.audioMode === 'mock')
+    )
+  }
+  if (value.type === 'stop-meeting-assistant') {
+    return value.sessionId === undefined || typeof value.sessionId === 'string'
+  }
+  if (value.type === 'get-meeting-assistant-state') return true
   if (value.type === 'translate-batch') {
     if (
       typeof value.pageKey !== 'string' ||
@@ -253,6 +280,38 @@ async function handle(
     } catch {
       return { type: 'open-options-result', ok: false }
     }
+  }
+
+  if (message.type === 'start-meeting-assistant') {
+    const session = await meetingManager.start({
+      tabId: message.tabId,
+      sourceLang: message.sourceLang,
+      targetLang: message.targetLang,
+      audioMode: message.audioMode,
+    })
+    return { type: 'meeting-assistant-control-result', ok: true, session }
+  }
+
+  if (message.type === 'stop-meeting-assistant') {
+    await meetingManager.stop()
+    return {
+      type: 'meeting-assistant-control-result',
+      ok: true,
+      session: {
+        id: message.sessionId ?? 'stopped',
+        tabId: sender.tab?.id ?? -1,
+        startedAt: Date.now(),
+        stoppedAt: Date.now(),
+        status: 'stopped',
+        audioMode: 'mock',
+        sourceLang: 'auto',
+        targetLang: 'cn',
+      },
+    }
+  }
+
+  if (message.type === 'get-meeting-assistant-state') {
+    return { type: 'meeting-assistant-state', state: meetingManager.getState() }
   }
 
   if (message.type === 'translate-batch') {

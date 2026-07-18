@@ -327,6 +327,29 @@ h1 {
   color: var(--text-tertiary);
 }
 
+.meeting-card {
+  gap: 7px;
+}
+
+.meeting-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 680;
+}
+
+.meeting-hint {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.32;
+}
+
+.meeting-btn {
+  width: 100%;
+  padding: 0.46rem 0.72rem;
+  border-radius: 0.78rem;
+}
+
 .btn {
   appearance: none;
   border: 1px solid rgba(0, 122, 255, 0.2);

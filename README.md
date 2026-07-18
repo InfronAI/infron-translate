@@ -1,6 +1,6 @@
 # Infron Translate
 
-Infron Translate is a Chrome Manifest V3 extension for full-page webpage translation. It detects the source language of the current page, lets the user choose both source and target languages, and supports either bilingual comparison text or translation-only replacement.
+Infron Translate is a Chrome Manifest V3 extension for full-page webpage translation and live meeting assistance. It detects the source language of the current page, lets the user choose both source and target languages, and supports either bilingual comparison text or translation-only replacement.
 
 The default extension UI language is Chinese. Users can switch the extension interface between Chinese and English from the popup or settings page.
 
@@ -28,6 +28,11 @@ The default extension UI language is Chinese. Users can switch the extension int
 - Cache repeated text translations to avoid duplicate requests.
 - Pause translation per site from the popup.
 - Configure inserted translation typography, color, background, and formatting.
+- Start a meeting assistant from the popup:
+  - Capture microphone input when permission is granted.
+  - Request current-tab meeting audio through Chrome tab capture.
+  - Show two full-screen panels on the current page: meeting outline and live transcript with translations.
+  - Keep the speech-to-text and summary pipeline isolated behind a swappable runtime module.
 
 ## Installation
 
@@ -58,8 +63,26 @@ Click the Infron Translate extension icon to open the popup. The popup shows:
 - Automatic page translation switch.
 - Site pause switch.
 - Interface language selector.
+- Meeting Assistant start button.
 
 Use **Translate this page** to start or stop manual full-page translation.
+
+Use **Start Meeting Assistant** during a video or voice meeting to open the live meeting overlay on the current tab.
+
+### Meeting Assistant
+
+The Meeting Assistant is designed for live calls where the user needs both a structured meeting outline and bilingual transcript view.
+
+Current implementation:
+
+- Starts from the extension popup.
+- Opens a two-panel overlay on the active webpage.
+- Uses an offscreen document for microphone and tab-audio capture setup.
+- Shows microphone and meeting-audio capture state in the overlay header.
+- Streams real-time sample transcript, translation, decisions, action items, and open questions through the same runtime channel that production transcription will use.
+- Can be stopped from the overlay.
+
+Production speech recognition can be connected by replacing the current transcript adapter in `src/background/meeting.ts` while keeping the popup, offscreen audio setup, and overlay UI intact.
 
 ### Floating Auto-Translation Button
 
@@ -118,6 +141,8 @@ If Cloud Model is selected before it is fully configured, the extension opens th
 - Content scripts do not receive the API key, Base URL, model, or provider configuration.
 - Chrome built-in translation processes text on device.
 - Cloud Model sends matched page text only to the configured endpoint.
+- Meeting Assistant requests microphone and tab-audio permissions only after the user clicks the popup button.
+- The current Meeting Assistant implementation displays sample live transcript data until a production speech-to-text adapter is connected.
 - The settings page connection test can only be started from the extension settings page.
 - Paused sites do not start automatic page translation.
 - The extension does not include analytics, telemetry, or remote code.
@@ -142,12 +167,15 @@ Scripts:
 
 - Popup loads on supported webpages without scrollbars.
 - Popup displays detected source language and allows source/target language changes.
+- Popup starts Meeting Assistant on supported webpages.
 - Interface language can switch between Chinese and English from popup and settings.
 - Manual full-page translation starts and stops from the popup.
 - Bilingual mode appends translations without hiding original text.
 - Bilingual mode expands clipped containers when needed without damaging page readability.
 - Translation-only mode replaces source text in place and restores it when toggled off.
 - Floating logo toggles automatic page translation globally with no visible text.
+- Meeting Assistant overlay shows meeting outline and live transcript panels.
+- Meeting Assistant stop button closes the overlay.
 - Chrome built-in support check reports available, downloadable, unavailable, or unsupported states.
 - Cloud Model cannot be selected until required configuration is complete.
 - Cloud Model connection status updates after a successful test.

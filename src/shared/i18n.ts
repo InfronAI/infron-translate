@@ -22,6 +22,9 @@ export type I18nKey =
   | 'fullPageBilingual'
   | 'fullPageTranslationOnly'
   | 'interfaceLanguage'
+  | 'meetingAssistant'
+  | 'meetingAssistantHint'
+  | 'startMeetingAssistant'
   | 'openSettings'
   | 'pauseThisSite'
   | 'popupCurrentSite'
@@ -72,6 +75,9 @@ const STRINGS: Record<UiLanguage, Record<I18nKey, string>> = {
     fullPageBilingual: '整页双语对照',
     fullPageTranslationOnly: '整页仅译文',
     interfaceLanguage: '界面语言',
+    meetingAssistant: '会议助手',
+    meetingAssistantHint: '监听麦克风与会议声音，并打开实时总结双屏。',
+    startMeetingAssistant: '启动会议助手',
     openSettings: '打开设置',
     pauseThisSite: '暂停此网站',
     popupCurrentSite: '当前网站',
@@ -121,6 +127,9 @@ const STRINGS: Record<UiLanguage, Record<I18nKey, string>> = {
     fullPageBilingual: 'Full-page bilingual',
     fullPageTranslationOnly: 'Full-page translation only',
     interfaceLanguage: 'Interface language',
+    meetingAssistant: 'Meeting Assistant',
+    meetingAssistantHint: 'Listen to microphone and meeting audio, then open the live summary screens.',
+    startMeetingAssistant: 'Start Meeting Assistant',
     openSettings: 'Open settings',
     pauseThisSite: 'Pause this site',
     popupCurrentSite: 'Current site',

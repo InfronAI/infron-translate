@@ -5,9 +5,12 @@ import type {
   PageLanguageResult,
   SetAutoPageTranslationMsg,
   SettingsMsg,
+  MeetingAssistantUpdateMsg,
+  ShowMeetingAssistantMsg,
   TogglePageTranslationResult,
 } from '../shared/messages'
 import { BrowserTranslator } from './browser-translator'
+import { MeetingOverlay } from './meeting-overlay'
 import { PageTranslator } from './page-translator'
 import { detectPageSourceLanguage } from './page-language'
 import { browserLanguageCode } from '../shared/languages'
@@ -26,6 +29,28 @@ function backgroundError(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null
   if (!('type' in value) || value.type !== 'background-error') return null
   return 'error' in value && typeof value.error === 'string' ? value.error : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object'
+}
+
+function isShowMeetingAssistantMessage(value: unknown): value is ShowMeetingAssistantMsg {
+  return (
+    isRecord(value) &&
+    value.type === 'show-meeting-assistant' &&
+    isRecord(value.state) &&
+    isRecord(value.state.session)
+  )
+}
+
+function isMeetingAssistantUpdateMessage(value: unknown): value is MeetingAssistantUpdateMsg {
+  return (
+    isRecord(value) &&
+    value.type === 'meeting-assistant-update' &&
+    isRecord(value.update) &&
+    isRecord(value.update.session)
+  )
 }
 
 export function pageTranslationSigOf(
@@ -64,6 +89,7 @@ const AUTO_TOGGLE_HOST_ID = 'infron-translate-auto-toggle'
 export class PageController {
   private readonly browserTranslator = new BrowserTranslator()
   private readonly pageTranslator = new PageTranslator(this.browserTranslator)
+  private readonly meetingOverlay = new MeetingOverlay()
   private settings: UserSettings = DEFAULT_SETTINGS
   private configured = false
   private pausedHere = false
@@ -107,6 +133,21 @@ export class PageController {
           detectedSourceLang: this.detectedSourceLang,
           effectiveSourceLang: this.effectiveSourceLang(),
         } satisfies PageLanguageResult)
+        return false
+      }
+
+      if (type === 'show-meeting-assistant' && isShowMeetingAssistantMessage(message)) {
+        this.meetingOverlay.show(message.state)
+        return false
+      }
+
+      if (type === 'meeting-assistant-update' && isMeetingAssistantUpdateMessage(message)) {
+        this.meetingOverlay.update(message.update)
+        return false
+      }
+
+      if (type === 'hide-meeting-assistant') {
+        this.meetingOverlay.hide()
         return false
       }
 

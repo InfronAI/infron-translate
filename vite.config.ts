@@ -8,6 +8,9 @@ export default defineConfig({
     sourcemap: true,
     // Stable, distinct names reduce CRX entry mix-ups between SW and content
     rollupOptions: {
+      input: {
+        meetingAudio: 'src/offscreen/meeting-audio.html',
+      },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',

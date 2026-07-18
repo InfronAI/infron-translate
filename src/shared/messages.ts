@@ -1,4 +1,10 @@
 import type { UserSettings } from './settings-defaults'
+import type {
+  MeetingAudioMode,
+  MeetingRuntimeState,
+  MeetingSession,
+  MeetingUpdatePayload,
+} from './meeting'
 
 export type TranslateBlock = {
   id: string
@@ -102,6 +108,42 @@ export type PageLanguageResult = {
   effectiveSourceLang: string
 }
 
+export type StartMeetingAssistantMsg = {
+  type: 'start-meeting-assistant'
+  tabId: number
+  sourceLang: string
+  targetLang: string
+  audioMode: MeetingAudioMode
+}
+
+export type StopMeetingAssistantMsg = {
+  type: 'stop-meeting-assistant'
+  sessionId?: string
+}
+
+export type GetMeetingAssistantStateMsg = { type: 'get-meeting-assistant-state' }
+
+export type MeetingAssistantControlResult =
+  | { type: 'meeting-assistant-control-result'; ok: true; session: MeetingSession }
+  | { type: 'meeting-assistant-control-result'; ok: false; error: string }
+
+export type MeetingAssistantStateResult = {
+  type: 'meeting-assistant-state'
+  state: MeetingRuntimeState | null
+}
+
+export type ShowMeetingAssistantMsg = {
+  type: 'show-meeting-assistant'
+  state: MeetingRuntimeState
+}
+
+export type MeetingAssistantUpdateMsg = {
+  type: 'meeting-assistant-update'
+  update: MeetingUpdatePayload
+}
+
+export type HideMeetingAssistantMsg = { type: 'hide-meeting-assistant' }
+
 export type BackgroundErrorResult = {
   type: 'background-error'
   ok: false
@@ -114,12 +156,17 @@ export type ToBackground =
   | GetSettingsMsg
   | PauseHostnameMsg
   | SetAutoPageTranslationMsg
+  | StartMeetingAssistantMsg
+  | StopMeetingAssistantMsg
+  | GetMeetingAssistantStateMsg
   | OpenOptionsMsg
   | TestConnectionMsg
 export type FromBackground =
   | TranslateBatchResultOk
   | TranslateBatchResultErr
   | SettingsMsg
+  | MeetingAssistantControlResult
+  | MeetingAssistantStateResult
   | TestConnectionResult
   | BackgroundErrorResult
   | { type: 'open-options-result'; ok: boolean }

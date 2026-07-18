@@ -10,8 +10,10 @@ import { LANGUAGE_OPTIONS, languageLabel } from '../shared/languages'
 import type { TranslationDisplayMode } from '../shared/settings-defaults'
 import type {
   GetPageLanguageMsg,
+  MeetingAssistantControlResult,
   PageLanguageResult,
   PauseHostnameMsg,
+  StartMeetingAssistantMsg,
   TogglePageTranslationMsg,
   TogglePageTranslationResult,
 } from '../shared/messages'
@@ -104,6 +106,10 @@ function applyPopupI18n(settings: UserSettings): void {
     `${uiText(lang, 'cloudConfigNeeded')} · ${uiText(lang, 'openSettings')}`
   el<HTMLButtonElement>('translatePage').querySelector('span')!.textContent =
     uiText(lang, 'translateThisPage')
+  el<HTMLElement>('meetingAssistantTitle').textContent = uiText(lang, 'meetingAssistant')
+  el<HTMLElement>('meetingAssistantHint').textContent = uiText(lang, 'meetingAssistantHint')
+  el<HTMLButtonElement>('startMeetingAssistant').querySelector('span')!.textContent =
+    uiText(lang, 'startMeetingAssistant')
   el<HTMLButtonElement>('openOptions').querySelector('span')!.textContent =
     uiText(lang, 'openSettings')
   el<HTMLSelectElement>('uiLanguageSelect').value = lang
@@ -203,6 +209,32 @@ function isTogglePageTranslationResult(value: unknown): value is TogglePageTrans
   return value.ok === false && 'error' in value && typeof value.error === 'string'
 }
 
+function isMeetingAssistantControlResult(value: unknown): value is MeetingAssistantControlResult {
+  if (!value || typeof value !== 'object' || !('type' in value)) return false
+  if (value.type !== 'meeting-assistant-control-result' || !('ok' in value)) return false
+  if (value.ok === true) return 'session' in value && typeof value.session === 'object'
+  return value.ok === false && 'error' in value && typeof value.error === 'string'
+}
+
+async function startMeetingAssistant(
+  tabId: number,
+  sourceLang: string,
+  targetLang: string,
+): Promise<void> {
+  const message: StartMeetingAssistantMsg = {
+    type: 'start-meeting-assistant',
+    tabId,
+    sourceLang,
+    targetLang,
+    audioMode: 'tab-and-mic',
+  }
+  const response: unknown = await chrome.runtime.sendMessage(message)
+  if (!isMeetingAssistantControlResult(response)) {
+    throw new Error('Meeting assistant returned an invalid response')
+  }
+  if (!response.ok) throw new Error(response.error)
+}
+
 async function queryPageLanguage(tabId: number): Promise<PageLanguageResult | null> {
   const message: GetPageLanguageMsg = { type: 'get-page-language' }
   let response: unknown
@@ -249,11 +281,13 @@ async function init(): Promise<void> {
   const pageEngineSelect = el<HTMLSelectElement>('pageEngineSelect')
   const uiLanguageSelect = el<HTMLSelectElement>('uiLanguageSelect')
   const configureCloudModel = el<HTMLButtonElement>('configureCloudModel')
+  const startMeetingAssistantBtn = el<HTMLButtonElement>('startMeetingAssistant')
   let settings = await normalizeUnavailableEngine(await loadSettings())
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
     translatePageBtn.disabled = true
+    startMeetingAssistantBtn.disabled = true
     sourceLangSelect.disabled = true
   } else {
     const tabId = tab.id
@@ -272,6 +306,23 @@ async function init(): Promise<void> {
         await togglePageTranslation(tabId)
         window.close()
       } catch (err) {
+        const error = el<HTMLElement>('error')
+        error.hidden = false
+        error.textContent = err instanceof Error ? err.message : String(err)
+      }
+    })
+    startMeetingAssistantBtn.addEventListener('click', async () => {
+      try {
+        el<HTMLElement>('error').hidden = true
+        startMeetingAssistantBtn.disabled = true
+        await startMeetingAssistant(
+          tabId,
+          sourceLangSelect.value || settings.sourceLang || 'auto',
+          targetLangSelect.value || settings.targetLang,
+        )
+        window.close()
+      } catch (err) {
+        startMeetingAssistantBtn.disabled = false
         const error = el<HTMLElement>('error')
         error.hidden = false
         error.textContent = err instanceof Error ? err.message : String(err)
