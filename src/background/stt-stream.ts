@@ -81,7 +81,7 @@ export class StepFunRealtimeAsrConnection {
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(connectEndpoint)
       this.ws = ws
-      let opened = false
+      let connected = false
       let settled = false
       const fail = (error: Error) => {
         if (settled) return
@@ -95,10 +95,6 @@ export class StepFunRealtimeAsrConnection {
       let errorFallback: ReturnType<typeof setTimeout> | null = null
 
       ws.addEventListener('open', () => {
-        opened = true
-        settled = true
-        globalThis.clearTimeout(timeout)
-        if (errorFallback) globalThis.clearTimeout(errorFallback)
         if (needsRelayConnect) {
           ws.send(
             JSON.stringify({
@@ -107,12 +103,38 @@ export class StepFunRealtimeAsrConnection {
               apiKey,
             }),
           )
+          return
         }
+        connected = true
+        settled = true
+        globalThis.clearTimeout(timeout)
+        if (errorFallback) globalThis.clearTimeout(errorFallback)
         this.configureSession(message)
         this.callbacks.onReady(message)
         resolve()
       })
-      ws.addEventListener('message', (event) => this.handleMessage(event))
+      ws.addEventListener('message', (event) => {
+        if (needsRelayConnect && !connected) {
+          const relayPayload = parseEvent(event.data)
+          const relayType = stringValue(relayPayload.type)
+          if (relayType === 'relay.ready') {
+            connected = true
+            settled = true
+            globalThis.clearTimeout(timeout)
+            if (errorFallback) globalThis.clearTimeout(errorFallback)
+            this.configureSession(message)
+            this.callbacks.onReady(message)
+            resolve()
+            return
+          }
+          if (relayType === 'error') {
+            fail(new Error(errorMessage(relayPayload)))
+            ws.close()
+            return
+          }
+        }
+        this.handleMessage(event)
+      })
       ws.addEventListener('error', () => {
         errorFallback = globalThis.setTimeout(() => {
           fail(new Error(connectionFailureMessage(usesLocalRelay, 'failed before close details were available')))
@@ -121,7 +143,7 @@ export class StepFunRealtimeAsrConnection {
       ws.addEventListener('close', (event) => {
         if (errorFallback) globalThis.clearTimeout(errorFallback)
         const detail = closeDetail(event)
-        if (!opened) {
+        if (!connected) {
           globalThis.clearTimeout(timeout)
           fail(new Error(`${connectionFailureMessage(usesLocalRelay, 'closed during handshake')}${detail}`))
           return

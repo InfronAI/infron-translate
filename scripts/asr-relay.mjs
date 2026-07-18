@@ -52,7 +52,9 @@ function connectUpstream(client, upstreamUrl, apiKey, pending) {
       Authorization: `Bearer ${apiKey}`,
     },
   })
+  let connected = false
   upstream.on('open', () => {
+    connected = true
     client.send(JSON.stringify({ type: 'relay.ready' }))
     while (pending.length && upstream.readyState === WebSocket.OPEN) upstream.send(pending.shift())
   })
@@ -63,17 +65,33 @@ function connectUpstream(client, upstreamUrl, apiKey, pending) {
     safeClose(client, code, reason)
   })
   upstream.on('error', (error) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({
-        type: 'error',
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-        },
-      }))
-      client.close(1011, 'upstream error')
-    }
+    sendError(client, upstreamErrorMessage(error, connected))
+    safeClose(client, 1011, 'upstream error')
+  })
+  upstream.on('unexpected-response', (_request, response) => {
+    let body = ''
+    response.setEncoding('utf8')
+    response.on('data', (chunk) => {
+      body += chunk
+      if (body.length > 1000) response.destroy()
+    })
+    response.on('end', () => {
+      sendError(
+        client,
+        `StepFun ASR WebSocket rejected handshake with HTTP ${response.statusCode}${body ? `: ${compact(body)}` : ''}`,
+      )
+      safeClose(client, 1011, 'upstream rejected')
+    })
   })
   return upstream
+}
+
+function sendError(socket, message) {
+  if (socket.readyState !== WebSocket.OPEN) return
+  socket.send(JSON.stringify({
+    type: 'error',
+    error: { message },
+  }))
 }
 
 function safeClose(socket, code = 1011, reason = '') {
@@ -96,4 +114,15 @@ function parseControl(data) {
   } catch {
     return null
   }
+}
+
+function upstreamErrorMessage(error, connected) {
+  const message = error instanceof Error ? error.message : String(error)
+  return connected
+    ? `StepFun ASR WebSocket error: ${message}`
+    : `StepFun ASR WebSocket handshake failed: ${message}`
+}
+
+function compact(value) {
+  return String(value).replace(/\s+/g, ' ').trim().slice(0, 500)
 }
