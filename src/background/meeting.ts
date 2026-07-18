@@ -93,20 +93,17 @@ export class MeetingManager {
         message:
           input.audioMode === 'mock'
             ? 'Demo transcript stream is running.'
-            : 'Click Start mic in this window to begin real microphone transcription.',
+            : 'Mic input and system audio are off. Turn on either input when you are ready to transcribe.',
       },
     }
 
     await this.ensureOffscreen()
-    const outputStreamId =
-      input.audioMode !== 'mock' ? await this.getTabAudioStreamId(input.tabId) : undefined
-    await this.notifyOffscreenStart(session, outputStreamId)
     this.state = {
       ...this.state,
       session: { ...session, status: 'listening' },
       audio: {
         microphone: false,
-        output: Boolean(outputStreamId),
+        output: false,
         microphoneLevel: 0,
         outputLevel: 0,
       },

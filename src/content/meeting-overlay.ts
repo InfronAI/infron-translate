@@ -55,7 +55,6 @@ export class MeetingOverlay {
   private micPcmBuffers: Int16Array[] = []
   private micChunkStartedAt = 0
   private maxMicLevelSinceChunk = 0
-  private autoMicAttempted = false
   private contextEditorOpen = false
   private contextDraft = ''
 
@@ -64,14 +63,12 @@ export class MeetingOverlay {
     this.ensureRoot()
     this.windowState ??= defaultWindowState()
     this.render()
-    this.ensureAutomaticTranscription()
   }
 
   update(update: MeetingRuntimeState): void {
     if (!this.state) return
     this.state = update
     this.render()
-    this.ensureAutomaticTranscription()
   }
 
   hide(): void {
@@ -140,7 +137,7 @@ export class MeetingOverlay {
           </button>
           <button class="input-pill mic-toggle ${this.isMicActive() ? 'active recording' : ''}" type="button">
             <span aria-hidden="true"></span>
-            ${this.isMicActive() ? 'Stop Mic' : this.autoMicAttempted ? 'Retry Mic' : 'Start Mic'}
+            ${this.isMicActive() ? 'Stop Mic' : 'Start Mic'}
           </button>
         </div>
       </header>
@@ -175,7 +172,7 @@ export class MeetingOverlay {
     })
     shell.querySelector<HTMLButtonElement>('.mic-toggle')?.addEventListener('click', () => {
       if (this.isMicActive()) this.stopLocalSpeechRecognition()
-      else void this.startLocalSpeechRecognition(false)
+      else void this.startLocalSpeechRecognition()
     })
     shell.querySelector<HTMLButtonElement>('.system-toggle')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
@@ -331,20 +328,7 @@ export class MeetingOverlay {
     this.render()
   }
 
-  private ensureAutomaticTranscription(): void {
-    if (
-      !this.state ||
-      this.state.session.status !== 'listening' ||
-      this.isMicActive() ||
-      this.autoMicAttempted
-    ) {
-      return
-    }
-    this.autoMicAttempted = true
-    void this.startLocalSpeechRecognition(true)
-  }
-
-  private async startLocalSpeechRecognition(automatic: boolean): Promise<void> {
+  private async startLocalSpeechRecognition(): Promise<void> {
     if (!this.state) return
     const session = this.state.session
     try {
@@ -354,9 +338,7 @@ export class MeetingOverlay {
       await this.sendAudioStatus({
         active: true,
         source: 'external-stt',
-        message: automatic
-          ? 'Automatic microphone transcription is streaming to StepFun ASR.'
-          : 'Microphone transcription is streaming to StepFun ASR.',
+        message: 'Microphone transcription is streaming to StepFun ASR.',
       })
       this.render()
       return
@@ -783,9 +765,9 @@ const css = `
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   padding: 16px;
-  border: 1px solid rgb(255 255 255 / 66%);
+  border: 1px solid #dfe3e8;
   border-radius: 18px;
-  background: linear-gradient(135deg, rgb(248 250 252 / 94%), rgb(236 253 245 / 88%) 46%, rgb(239 246 255 / 92%));
+  background: rgb(247 248 250 / 96%);
   box-shadow: 0 26px 80px rgb(15 23 42 / 26%);
   backdrop-filter: blur(16px) saturate(155%);
   -webkit-backdrop-filter: blur(16px) saturate(155%);
@@ -885,7 +867,7 @@ ul {
   gap: 8px;
   margin-left: auto;
   padding: 3px;
-  border: 1px solid rgb(15 23 42 / 7%);
+  border: 1px solid #dfe3e8;
   border-radius: 999px;
   background: rgb(255 255 255 / 54%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 62%);
@@ -905,14 +887,14 @@ ul {
   display: flex;
   align-items: center;
   gap: 7px;
-  box-shadow: 0 8px 18px rgb(15 118 110 / 20%);
+  box-shadow: 0 8px 18px rgb(23 105 224 / 14%);
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input-pill:hover {
   transform: translateY(-1px);
-  background: rgb(15 118 110 / 12%);
-  color: #0f766e;
+  background: #eaf2ff;
+  color: #1769e0;
 }
 
 .input-pill:active {
@@ -928,15 +910,15 @@ ul {
 }
 
 .input-pill.active {
-  background: #0f766e;
+  background: #16794a;
   color: #fff;
-  box-shadow: 0 8px 18px rgb(15 118 110 / 20%);
+  box-shadow: 0 8px 18px rgb(22 121 74 / 20%);
 }
 
 .input-pill.active:hover {
-  background: #115e59;
+  background: #12673f;
   color: #fff;
-  box-shadow: 0 10px 22px rgb(15 118 110 / 26%);
+  box-shadow: 0 10px 22px rgb(22 121 74 / 26%);
 }
 
 .input-pill.active span {
@@ -1001,7 +983,7 @@ ul {
   display: grid;
   gap: 9px;
   padding: 12px;
-  border: 1px solid rgb(15 23 42 / 8%);
+  border: 1px solid #dfe3e8;
   border-radius: 14px;
   background: rgb(255 255 255 / 66%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
@@ -1042,7 +1024,7 @@ ul {
   min-height: 86px;
   max-height: 180px;
   resize: vertical;
-  border: 1px solid rgb(15 23 42 / 10%);
+  border: 1px solid #cbd1d8;
   border-radius: 12px;
   padding: 10px 11px;
   background: rgb(255 255 255 / 82%);
@@ -1054,8 +1036,8 @@ ul {
 }
 
 .context-input:focus {
-  border-color: rgb(15 118 110 / 45%);
-  box-shadow: 0 0 0 3px rgb(20 184 166 / 12%);
+  border-color: rgb(23 105 224 / 42%);
+  box-shadow: 0 0 0 3px rgb(23 105 224 / 12%);
 }
 
 .context-actions {
@@ -1083,20 +1065,20 @@ ul {
 }
 
 .context-save {
-  background: #0f766e;
+  background: #1769e0;
   color: #fff;
 }
 
 .context-toggle:hover,
 .context-clear:hover {
   transform: translateY(-1px);
-  background: rgb(15 118 110 / 12%);
-  color: #0f766e;
+  background: #eaf2ff;
+  color: #1769e0;
 }
 
 .context-save:hover {
   transform: translateY(-1px);
-  background: #115e59;
+  background: #0f56bd;
 }
 
 .audio-meters {
@@ -1109,7 +1091,7 @@ ul {
 .meter {
   position: relative;
   padding: 12px;
-  border: 1px solid rgb(15 23 42 / 8%);
+  border: 1px solid #dfe3e8;
   border-radius: 14px;
   background:
     linear-gradient(180deg, rgb(255 255 255 / 72%), rgb(248 250 252 / 62%));
@@ -1157,7 +1139,7 @@ ul {
 }
 
 .meter-head strong {
-  color: #0f766e;
+  color: #1769e0;
   font-size: 18px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -1177,13 +1159,13 @@ ul {
   height: 100%;
   min-width: 2px;
   border-radius: inherit;
-  background: linear-gradient(90deg, #14b8a6, #22c55e);
-  box-shadow: 0 0 16px rgb(20 184 166 / 28%);
+  background: linear-gradient(90deg, #1769e0, #16794a);
+  box-shadow: 0 0 16px rgb(23 105 224 / 24%);
   transition: width 0.18s ease;
 }
 
 .meter.hot .meter-track span {
-  background: linear-gradient(90deg, #22c55e, #f59e0b);
+  background: linear-gradient(90deg, #16794a, #d28a18);
 }
 
 .meter-scale {
@@ -1203,7 +1185,7 @@ ul {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgb(15 23 42 / 8%);
+  border: 1px solid #dfe3e8;
   border-radius: 16px;
   background: rgb(255 255 255 / 72%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 72%);
@@ -1228,7 +1210,7 @@ ul {
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  background: #0f766e;
+  background: #1769e0;
   color: #fff;
   font-weight: 760;
   flex: 0 0 auto;
@@ -1254,9 +1236,9 @@ h3 {
   display: grid;
   gap: 12px;
   padding: 13px;
-  border: 1px solid rgb(15 118 110 / 14%);
+  border: 1px solid rgb(23 105 224 / 14%);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgb(240 253 250 / 76%), rgb(255 255 255 / 62%));
+  background: linear-gradient(180deg, rgb(234 242 255 / 78%), rgb(255 255 255 / 68%));
 }
 
 .alignment-title {
@@ -1346,7 +1328,7 @@ ul {
 }
 
 .segment.microphone {
-  background: rgb(236 253 245 / 86%);
+  background: #e8f6ef;
 }
 
 .segment-head {
@@ -1369,7 +1351,7 @@ ul {
 
 .translated {
   margin-top: 5px;
-  color: #0f766e;
+  color: #16794a;
   font-weight: 650;
 }
 
