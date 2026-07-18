@@ -165,6 +165,8 @@ export type MeetingAudioStatusMsg = {
   output?: boolean
   microphoneLevel?: number
   outputLevel?: number
+  microphoneLabel?: string
+  outputLabel?: string
   transcription?: MeetingRuntimeState['transcription']
 }
 

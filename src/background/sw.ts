@@ -292,6 +292,10 @@ function isToBackground(value: unknown): value is ToBackground {
       (value.output === undefined || typeof value.output === 'boolean') &&
       (value.microphoneLevel === undefined || isAudioLevel(value.microphoneLevel)) &&
       (value.outputLevel === undefined || isAudioLevel(value.outputLevel)) &&
+      (value.microphoneLabel === undefined ||
+        (typeof value.microphoneLabel === 'string' && value.microphoneLabel.length <= 256)) &&
+      (value.outputLabel === undefined ||
+        (typeof value.outputLabel === 'string' && value.outputLabel.length <= 256)) &&
       (value.transcription === undefined || isMeetingTranscription(value.transcription))
     )
   }

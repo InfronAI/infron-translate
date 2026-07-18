@@ -86,7 +86,14 @@ export class MeetingManager {
       summary,
       preMeetingMaterial: '',
       contextAlignment: emptyContextAlignment(),
-      audio: { microphone: false, output: false, microphoneLevel: 0, outputLevel: 0 },
+      audio: {
+        microphone: false,
+        output: false,
+        microphoneLevel: 0,
+        outputLevel: 0,
+        microphoneLabel: 'Default microphone',
+        outputLabel: 'Current Chrome tab audio',
+      },
       transcription: {
         active: input.audioMode === 'mock',
         source: input.audioMode === 'mock' ? 'mock' : 'none',
@@ -106,6 +113,8 @@ export class MeetingManager {
         output: false,
         microphoneLevel: 0,
         outputLevel: 0,
+        microphoneLabel: 'Default microphone',
+        outputLabel: await this.tabAudioLabel(session.tabId),
       },
     }
     await this.showOverlay()
@@ -134,6 +143,8 @@ export class MeetingManager {
         output: message.output ?? this.state.audio.output,
         microphoneLevel: clampLevel(message.microphoneLevel ?? this.state.audio.microphoneLevel),
         outputLevel: clampLevel(message.outputLevel ?? this.state.audio.outputLevel),
+        microphoneLabel: message.microphoneLabel ?? this.state.audio.microphoneLabel,
+        outputLabel: message.outputLabel ?? this.state.audio.outputLabel,
       },
       transcription: nextTranscription,
     }
@@ -305,7 +316,12 @@ export class MeetingManager {
       }
       this.state = {
         ...this.state,
-        audio: { ...this.state.audio, output: false, outputLevel: 0 },
+        audio: {
+          ...this.state.audio,
+          output: false,
+          outputLevel: 0,
+          outputLabel: await this.tabAudioLabel(this.state.session.tabId),
+        },
       }
       await this.broadcastUpdate()
       return
@@ -315,7 +331,12 @@ export class MeetingManager {
     await this.notifyOffscreenStart(this.state.session, outputStreamId)
     this.state = {
       ...this.state,
-      audio: { ...this.state.audio, output: Boolean(outputStreamId), outputLevel: 0 },
+      audio: {
+        ...this.state.audio,
+        output: Boolean(outputStreamId),
+        outputLevel: 0,
+        outputLabel: await this.tabAudioLabel(this.state.session.tabId),
+      },
     }
     await this.broadcastUpdate()
   }
@@ -494,6 +515,18 @@ export class MeetingManager {
     } catch {
       return undefined
     }
+  }
+
+  private async tabAudioLabel(tabId: number): Promise<string> {
+    try {
+      const tab = await chrome.tabs.get(tabId)
+      const title = tab.title?.trim()
+      if (title) return `Chrome tab: ${title}`
+      if (tab.url) return `Chrome tab: ${new URL(tab.url).hostname}`
+    } catch {
+      // Fall back to a stable generic label.
+    }
+    return 'Current Chrome tab audio'
   }
 
   private async notifyOffscreenStart(

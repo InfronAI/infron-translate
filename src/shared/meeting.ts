@@ -62,6 +62,8 @@ export type MeetingRuntimeState = MeetingUpdatePayload & {
     output: boolean
     microphoneLevel: number
     outputLevel: number
+    microphoneLabel: string
+    outputLabel: string
   }
   transcription: {
     active: boolean

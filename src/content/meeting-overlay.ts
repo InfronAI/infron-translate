@@ -96,6 +96,8 @@ export class MeetingOverlay {
   private render(): void {
     if (!this.root || !this.state || !this.windowState) return
     const { session, segments, summary, audio, transcription } = this.state
+    const micLabel = audio.microphoneLabel || 'Default microphone'
+    const outputLabel = audio.outputLabel || 'Current Chrome tab audio'
     this.root.replaceChildren()
     const style = document.createElement('style')
     style.textContent = css
@@ -136,14 +138,14 @@ export class MeetingOverlay {
             <span class="toggle-track" aria-hidden="true"><span></span></span>
             <span class="toggle-copy">
               <strong>System Audio</strong>
-              <em>${audio.output ? 'On' : 'Off'}</em>
+              <em>${audio.output ? escapeHtml(outputLabel) : 'Off'}</em>
             </span>
           </button>
           <button class="input-toggle mic-toggle ${this.isMicActive() ? 'active' : ''}" type="button" aria-pressed="${this.isMicActive()}">
             <span class="toggle-track" aria-hidden="true"><span></span></span>
             <span class="toggle-copy">
               <strong>Mic Input</strong>
-              <em>${this.isMicActive() ? 'On' : 'Off'}</em>
+              <em>${this.isMicActive() ? escapeHtml(micLabel) : 'Off'}</em>
             </span>
           </button>
         </div>
@@ -155,8 +157,8 @@ export class MeetingOverlay {
           this.state.contextAlignment,
         )}
         <section class="audio-meters">
-          ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel, 'Local microphone signal')}
-          ${meterHtml('System audio input', audio.output, audio.outputLevel, 'Audio captured from the active Chrome tab')}
+          ${meterHtml('Mic input', audio.microphone, audio.microphoneLevel, micLabel)}
+          ${meterHtml('System audio input', audio.output, audio.outputLevel, outputLabel)}
         </section>
         <article class="screen summary-screen"></article>
         <article class="screen transcript-screen"></article>
@@ -381,6 +383,7 @@ export class MeetingOverlay {
         type: 'meeting-audio-status',
         sessionId: this.state.session.id,
         microphone: this.recognitionShouldRun,
+        microphoneLabel: this.micInputLabel(),
         transcription,
       } satisfies MeetingAudioStatusMsg)
     } catch {
@@ -414,6 +417,7 @@ export class MeetingOverlay {
           sessionId,
           microphone: true,
           microphoneLevel: level,
+          microphoneLabel: this.micInputLabel(),
         } satisfies MeetingAudioStatusMsg)
       }, 500)
     } catch (error) {
@@ -513,6 +517,11 @@ export class MeetingOverlay {
 
   private isMicActive(): boolean {
     return Boolean(this.micPcmWorklet)
+  }
+
+  private micInputLabel(): string {
+    const trackLabel = this.micStream?.getAudioTracks()[0]?.label?.trim()
+    return trackLabel || 'Default microphone'
   }
 }
 
@@ -973,6 +982,10 @@ ul {
   font-style: normal;
   font-weight: 720;
   line-height: 1.05;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .input-toggle.active {
