@@ -47,6 +47,7 @@ export default defineManifest({
     'scripting',
     'offscreen',
     'tabCapture',
+    'nativeMessaging',
   ],
   host_permissions: ['http://*/*', 'https://*/*', 'ws://127.0.0.1/*', 'wss://api.stepfun.com/*'],
   web_accessible_resources: [

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "asr:relay": "node scripts/asr-relay.mjs",
+    "native:install": "node scripts/install-native-host.mjs",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest"

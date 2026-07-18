@@ -15,6 +15,7 @@ import {
   persistTranslationCache,
 } from './translate'
 import { MeetingManager } from './meeting'
+import { ensureNativeAsrRelayStarted } from './native-asr-relay'
 
 const meetingManager = new MeetingManager()
 
@@ -389,6 +390,7 @@ async function handle(
   }
 
   if (message.type === 'start-meeting-assistant') {
+    if (message.audioMode !== 'mock') await ensureNativeAsrRelayStarted()
     const session = await meetingManager.start({
       tabId: message.tabId,
       sourceLang: message.sourceLang,

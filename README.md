@@ -182,13 +182,19 @@ Current implementation:
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 
-Run the relay before testing live ASR:
+For local development, the relay can be started manually:
 
 ```bash
 npm run asr:relay
 ```
 
-The relay uses the ASR API key saved in the extension settings. You can also provide `STEPFUN_API_KEY` as an environment variable. If the upstream StepFun connection must use a proxy, start the relay with `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY`.
+For automatic startup, install the Chrome Native Messaging host once. After installation, clicking **Start Meeting Assistant** asks Chrome to launch the local relay host automatically.
+
+```bash
+EXTENSION_ID=<id-from-chrome-extensions> npm run native:install
+```
+
+The extension ID is shown on the unpacked extension card in `chrome://extensions` after loading `dist/`. The relay uses the ASR API key saved in the extension settings. You can also provide `STEPFUN_API_KEY` as an environment variable. If the upstream StepFun connection must use a proxy, start the relay or native host with `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY`.
 
 Quick relay check:
 
@@ -196,7 +202,7 @@ Quick relay check:
 lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 
-If the meeting overlay reports that the local ASR relay is not reachable, keep `npm run asr:relay` running in a terminal, rebuild the extension, and reload the unpacked extension in `chrome://extensions`.
+If the meeting overlay reports that the local ASR relay is not reachable, either keep `npm run asr:relay` running in a terminal or install the native host, then rebuild the extension and reload the unpacked extension in `chrome://extensions`.
 
 Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Meeting Transcription with an ASR endpoint and API key before using live ASR.
 
@@ -279,6 +285,8 @@ Scripts:
 - `npm run build`: run TypeScript checks and build the extension into `dist/`.
 - `npm test`: run the Vitest suite.
 - `npm run test:watch`: run Vitest in watch mode.
+- `npm run asr:relay`: start the local ASR WebSocket relay manually.
+- `npm run native:install`: install the local Native Messaging host for automatic ASR relay startup.
 
 ## Manual QA Checklist
 
