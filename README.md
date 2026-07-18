@@ -83,13 +83,13 @@ Current implementation:
 - Provides a Pre-meeting Material entry in the overlay for agenda, goals, planned strategy, risks, and expected outcomes.
 - Cross-checks the live transcript against the pre-meeting material throughout the call.
 - Shows context alignment in the live summary panel, including plan status, completed goals, unmet goals, evidence, and course-correction suggestions.
-- Automatically streams microphone audio chunks to Infron Whisper STT when Cloud Model is configured.
-- Automatically streams captured system-audio chunks to Infron Whisper STT when Cloud Model is configured.
-- Uses `openai/whisper-1/audio-to-text` through the OpenAI-compatible `/audio/transcriptions` endpoint.
+- Automatically streams microphone audio chunks to StepFun ASR SSE when Cloud Model is configured with a StepFun API key.
+- Automatically streams captured system-audio chunks to StepFun ASR SSE when Cloud Model is configured with a StepFun API key.
+- Sends 16 kHz mono `pcm_s16le` audio chunks to `https://api.stepfun.com/v1/audio/asr/sse` with the `stepaudio-2.5-asr` model.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 
-Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Cloud Model with an Infron API key before using Whisper STT.
+Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Cloud Model with a StepFun API key before using live ASR.
 
 ### Floating Auto-Translation Button
 

@@ -49,7 +49,10 @@ export class MeetingOverlay {
   private micStream: MediaStream | null = null
   private micAudioContext: AudioContext | null = null
   private micLevelTimer: ReturnType<typeof setInterval> | null = null
-  private micRecorder: MediaRecorder | null = null
+  private micPcmProcessor: ScriptProcessorNode | null = null
+  private micPcmSilentGain: GainNode | null = null
+  private micPcmTimer: ReturnType<typeof setInterval> | null = null
+  private micPcmBuffers: Int16Array[] = []
   private micChunkStartedAt = 0
   private maxMicLevelSinceChunk = 0
   private autoMicAttempted = false
@@ -352,8 +355,8 @@ export class MeetingOverlay {
         active: true,
         source: 'external-stt',
         message: automatic
-          ? 'Automatic microphone transcription is streaming to Infron Whisper STT.'
-          : 'Microphone transcription is streaming to Infron Whisper STT.',
+          ? 'Automatic microphone transcription is streaming to StepFun ASR.'
+          : 'Microphone transcription is streaming to StepFun ASR.',
       })
       this.render()
       return
@@ -435,8 +438,19 @@ export class MeetingOverlay {
   }
 
   private stopMicLevelMeter(): void {
-    if (this.micRecorder && this.micRecorder.state !== 'inactive') this.micRecorder.stop()
-    this.micRecorder = null
+    if (this.micPcmTimer) {
+      globalThis.clearInterval(this.micPcmTimer)
+      this.micPcmTimer = null
+    }
+    if (this.micPcmProcessor) {
+      this.micPcmProcessor.disconnect()
+      this.micPcmProcessor = null
+    }
+    if (this.micPcmSilentGain) {
+      this.micPcmSilentGain.disconnect()
+      this.micPcmSilentGain = null
+    }
+    this.micPcmBuffers = []
     this.micChunkStartedAt = 0
     this.maxMicLevelSinceChunk = 0
     if (this.micLevelTimer) {
@@ -454,42 +468,54 @@ export class MeetingOverlay {
   }
 
   private startMicRecorder(sessionId: string, sourceLang: string): void {
-    if (!this.micStream || !MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return
-    this.micRecorder = new MediaRecorder(this.micStream, { mimeType: 'audio/webm;codecs=opus' })
+    if (!this.micStream || !this.micAudioContext) return
+    this.micPcmBuffers = []
     this.micChunkStartedAt = Date.now()
-    this.micRecorder.addEventListener('dataavailable', (event) => {
-      if (!event.data.size) return
+    const source = this.micAudioContext.createMediaStreamSource(this.micStream)
+    this.micPcmProcessor = this.micAudioContext.createScriptProcessor(4096, 1, 1)
+    this.micPcmSilentGain = this.micAudioContext.createGain()
+    this.micPcmSilentGain.gain.value = 0
+    this.micPcmProcessor.onaudioprocess = (event) => {
+      this.micPcmBuffers.push(
+        floatTo16kPcm(event.inputBuffer.getChannelData(0), this.micAudioContext?.sampleRate ?? 48000),
+      )
+    }
+    source.connect(this.micPcmProcessor)
+    this.micPcmProcessor.connect(this.micPcmSilentGain)
+    this.micPcmSilentGain.connect(this.micAudioContext.destination)
+    this.micPcmTimer = globalThis.setInterval(() => {
       const endedAt = Date.now()
       const startedAt = this.micChunkStartedAt || endedAt - 4000
       this.micChunkStartedAt = endedAt
       const shouldSend = this.maxMicLevelSinceChunk > 0.025
       this.maxMicLevelSinceChunk = 0
+      const bytes = mergePcmBuffers(this.micPcmBuffers)
+      this.micPcmBuffers = []
       if (!shouldSend) return
       void this.sendAudioChunk({
         type: 'meeting-audio-chunk',
         sessionId,
         channel: 'microphone',
         sourceLang,
-        mimeType: event.data.type || 'audio/webm',
-        audioBase64: '',
+        mimeType: 'audio/pcm',
+        audioBase64: bytesToBase64(bytes),
         startedAt,
         endedAt,
-      }, event.data)
-    })
-    this.micRecorder.start(4000)
+      })
+    }, 4000)
   }
 
-  private async sendAudioChunk(message: MeetingAudioChunkMsg, blob: Blob): Promise<void> {
+  private async sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
     try {
-      const audioBase64 = await blobToBase64(blob)
-      await chrome.runtime.sendMessage({ ...message, audioBase64 } satisfies MeetingAudioChunkMsg)
+      if (!message.audioBase64) return
+      await chrome.runtime.sendMessage(message satisfies MeetingAudioChunkMsg)
     } catch {
       // Best-effort streaming.
     }
   }
 
   private isMicActive(): boolean {
-    return Boolean(this.micRecorder)
+    return Boolean(this.micPcmProcessor)
   }
 }
 
@@ -539,10 +565,31 @@ function rmsLevel(data: Uint8Array): number {
   return Math.min(1, Math.sqrt(sum / data.length) * 4)
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer()
+function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {
+  const sampleCount = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
+  const bytes = new Uint8Array(sampleCount * 2)
+  let offset = 0
+  for (const buffer of buffers) {
+    bytes.set(new Uint8Array(buffer.buffer), offset)
+    offset += buffer.byteLength
+  }
+  return bytes
+}
+
+function floatTo16kPcm(input: Float32Array, inputSampleRate: number): Int16Array {
+  const ratio = inputSampleRate / 16000
+  const outputLength = Math.max(1, Math.floor(input.length / ratio))
+  const output = new Int16Array(outputLength)
+  for (let index = 0; index < outputLength; index += 1) {
+    const sample = input[Math.min(input.length - 1, Math.floor(index * ratio))]
+    const clamped = Math.max(-1, Math.min(1, sample))
+    output[index] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff
+  }
+  return output
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = ''
-  const bytes = new Uint8Array(buffer)
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   }

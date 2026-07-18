@@ -15,7 +15,10 @@ let streams: MediaStream[] = []
 let playback: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
 let levelTimer: ReturnType<typeof setInterval> | null = null
-let recorder: MediaRecorder | null = null
+let pcmProcessor: ScriptProcessorNode | null = null
+let pcmSilentGain: GainNode | null = null
+let pcmTimer: ReturnType<typeof setInterval> | null = null
+let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
 
@@ -76,7 +79,7 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
       source: 'none',
       message:
         session.audioMode === 'tab-only'
-          ? 'Tab audio is captured, but transcription requires an external STT adapter.'
+          ? 'Tab audio is captured. StepFun ASR transcription will start when audio chunks are available.'
           : 'Click Start mic in the visible Meeting Assistant window to begin real microphone transcription.',
     },
   })
@@ -87,8 +90,19 @@ function stopCapture(): void {
     globalThis.clearInterval(levelTimer)
     levelTimer = null
   }
-  if (recorder && recorder.state !== 'inactive') recorder.stop()
-  recorder = null
+  if (pcmTimer) {
+    globalThis.clearInterval(pcmTimer)
+    pcmTimer = null
+  }
+  if (pcmProcessor) {
+    pcmProcessor.disconnect()
+    pcmProcessor = null
+  }
+  if (pcmSilentGain) {
+    pcmSilentGain.disconnect()
+    pcmSilentGain = null
+  }
+  pcmBuffers = []
   chunkStartedAt = 0
   maxLevelSinceChunk = 0
   if (audioContext) {
@@ -127,29 +141,39 @@ function startOutputLevelMeter(sessionId: string, stream: MediaStream): void {
 }
 
 function startOutputRecorder(session: MeetingSession, stream: MediaStream): void {
-  if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return
-  recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+  if (!audioContext) return
+  pcmBuffers = []
   chunkStartedAt = Date.now()
-  recorder.addEventListener('dataavailable', (event) => {
-    if (!event.data.size) return
+  const source = audioContext.createMediaStreamSource(stream)
+  pcmProcessor = audioContext.createScriptProcessor(4096, 1, 1)
+  pcmSilentGain = audioContext.createGain()
+  pcmSilentGain.gain.value = 0
+  pcmProcessor.onaudioprocess = (event) => {
+    pcmBuffers.push(floatTo16kPcm(event.inputBuffer.getChannelData(0), audioContext?.sampleRate ?? 48000))
+  }
+  source.connect(pcmProcessor)
+  pcmProcessor.connect(pcmSilentGain)
+  pcmSilentGain.connect(audioContext.destination)
+  pcmTimer = globalThis.setInterval(() => {
     const endedAt = Date.now()
     const startedAt = chunkStartedAt || endedAt - 4000
     chunkStartedAt = endedAt
     const shouldSend = maxLevelSinceChunk > 0.025
     maxLevelSinceChunk = 0
+    const bytes = mergePcmBuffers(pcmBuffers)
+    pcmBuffers = []
     if (!shouldSend) return
     void sendAudioChunk({
       type: 'meeting-audio-chunk',
       sessionId: session.id,
       channel: 'meeting-output',
       sourceLang: session.sourceLang,
-      mimeType: event.data.type || 'audio/webm',
-      audioBase64: '',
+      mimeType: 'audio/pcm',
+      audioBase64: bytesToBase64(bytes),
       startedAt,
       endedAt,
-    }, event.data)
-  })
-  recorder.start(4000)
+    })
+  }, 4000)
 }
 
 function updateChunkLevel(level: number): number {
@@ -157,19 +181,40 @@ function updateChunkLevel(level: number): number {
   return level
 }
 
-async function sendAudioChunk(message: MeetingAudioChunkMsg, blob: Blob): Promise<void> {
+async function sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
   try {
-    const audioBase64 = await blobToBase64(blob)
-    await chrome.runtime.sendMessage({ ...message, audioBase64 } satisfies MeetingAudioChunkMsg)
+    if (!message.audioBase64) return
+    await chrome.runtime.sendMessage(message satisfies MeetingAudioChunkMsg)
   } catch {
     // Best-effort streaming: dropping one chunk should not stop capture.
   }
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer()
+function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {
+  const sampleCount = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
+  const bytes = new Uint8Array(sampleCount * 2)
+  let offset = 0
+  for (const buffer of buffers) {
+    bytes.set(new Uint8Array(buffer.buffer), offset)
+    offset += buffer.byteLength
+  }
+  return bytes
+}
+
+function floatTo16kPcm(input: Float32Array, inputSampleRate: number): Int16Array {
+  const ratio = inputSampleRate / 16000
+  const outputLength = Math.max(1, Math.floor(input.length / ratio))
+  const output = new Int16Array(outputLength)
+  for (let index = 0; index < outputLength; index += 1) {
+    const sample = input[Math.min(input.length - 1, Math.floor(index * ratio))]
+    const clamped = Math.max(-1, Math.min(1, sample))
+    output[index] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff
+  }
+  return output
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = ''
-  const bytes = new Uint8Array(buffer)
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   }

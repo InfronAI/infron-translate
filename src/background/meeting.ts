@@ -127,7 +127,7 @@ export class MeetingManager {
             active: false,
             source: 'none' as const,
             message:
-              'System audio input detected. Automatic system-audio transcription requires an external STT adapter.',
+              'System audio input detected. StepFun ASR transcription will start when audio chunks are available.',
           }
         : this.state.transcription)
     this.state = {
@@ -172,7 +172,7 @@ export class MeetingManager {
         source: message.channel === 'meeting-output' ? 'external-stt' : this.state.transcription.source,
         message:
           message.channel === 'meeting-output'
-            ? 'Live system audio transcription is running through Infron Whisper STT.'
+            ? 'Live system audio transcription is running through StepFun ASR SSE.'
             : 'Live microphone transcription is running.',
       },
     }
@@ -193,7 +193,7 @@ export class MeetingManager {
         transcription: {
           active: true,
           source: 'external-stt',
-          message: `${labelForChannel(message.channel)} audio queued for Infron Whisper STT (${queue.length} chunk${queue.length === 1 ? '' : 's'}).`,
+          message: `${labelForChannel(message.channel)} audio queued for StepFun ASR (${queue.length} chunk${queue.length === 1 ? '' : 's'}).`,
         },
       })
       return
@@ -224,14 +224,14 @@ export class MeetingManager {
   private async transcribeQueuedChunk(message: MeetingAudioChunkMsg): Promise<void> {
     if (!this.state || this.state.session.id !== message.sessionId) return
     const settings = await loadSettings()
-    if (!isConfigured(settings)) {
+    if (!settings.apiKey.trim()) {
       await this.updateAudioStatus({
         type: 'meeting-audio-status',
         sessionId: message.sessionId,
         transcription: {
           active: false,
           source: 'external-stt',
-          message: 'Configure Cloud Model with an Infron API Key to enable Whisper STT.',
+          message: 'Configure Cloud Model with a StepFun API Key to enable ASR transcription.',
         },
       })
       return
@@ -243,7 +243,7 @@ export class MeetingManager {
       transcription: {
         active: true,
         source: 'external-stt',
-        message: `Transcribing ${labelForChannel(message.channel).toLowerCase()} audio with Infron Whisper STT...`,
+        message: `Transcribing ${labelForChannel(message.channel).toLowerCase()} audio with StepFun ASR SSE...`,
       },
     })
     const result = await transcribeAudioChunk({
@@ -260,7 +260,7 @@ export class MeetingManager {
         transcription: {
           active: false,
           source: 'external-stt',
-          message: `Infron Whisper STT failed: ${result.error}`,
+          message: `StepFun ASR failed: ${result.error}`,
         },
       })
       return
@@ -272,7 +272,7 @@ export class MeetingManager {
         transcription: {
           active: true,
           source: 'external-stt',
-          message: `${labelForChannel(message.channel)} audio detected; Whisper returned no speech for this chunk.`,
+          message: `${labelForChannel(message.channel)} audio detected; StepFun ASR returned no speech for this chunk.`,
         },
       })
       return
