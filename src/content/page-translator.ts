@@ -643,12 +643,19 @@ export class PageTranslator {
         this.sourceHosts.set(host, host.getAttribute(PAGE_SOURCE_ATTR))
         host.setAttribute(PAGE_SOURCE_ATTR, block.text)
       }
+      if (
+        settings.translationDisplayMode === 'translation-only' &&
+        !this.replaceTextWithTranslation(host, translation)
+      ) {
+        const previous = this.sourceHosts.get(host)
+        if (previous === null) host.removeAttribute(PAGE_SOURCE_ATTR)
+        else if (previous !== undefined) host.setAttribute(PAGE_SOURCE_ATTR, previous)
+        this.sourceHosts.delete(host)
+        continue
+      }
       host.setAttribute(TRANSLATED_ATTR, '')
       host.setAttribute(TRANSLATION_TEXT_ATTR, translation)
       host.setAttribute(DISPLAY_MODE_ATTR, settings.translationDisplayMode)
-      if (settings.translationDisplayMode === 'translation-only') {
-        this.replaceTextWithTranslation(host, translation)
-      }
       if (isUi) {
         host.setAttribute(UI_TRANSLATION_ATTR, '')
         if (isButtonLikeUi(block)) {
@@ -770,15 +777,11 @@ export class PageTranslator {
     this.sourceBlockByHost.delete(host)
   }
 
-  private replaceTextWithTranslation(host: Element, translation: string): void {
-    const nodes: Text[] = []
-    const walker = document.createTreeWalker(host, 4 /* SHOW_TEXT */)
-    let node = walker.nextNode()
-    while (node) {
-      if (node.nodeValue?.trim()) nodes.push(node as Text)
-      node = walker.nextNode()
-    }
-    if (!nodes.length) return
+  private replaceTextWithTranslation(host: Element, translation: string): boolean {
+    const nodes = [...host.childNodes].filter(
+      (node): node is Text => node.nodeType === 3 && Boolean(node.nodeValue?.trim()),
+    )
+    if (nodes.length !== 1) return false
     if (!this.originalTextNodes.has(host)) {
       this.originalTextNodes.set(
         host,
@@ -789,7 +792,7 @@ export class PageTranslator {
       )
     }
     nodes[0].nodeValue = translation
-    for (const textNode of nodes.slice(1)) textNode.nodeValue = ''
+    return true
   }
 
   private restoreOriginalText(host: Element): void {
