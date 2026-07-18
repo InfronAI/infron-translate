@@ -45,6 +45,9 @@ export type UserSettings = {
   uiLanguage: UiLanguage
 }
 
+const LEGACY_ASR_ENDPOINTS = new Set(['https://api.stepfun.com/v1/audio/asr/sse'])
+const LEGACY_ASR_MODELS = new Set(['stepaudio-2.5-asr'])
+
 export const DEFAULT_SETTINGS: UserSettings = {
   baseURL: 'https://llm.onerouter.pro/v1',
   apiKey: '',
@@ -113,6 +116,16 @@ function stringValue(value: unknown, fallback: string): string {
   return value === null || value === undefined ? fallback : String(value)
 }
 
+function asrEndpointValue(value: unknown): string {
+  const endpoint = stringValue(value, DEFAULT_SETTINGS.asrEndpoint).trim()
+  return LEGACY_ASR_ENDPOINTS.has(endpoint) ? DEFAULT_SETTINGS.asrEndpoint : endpoint
+}
+
+function asrModelValue(value: unknown): string {
+  const model = stringValue(value, DEFAULT_SETTINGS.asrModel).trim()
+  return LEGACY_ASR_MODELS.has(model) ? DEFAULT_SETTINGS.asrModel : model
+}
+
 function languageValue(value: unknown, fallback: string): string {
   const language = stringValue(value, fallback).slice(0, 64)
   return language === 'zh' ? 'cn' : language
@@ -129,8 +142,8 @@ export function mergeSettings(partial: unknown): UserSettings {
     baseURL: stringValue(p.baseURL, DEFAULT_SETTINGS.baseURL),
     apiKey: stringValue(p.apiKey, DEFAULT_SETTINGS.apiKey),
     model: stringValue(p.model, DEFAULT_SETTINGS.model),
-    asrEndpoint: stringValue(p.asrEndpoint, DEFAULT_SETTINGS.asrEndpoint),
-    asrModel: stringValue(p.asrModel, DEFAULT_SETTINGS.asrModel),
+    asrEndpoint: asrEndpointValue(p.asrEndpoint),
+    asrModel: asrModelValue(p.asrModel),
     asrApiKey: stringValue(p.asrApiKey, DEFAULT_SETTINGS.asrApiKey),
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
