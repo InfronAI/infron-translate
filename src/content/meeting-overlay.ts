@@ -132,13 +132,19 @@ export class MeetingOverlay {
           <button class="traffic maximize" type="button" aria-label="${this.windowState.maximized ? 'Restore Meeting Assistant' : 'Maximize Meeting Assistant'}"></button>
         </div>
         <div class="input-switches" role="group" aria-label="Audio input controls">
-          <button class="input-pill system-toggle ${audio.output ? 'active' : ''}" type="button">
-            <span aria-hidden="true"></span>
-            ${audio.output ? 'Stop System Audio' : 'Start System Audio'}
+          <button class="input-toggle system-toggle ${audio.output ? 'active' : ''}" type="button" aria-pressed="${audio.output}">
+            <span class="toggle-track" aria-hidden="true"><span></span></span>
+            <span class="toggle-copy">
+              <strong>System Audio</strong>
+              <em>${audio.output ? 'On' : 'Off'}</em>
+            </span>
           </button>
-          <button class="input-pill mic-toggle ${this.isMicActive() ? 'active recording' : ''}" type="button">
-            <span aria-hidden="true"></span>
-            ${this.isMicActive() ? 'Stop Mic' : 'Start Mic'}
+          <button class="input-toggle mic-toggle ${this.isMicActive() ? 'active recording' : ''}" type="button" aria-pressed="${this.isMicActive()}">
+            <span class="toggle-track" aria-hidden="true"><span></span></span>
+            <span class="toggle-copy">
+              <strong>Mic Input</strong>
+              <em>${this.isMicActive() ? 'On' : 'Off'}</em>
+            </span>
           </button>
         </div>
       </header>
@@ -877,6 +883,8 @@ ul {
 .input-switches {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   margin-left: auto;
   padding: 3px;
@@ -887,59 +895,115 @@ ul {
   cursor: default;
 }
 
-.input-pill {
-  border: 0;
+.input-toggle {
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 7px 12px;
-  background: rgb(15 23 42 / 8%);
+  padding: 5px 10px 5px 6px;
+  background: rgb(15 23 42 / 6%);
   color: #334155;
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 7px;
-  box-shadow: 0 8px 18px rgb(23 105 224 / 14%);
-  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  gap: 8px;
+  min-width: 132px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 66%);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
 }
 
-.input-pill:hover {
+.input-toggle:hover {
   transform: translateY(-1px);
   background: #eaf2ff;
+  border-color: rgb(23 105 224 / 18%);
   color: #1769e0;
+  box-shadow: 0 8px 18px rgb(23 105 224 / 12%);
 }
 
-.input-pill:active {
+.input-toggle:active {
   transform: translateY(0) scale(0.98);
 }
 
-.input-pill span {
-  width: 8px;
-  height: 8px;
+.toggle-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
   border-radius: 999px;
-  background: #94a3b8;
-  box-shadow: 0 0 0 3px rgb(148 163 184 / 14%);
+  background: #cbd1d8;
+  box-shadow:
+    inset 0 1px 2px rgb(15 23 42 / 18%),
+    inset 0 -1px 0 rgb(255 255 255 / 46%);
+  flex: 0 0 auto;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.input-pill.active {
+.toggle-track span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 22%);
+  transition: transform 0.16s ease;
+}
+
+.toggle-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.toggle-copy strong {
+  color: currentColor;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.05;
+}
+
+.toggle-copy em {
+  color: #626b78;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 720;
+  line-height: 1.05;
+}
+
+.input-toggle.active {
+  background: #e8f6ef;
+  border-color: rgb(22 121 74 / 18%);
+  color: #16794a;
+  box-shadow: 0 8px 18px rgb(22 121 74 / 12%);
+}
+
+.input-toggle.active:hover {
+  background: #def1e8;
+  color: #12673f;
+  box-shadow: 0 10px 22px rgb(22 121 74 / 16%);
+}
+
+.input-toggle.active .toggle-track {
   background: #16794a;
-  color: #fff;
-  box-shadow: 0 8px 18px rgb(22 121 74 / 20%);
+  box-shadow:
+    inset 0 1px 2px rgb(15 23 42 / 14%),
+    0 0 0 3px rgb(22 121 74 / 12%);
 }
 
-.input-pill.active:hover {
-  background: #12673f;
-  color: #fff;
-  box-shadow: 0 10px 22px rgb(22 121 74 / 26%);
+.input-toggle.active .toggle-track span {
+  transform: translateX(14px);
 }
 
-.input-pill.active span {
-  background: rgb(255 255 255 / 78%);
-  box-shadow: 0 0 0 3px rgb(255 255 255 / 16%);
+.input-toggle.active .toggle-copy em {
+  color: #16794a;
 }
 
-.input-pill.recording span {
+.input-toggle.recording .toggle-track {
   animation: micPulse 1.1s ease-in-out infinite;
 }
 
@@ -1395,5 +1459,7 @@ ul {
   .screens { grid-template-columns: 1fr; }
   .audio-meters { grid-template-columns: 1fr; }
   .topbar { align-items: flex-start; flex-direction: column; }
+  .input-switches { width: 100%; justify-content: space-between; }
+  .input-toggle { flex: 1 1 0; min-width: 0; }
 }
 `
