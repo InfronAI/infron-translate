@@ -48,8 +48,9 @@ export class MeetingOverlay {
   private recognitionShouldRun = false
   private micStream: MediaStream | null = null
   private micAudioContext: AudioContext | null = null
+  private micAudioSource: MediaStreamAudioSourceNode | null = null
   private micLevelTimer: ReturnType<typeof setInterval> | null = null
-  private micPcmProcessor: ScriptProcessorNode | null = null
+  private micPcmWorklet: AudioWorkletNode | null = null
   private micPcmSilentGain: GainNode | null = null
   private micPcmTimer: ReturnType<typeof setInterval> | null = null
   private micPcmBuffers: Int16Array[] = []
@@ -333,7 +334,7 @@ export class MeetingOverlay {
     const session = this.state.session
     try {
       await this.startMicLevelMeter(session.id)
-      this.startMicRecorder(session.id, session.sourceLang)
+      await this.startMicRecorder(session.id, session.sourceLang)
       this.recognitionShouldRun = true
       await this.sendAudioStatus({
         active: true,
@@ -393,10 +394,10 @@ export class MeetingOverlay {
         video: false,
       })
       this.micAudioContext = new AudioContext()
-      const source = this.micAudioContext.createMediaStreamSource(this.micStream)
+      this.micAudioSource = this.micAudioContext.createMediaStreamSource(this.micStream)
       const analyser = this.micAudioContext.createAnalyser()
       analyser.fftSize = 512
-      source.connect(analyser)
+      this.micAudioSource.connect(analyser)
       const data = new Uint8Array(analyser.fftSize)
       this.micLevelTimer = globalThis.setInterval(() => {
         analyser.getByteTimeDomainData(data)
@@ -424,9 +425,10 @@ export class MeetingOverlay {
       globalThis.clearInterval(this.micPcmTimer)
       this.micPcmTimer = null
     }
-    if (this.micPcmProcessor) {
-      this.micPcmProcessor.disconnect()
-      this.micPcmProcessor = null
+    if (this.micPcmWorklet) {
+      this.micPcmWorklet.port.onmessage = null
+      this.micPcmWorklet.disconnect()
+      this.micPcmWorklet = null
     }
     if (this.micPcmSilentGain) {
       this.micPcmSilentGain.disconnect()
@@ -439,6 +441,10 @@ export class MeetingOverlay {
       globalThis.clearInterval(this.micLevelTimer)
       this.micLevelTimer = null
     }
+    if (this.micAudioSource) {
+      this.micAudioSource.disconnect()
+      this.micAudioSource = null
+    }
     if (this.micAudioContext) {
       void this.micAudioContext.close()
       this.micAudioContext = null
@@ -449,21 +455,24 @@ export class MeetingOverlay {
     }
   }
 
-  private startMicRecorder(sessionId: string, sourceLang: string): void {
+  private async startMicRecorder(sessionId: string, sourceLang: string): Promise<void> {
     if (!this.micStream || !this.micAudioContext) return
     this.micPcmBuffers = []
     this.micChunkStartedAt = Date.now()
-    const source = this.micAudioContext.createMediaStreamSource(this.micStream)
-    this.micPcmProcessor = this.micAudioContext.createScriptProcessor(4096, 1, 1)
+    this.micAudioSource ??= this.micAudioContext.createMediaStreamSource(this.micStream)
+    await ensurePcmWorklet(this.micAudioContext)
+    this.micPcmWorklet = new AudioWorkletNode(this.micAudioContext, 'pcm-capture-processor', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+    })
     this.micPcmSilentGain = this.micAudioContext.createGain()
     this.micPcmSilentGain.gain.value = 0
-    this.micPcmProcessor.onaudioprocess = (event) => {
-      this.micPcmBuffers.push(
-        floatTo16kPcm(event.inputBuffer.getChannelData(0), this.micAudioContext?.sampleRate ?? 48000),
-      )
+    this.micPcmWorklet.port.onmessage = (event: MessageEvent<Float32Array>) => {
+      this.micPcmBuffers.push(floatTo16kPcm(event.data, this.micAudioContext?.sampleRate ?? 48000))
     }
-    source.connect(this.micPcmProcessor)
-    this.micPcmProcessor.connect(this.micPcmSilentGain)
+    this.micAudioSource.connect(this.micPcmWorklet)
+    this.micPcmWorklet.connect(this.micPcmSilentGain)
     this.micPcmSilentGain.connect(this.micAudioContext.destination)
     this.micPcmTimer = globalThis.setInterval(() => {
       const endedAt = Date.now()
@@ -497,7 +506,7 @@ export class MeetingOverlay {
   }
 
   private isMicActive(): boolean {
-    return Boolean(this.micPcmProcessor)
+    return Boolean(this.micPcmWorklet)
   }
 }
 
@@ -545,6 +554,10 @@ function rmsLevel(data: Uint8Array): number {
     sum += centered * centered
   }
   return Math.min(1, Math.sqrt(sum / data.length) * 4)
+}
+
+async function ensurePcmWorklet(context: AudioContext): Promise<void> {
+  await context.audioWorklet.addModule(chrome.runtime.getURL('worklets/pcm-capture.js'))
 }
 
 function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {

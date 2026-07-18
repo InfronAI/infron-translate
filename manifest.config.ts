@@ -41,7 +41,7 @@ export default defineManifest({
   host_permissions: ['http://*/*', 'https://*/*'],
   web_accessible_resources: [
     {
-      resources: ['icons/infron-mark.png'],
+      resources: ['icons/infron-mark.png', 'worklets/pcm-capture.js'],
       matches: ['http://*/*', 'https://*/*'],
     },
   ],

@@ -179,6 +179,15 @@ export class MeetingManager {
   async ingestAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
     if (!this.state || this.state.session.id !== message.sessionId) return
     const key = `${message.sessionId}:${message.channel}`
+    await this.updateAudioStatus({
+      type: 'meeting-audio-status',
+      sessionId: message.sessionId,
+      transcription: {
+        active: true,
+        source: 'external-stt',
+        message: `${labelForChannel(message.channel)} PCM audio chunk received; sending to StepFun ASR...`,
+      },
+    })
     const queue = this.sttQueues.get(key) ?? []
     queue.push(message)
     while (queue.length > 4) queue.shift()

@@ -14,8 +14,9 @@ type InternalMeetingAudioStopMsg = {
 let streams: MediaStream[] = []
 let playback: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
+let outputSource: MediaStreamAudioSourceNode | null = null
 let levelTimer: ReturnType<typeof setInterval> | null = null
-let pcmProcessor: ScriptProcessorNode | null = null
+let pcmWorklet: AudioWorkletNode | null = null
 let pcmSilentGain: GainNode | null = null
 let pcmTimer: ReturnType<typeof setInterval> | null = null
 let pcmBuffers: Int16Array[] = []
@@ -59,7 +60,7 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
       playback.srcObject = tabAudio
       await playback.play()
       startOutputLevelMeter(session.id, tabAudio)
-      startOutputRecorder(session, tabAudio)
+      await startOutputRecorder(session, tabAudio)
       outputReady = true
     } catch (error) {
       console.warn(
@@ -94,13 +95,18 @@ function stopCapture(): void {
     globalThis.clearInterval(pcmTimer)
     pcmTimer = null
   }
-  if (pcmProcessor) {
-    pcmProcessor.disconnect()
-    pcmProcessor = null
+  if (pcmWorklet) {
+    pcmWorklet.port.onmessage = null
+    pcmWorklet.disconnect()
+    pcmWorklet = null
   }
   if (pcmSilentGain) {
     pcmSilentGain.disconnect()
     pcmSilentGain = null
+  }
+  if (outputSource) {
+    outputSource.disconnect()
+    outputSource = null
   }
   pcmBuffers = []
   chunkStartedAt = 0
@@ -124,10 +130,10 @@ function startOutputLevelMeter(sessionId: string, stream: MediaStream): void {
   if (levelTimer) globalThis.clearInterval(levelTimer)
   if (audioContext) void audioContext.close()
   audioContext = new AudioContext()
-  const source = audioContext.createMediaStreamSource(stream)
+  outputSource = audioContext.createMediaStreamSource(stream)
   const analyser = audioContext.createAnalyser()
   analyser.fftSize = 512
-  source.connect(analyser)
+  outputSource.connect(analyser)
   const data = new Uint8Array(analyser.fftSize)
   levelTimer = globalThis.setInterval(() => {
     analyser.getByteTimeDomainData(data)
@@ -140,29 +146,33 @@ function startOutputLevelMeter(sessionId: string, stream: MediaStream): void {
   }, 500)
 }
 
-function startOutputRecorder(session: MeetingSession, stream: MediaStream): void {
+async function startOutputRecorder(session: MeetingSession, stream: MediaStream): Promise<void> {
   if (!audioContext) return
   pcmBuffers = []
   chunkStartedAt = Date.now()
-  const source = audioContext.createMediaStreamSource(stream)
-  pcmProcessor = audioContext.createScriptProcessor(4096, 1, 1)
+  outputSource ??= audioContext.createMediaStreamSource(stream)
+  await ensurePcmWorklet(audioContext)
+  pcmWorklet = new AudioWorkletNode(audioContext, 'pcm-capture-processor', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [1],
+  })
   pcmSilentGain = audioContext.createGain()
   pcmSilentGain.gain.value = 0
-  pcmProcessor.onaudioprocess = (event) => {
-    pcmBuffers.push(floatTo16kPcm(event.inputBuffer.getChannelData(0), audioContext?.sampleRate ?? 48000))
+  pcmWorklet.port.onmessage = (event: MessageEvent<Float32Array>) => {
+    pcmBuffers.push(floatTo16kPcm(event.data, audioContext?.sampleRate ?? 48000))
   }
-  source.connect(pcmProcessor)
-  pcmProcessor.connect(pcmSilentGain)
+  outputSource.connect(pcmWorklet)
+  pcmWorklet.connect(pcmSilentGain)
   pcmSilentGain.connect(audioContext.destination)
   pcmTimer = globalThis.setInterval(() => {
     const endedAt = Date.now()
     const startedAt = chunkStartedAt || endedAt - 4000
     chunkStartedAt = endedAt
-    const shouldSend = maxLevelSinceChunk > 0.025
     maxLevelSinceChunk = 0
     const bytes = mergePcmBuffers(pcmBuffers)
     pcmBuffers = []
-    if (!shouldSend) return
+    if (bytes.byteLength < 8000) return
     void sendAudioChunk({
       type: 'meeting-audio-chunk',
       sessionId: session.id,
@@ -174,6 +184,10 @@ function startOutputRecorder(session: MeetingSession, stream: MediaStream): void
       endedAt,
     })
   }, 4000)
+}
+
+async function ensurePcmWorklet(context: AudioContext): Promise<void> {
+  await context.audioWorklet.addModule(chrome.runtime.getURL('worklets/pcm-capture.js'))
 }
 
 function updateChunkLevel(level: number): number {
