@@ -139,7 +139,7 @@ export class MeetingOverlay {
               <em>${audio.output ? 'On' : 'Off'}</em>
             </span>
           </button>
-          <button class="input-toggle mic-toggle ${this.isMicActive() ? 'active recording' : ''}" type="button" aria-pressed="${this.isMicActive()}">
+          <button class="input-toggle mic-toggle ${this.isMicActive() ? 'active' : ''}" type="button" aria-pressed="${this.isMicActive()}">
             <span class="toggle-track" aria-hidden="true"><span></span></span>
             <span class="toggle-copy">
               <strong>Mic Input</strong>
@@ -1001,15 +1001,6 @@ ul {
 
 .input-toggle.active .toggle-copy em {
   color: #16794a;
-}
-
-.input-toggle.recording .toggle-track {
-  animation: micPulse 1.1s ease-in-out infinite;
-}
-
-@keyframes micPulse {
-  0%, 100% { opacity: 0.55; transform: scale(0.86); }
-  50% { opacity: 1; transform: scale(1.1); }
 }
 
 .dock {
