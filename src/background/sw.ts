@@ -10,7 +10,6 @@ import {
   filterUncachedByText,
   expandTranslationsToAllIds,
   translateBlocksSingleFlight,
-  translateImage,
   testConnection,
   ensureCacheHydrated,
   persistTranslationCache,
@@ -36,9 +35,6 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
       error: detail,
       failedIds: message.blocks.map((block) => block.id),
     }
-  }
-  if (message.type === 'translate-image') {
-    return { type: 'translate-image-result', ok: false, error: detail }
   }
   if (message.type === 'test-connection') {
     return { type: 'test-connection-result', ok: false, error: detail }
@@ -88,7 +84,6 @@ async function injectIntoOpenTabs(): Promise<void> {
 function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg {
   const {
     targetLang,
-    autoTranslate,
     pageTranslationEngine,
     autoPageTranslation,
     pageTranslationFontSizePx,
@@ -99,17 +94,13 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
     pageTranslationBold,
     pageTranslationItalic,
     pageTranslationUnderline,
-    lensWidthPx,
     minTextLength,
     batchCharLimit,
-    prefetchMarginRatio,
-    pageTranslationHotkey,
   } = settings
   return {
     type: 'settings',
     settings: {
       targetLang,
-      autoTranslate,
       pageTranslationEngine,
       autoPageTranslation,
       pageTranslationFontSizePx,
@@ -120,11 +111,8 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
       pageTranslationBold,
       pageTranslationItalic,
       pageTranslationUnderline,
-      lensWidthPx,
       minTextLength,
       batchCharLimit,
-      prefetchMarginRatio,
-      pageTranslationHotkey,
       apiKey: '',
     },
     paused: hostname ? settings.pausedHostnames.includes(hostname) : false,
@@ -172,14 +160,6 @@ function isToBackground(value: unknown): value is ToBackground {
       value.hostname.length > 0 &&
       value.hostname.length <= 253 &&
       typeof value.paused === 'boolean'
-    )
-  }
-  if (value.type === 'translate-image') {
-    return (
-      typeof value.imageUrl === 'string' &&
-      value.imageUrl.length > 0 &&
-      value.imageUrl.length <= 5_500_000 &&
-      isLanguageCode(value.sourceLang)
     )
   }
   if (value.type === 'translate-batch') {
@@ -247,17 +227,6 @@ async function handle(
     } catch {
       return { type: 'open-options-result', ok: false }
     }
-  }
-
-  if (message.type === 'translate-image') {
-    const settings = await loadSettings()
-    if (!isConfigured(settings)) {
-      return { type: 'translate-image-result', ok: false, error: 'API not configured' }
-    }
-    const result = await translateImage(message.imageUrl, message.sourceLang, settings)
-    return result.ok
-      ? { type: 'translate-image-result', ok: true, translation: result.translation }
-      : { type: 'translate-image-result', ok: false, error: result.error }
   }
 
   if (message.type === 'translate-batch') {

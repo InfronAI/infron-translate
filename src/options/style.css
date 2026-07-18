@@ -62,7 +62,6 @@ select {
 .engine-summary,
 .brand-copy,
 .title-with-badge,
-.hotkey-control,
 .switch-control,
 .number-control,
 .action-buttons {
@@ -451,36 +450,6 @@ input:disabled {
   font-size: 11px;
 }
 
-.hotkey-control {
-  position: relative;
-  justify-content: flex-end;
-  gap: 9px;
-}
-
-kbd {
-  display: inline-flex;
-  min-width: 154px;
-  min-height: 40px;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 12px;
-  border: 1px solid var(--border-strong);
-  border-bottom-width: 2px;
-  border-radius: 6px;
-  background: var(--surface-muted);
-  color: #384150;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 12px;
-}
-
-.capture-hint {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  color: var(--accent);
-  font-size: 11px;
-}
-
 .appearance-controls {
   display: grid;
   grid-template-columns: 120px 132px;
@@ -681,11 +650,6 @@ input[type='color'] {
   background: var(--accent-hover);
 }
 
-.button.recording {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .actionbar {
   position: sticky;
   z-index: 10;
@@ -819,10 +783,6 @@ input[type='color'] {
 
   .number-control {
     width: 100%;
-  }
-
-  .hotkey-control {
-    justify-content: flex-start;
   }
 
   .appearance-controls,

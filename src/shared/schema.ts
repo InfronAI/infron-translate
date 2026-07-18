@@ -24,19 +24,6 @@ export const TRANSLATE_BATCH_JSON_SCHEMA = {
   },
 } as const
 
-export const IMAGE_TRANSLATION_JSON_SCHEMA = {
-  name: 'image_translation_result',
-  strict: true,
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    required: ['translation'],
-    properties: {
-      translation: { type: 'string' },
-    },
-  },
-} as const
-
 export type TranslateBatchResult = {
   items: { id: string; translation: string }[]
 }
@@ -66,31 +53,6 @@ export function parseTranslateBatchResult(
     out.push({ id, translation })
   }
   return { ok: true, items: out }
-}
-
-export function parseImageTranslationResult(
-  raw: unknown,
-): { ok: true; translation: string } | { ok: false; error: string } {
-  if (!raw || typeof raw !== 'object' || !('translation' in raw)) {
-    return { ok: false, error: 'translation missing' }
-  }
-  if (typeof raw.translation !== 'string' || !raw.translation.trim()) {
-    return { ok: false, error: 'translation empty' }
-  }
-  return { ok: true, translation: raw.translation.trim() }
-}
-
-export function buildTranslateImagePrompt(sourceLang: string, targetLang: string): string {
-  const languageInstruction =
-    sourceLang === 'auto'
-      ? `Detect the source language of visible text in this image and translate it to ${targetLang}.`
-      : `Read visible text in this image and translate it from ${sourceLang} to ${targetLang}.`
-  return [
-    languageInstruction,
-    'Preserve the original reading order and line breaks where meaningful.',
-    'Do not describe the image. If it has no readable text, return an empty translation.',
-    'Return ONLY JSON matching: { "translation": string }.',
-  ].join('\n')
 }
 
 export function buildTranslateUserPrompt(

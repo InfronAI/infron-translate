@@ -13,24 +13,6 @@ export type TranslateBatchRequestMsg = {
   blocks: TranslateBlock[]
 }
 
-export type TranslateImageRequestMsg = {
-  type: 'translate-image'
-  imageUrl: string
-  sourceLang: string
-}
-
-export type TranslateImageResultOk = {
-  type: 'translate-image-result'
-  ok: true
-  translation: string
-}
-
-export type TranslateImageResultErr = {
-  type: 'translate-image-result'
-  ok: false
-  error: string
-}
-
 export type TranslateBatchResultOk = {
   type: 'translate-batch-result'
   ok: true
@@ -50,7 +32,6 @@ export type GetSettingsMsg = { type: 'get-settings' }
 export type ContentSettings = Pick<
   UserSettings,
   | 'targetLang'
-  | 'autoTranslate'
   | 'pageTranslationEngine'
   | 'autoPageTranslation'
   | 'pageTranslationFontSizePx'
@@ -61,11 +42,8 @@ export type ContentSettings = Pick<
   | 'pageTranslationBold'
   | 'pageTranslationItalic'
   | 'pageTranslationUnderline'
-  | 'lensWidthPx'
   | 'minTextLength'
   | 'batchCharLimit'
-  | 'prefetchMarginRatio'
-  | 'pageTranslationHotkey'
 > & { apiKey: '' }
 
 export type SettingsMsg = {
@@ -118,7 +96,6 @@ export type BackgroundErrorResult = {
 
 export type ToBackground =
   | TranslateBatchRequestMsg
-  | TranslateImageRequestMsg
   | GetSettingsMsg
   | PauseHostnameMsg
   | OpenOptionsMsg
@@ -126,8 +103,6 @@ export type ToBackground =
 export type FromBackground =
   | TranslateBatchResultOk
   | TranslateBatchResultErr
-  | TranslateImageResultOk
-  | TranslateImageResultErr
   | SettingsMsg
   | TestConnectionResult
   | BackgroundErrorResult

@@ -18,4 +18,4 @@ export {
   isConfigured,
   missingConfigFields,
 } from './settings-defaults'
-export type { UserSettings, HotkeyConfig, TranslationEngine } from './settings-defaults'
+export type { UserSettings, TranslationEngine } from './settings-defaults'

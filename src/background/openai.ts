@@ -9,10 +9,7 @@ import { apiBaseUrlError } from '../shared/settings-defaults'
 
 export type ChatUserContent =
   | string
-  | (
-      | { type: 'text'; text: string }
-      | { type: 'image_url'; image_url: { url: string } }
-    )[]
+  | { type: 'text'; text: string }[]
 
 export type ChatJsonParams = {
   baseURL: string
@@ -20,10 +17,9 @@ export type ChatJsonParams = {
   model: string
   systemPrompt: string
   userPrompt: string
-  /** Optional multimodal user content; defaults to userPrompt. */
+  /** Optional structured user content; defaults to userPrompt. */
   userContent?: ChatUserContent
   useJsonSchema: boolean
-  /** Optional schema override for single-image translation responses. */
   jsonSchema?: Readonly<Record<string, unknown>>
   /** auto / openai / deepseek / stepfun */
   provider?: ProviderId

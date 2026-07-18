@@ -1,7 +1,7 @@
 {
   "name": "infron-translate",
   "version": "0.2.0",
-  "description": "Hold a hotkey to peek Chinese translations without leaving English immersion.",
+  "description": "Chrome extension for automatic full-page bilingual translation.",
   "private": true,
   "type": "module",
   "scripts": {

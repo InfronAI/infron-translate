@@ -4,11 +4,9 @@ import {
   saveSettings,
   isConfigured,
   missingConfigFields,
-  type HotkeyConfig,
   type TranslationEngine,
   type UserSettings,
 } from '../shared/settings'
-import { formatHotkeyLabel, hotkeyFromKeyboardEvent } from '../shared/hotkey'
 import {
   PROVIDER_PRESETS,
   type ProviderId,
@@ -102,37 +100,6 @@ function setLanguageValue(id: 'targetLang', value: string): void {
   select.value = value
 }
 
-function hotkeyFieldId(prefix: string, field: string): string {
-  return `${prefix}${field}`
-}
-
-function readHotkeyFromHidden(prefix: string, fallback: HotkeyConfig): HotkeyConfig {
-  return {
-    altKey: el<HTMLInputElement>(hotkeyFieldId(prefix, 'Alt')).value === '1',
-    shiftKey: el<HTMLInputElement>(hotkeyFieldId(prefix, 'Shift')).value === '1',
-    ctrlKey: el<HTMLInputElement>(hotkeyFieldId(prefix, 'Ctrl')).value === '1',
-    metaKey: el<HTMLInputElement>(hotkeyFieldId(prefix, 'Meta')).value === '1',
-    code: el<HTMLInputElement>(hotkeyFieldId(prefix, 'Code')).value || fallback.code,
-  }
-}
-
-function writeHotkeyHidden(prefix: string, h: HotkeyConfig): void {
-  el<HTMLInputElement>(hotkeyFieldId(prefix, 'Alt')).value = h.altKey ? '1' : '0'
-  el<HTMLInputElement>(hotkeyFieldId(prefix, 'Shift')).value = h.shiftKey ? '1' : '0'
-  el<HTMLInputElement>(hotkeyFieldId(prefix, 'Ctrl')).value = h.ctrlKey ? '1' : '0'
-  el<HTMLInputElement>(hotkeyFieldId(prefix, 'Meta')).value = h.metaKey ? '1' : '0'
-  el<HTMLInputElement>(hotkeyFieldId(prefix, 'Code')).value = h.code
-  el<HTMLElement>(hotkeyFieldId(prefix, 'Preview')).textContent = formatHotkeyLabel(h)
-}
-
-function updateHotkeyHelp(): void {
-  const pageLabel = formatHotkeyLabel(
-    readHotkeyFromHidden('pageHotkey', DEFAULT_SETTINGS.pageTranslationHotkey),
-  )
-  el<HTMLElement>('helpHotkey').textContent =
-    `开启自动翻译后，鼠标移到文本或图片上会显示翻译；关闭时点击后翻译。${pageLabel} 切换整页双语翻译。`
-}
-
 function fillForm(s: UserSettings): void {
   el<HTMLSelectElement>('provider').value = s.provider
   el<HTMLInputElement>('baseURL').value = s.baseURL
@@ -143,7 +110,6 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('model').value = s.model
   el<HTMLSelectElement>('reasoningPref').value = s.reasoningPref
   setLanguageValue('targetLang', s.targetLang)
-  el<HTMLInputElement>('autoTranslate').checked = s.autoTranslate
   el<HTMLSelectElement>('pageTranslationEngine').value = s.pageTranslationEngine
   el<HTMLInputElement>('autoPageTranslation').checked = s.autoPageTranslation
   el<HTMLInputElement>('pageTranslationFontSizePx').value = String(
@@ -159,9 +125,6 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('pageTranslationBold').checked = s.pageTranslationBold
   el<HTMLInputElement>('pageTranslationItalic').checked = s.pageTranslationItalic
   el<HTMLInputElement>('pageTranslationUnderline').checked = s.pageTranslationUnderline
-  el<HTMLInputElement>('lensWidthPx').value = String(s.lensWidthPx)
-  writeHotkeyHidden('pageHotkey', s.pageTranslationHotkey)
-  updateHotkeyHelp()
   el<HTMLInputElement>('pausedHostnames').value = s.pausedHostnames.join(', ')
   updateConfigBadge(s)
   updateProviderHint(s.provider)
@@ -170,7 +133,6 @@ function fillForm(s: UserSettings): void {
 }
 
 function readForm(stored: UserSettings): UserSettings {
-  const lensWidth = Number(el<HTMLInputElement>('lensWidthPx').value)
   const typedKey = el<HTMLInputElement>('apiKey').value
   const apiKey = typedKey.trim() ? typedKey : stored.apiKey
   const provider = el<HTMLSelectElement>('provider').value as ProviderId
@@ -184,7 +146,6 @@ function readForm(stored: UserSettings): UserSettings {
     apiKey,
     model: el<HTMLInputElement>('model').value.trim(),
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
-    autoTranslate: el<HTMLInputElement>('autoTranslate').checked,
     pageTranslationEngine: el<HTMLSelectElement>('pageTranslationEngine')
       .value as TranslationEngine,
     autoPageTranslation: el<HTMLInputElement>('autoPageTranslation').checked,
@@ -198,14 +159,6 @@ function readForm(stored: UserSettings): UserSettings {
     pageTranslationBold: el<HTMLInputElement>('pageTranslationBold').checked,
     pageTranslationItalic: el<HTMLInputElement>('pageTranslationItalic').checked,
     pageTranslationUnderline: el<HTMLInputElement>('pageTranslationUnderline').checked,
-    lensWidthPx:
-      Number.isFinite(lensWidth) && lensWidth > 0
-        ? Math.round(lensWidth)
-        : DEFAULT_SETTINGS.lensWidthPx,
-    pageTranslationHotkey: readHotkeyFromHidden(
-      'pageHotkey',
-      DEFAULT_SETTINGS.pageTranslationHotkey,
-    ),
     pausedHostnames: parsePausedHostnames(el<HTMLInputElement>('pausedHostnames').value),
   }
 }
@@ -293,7 +246,7 @@ function updateStyleControlStates(): void {
 
 function updateEngineSummary(settings: UserSettings): void {
   const page = settings.pageTranslationEngine === 'browser' ? 'Chrome' : '外部 LLM'
-  el<HTMLElement>('engineSummary').textContent = `透镜 外部 LLM · 整页 ${page}`
+  el<HTMLElement>('engineSummary').textContent = `整页 ${page}`
 }
 
 function browserVersion(): string {
@@ -315,7 +268,7 @@ function renderBrowserCapability(
   const content = {
     checking: ['正在检测 Chrome 内置翻译', '正在检查 API 和当前语言对。'],
     available: ['Chrome 内置翻译已就绪', '当前语言对可直接在设备侧翻译。'],
-    downloadable: ['需要下载语言包', '点击下载并测试；完成后可用于网页自动翻译。'],
+    downloadable: ['需要下载语言包', '点击下载并测试；完成后可用于网页自动双语。'],
     downloading: ['语言包正在下载', detail || '请保持此页面打开。'],
     unavailable: ['当前语言对不可用', '可更换语言代码，或将对应翻译引擎切换为外部 LLM。'],
     unsupported: [
@@ -367,50 +320,6 @@ function applyProviderPreset(id: string): void {
   }
 }
 
-function setupHotkeyCapture(prefix: string, buttonId: string, hintId: string): void {
-  const btn = el<HTMLButtonElement>(buttonId)
-  const hint = el<HTMLElement>(hintId)
-  let capturing = false
-
-  const onKey = (e: KeyboardEvent) => {
-    if (!capturing) return
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.key === 'Escape') {
-      stopCapture()
-      setStatus('已取消录制')
-      return
-    }
-    const hk = hotkeyFromKeyboardEvent(e)
-    if (!hk) return
-    writeHotkeyHidden(prefix, hk)
-    updateHotkeyHelp()
-    stopCapture()
-    setStatus(`已录制：${formatHotkeyLabel(hk)}（记得点保存）`)
-  }
-
-  const stopCapture = () => {
-    capturing = false
-    hint.hidden = true
-    btn.textContent = '录制快捷键'
-    btn.classList.remove('recording')
-    window.removeEventListener('keydown', onKey, true)
-  }
-
-  btn.addEventListener('click', () => {
-    if (capturing) {
-      stopCapture()
-      return
-    }
-    capturing = true
-    hint.hidden = false
-    btn.textContent = '录制中…'
-    btn.classList.add('recording')
-    setStatus('')
-    window.addEventListener('keydown', onKey, true)
-  })
-}
-
 function setupSectionNavigation(): void {
   const links = [...document.querySelectorAll<HTMLAnchorElement>('.section-nav a')]
   const sections = links
@@ -435,7 +344,6 @@ async function init(): Promise<void> {
   fillForm(stored)
   void checkBrowserCapability()
   setupSectionNavigation()
-  setupHotkeyCapture('pageHotkey', 'capturePageHotkey', 'capturePageHint')
   el<HTMLInputElement>('pageTranslationUseCustomColor').addEventListener(
     'change',
     updateStyleControlStates,
@@ -485,7 +393,7 @@ async function init(): Promise<void> {
         usesBrowser &&
         (browserCapability === 'downloadable' || browserCapability === 'downloading')
       ) {
-        setStatus('已保存 · 使用自动翻译前，请先在 Chrome 能力区下载语言包。', false)
+        setStatus('已保存 · 使用网页自动双语前，请先在 Chrome 能力区下载语言包。', false)
       } else if (isConfigured(stored)) {
         setStatus('已保存 · 已同步到打开的网页。', true)
       } else if (!usesExternal) {

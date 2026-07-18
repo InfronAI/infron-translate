@@ -1,13 +1,5 @@
 import type { ProviderId, ReasoningPref } from './providers'
 
-export type HotkeyConfig = {
-  altKey: boolean
-  shiftKey: boolean
-  ctrlKey: boolean
-  metaKey: boolean
-  code: string // KeyboardEvent.code, e.g. 'KeyL'
-}
-
 export type TranslationEngine = 'external' | 'browser'
 
 export type UserSettings = {
@@ -22,7 +14,6 @@ export type UserSettings = {
    */
   reasoningPref: ReasoningPref
   targetLang: string
-  autoTranslate: boolean
   /** Engine used by the full-page bilingual DOM translation mode. */
   pageTranslationEngine: TranslationEngine
   /** Automatically enable full-page bilingual mode after detecting the page language. */
@@ -35,11 +26,8 @@ export type UserSettings = {
   pageTranslationBold: boolean
   pageTranslationItalic: boolean
   pageTranslationUnderline: boolean
-  lensWidthPx: number
   minTextLength: number
   batchCharLimit: number
-  prefetchMarginRatio: number // 0.5 = half viewport
-  pageTranslationHotkey: HotkeyConfig
   pausedHostnames: string[]
 }
 
@@ -50,8 +38,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   provider: 'auto',
   reasoningPref: 'off',
   targetLang: 'zh',
-  /** Default off: only translate the block under the lens (fast first paint). */
-  autoTranslate: false,
   pageTranslationEngine: 'browser',
   autoPageTranslation: false,
   pageTranslationFontSizePx: 14,
@@ -62,17 +48,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   pageTranslationBold: false,
   pageTranslationItalic: false,
   pageTranslationUnderline: false,
-  lensWidthPx: 320,
   minTextLength: 10,
   batchCharLimit: 6000,
-  prefetchMarginRatio: 0.5,
-  pageTranslationHotkey: {
-    altKey: true,
-    shiftKey: true,
-    ctrlKey: false,
-    metaKey: false,
-    code: 'Semicolon',
-  },
   pausedHostnames: [],
 }
 
@@ -108,18 +85,6 @@ function colorValue(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback
 }
 
-function hotkeyValue(value: unknown, fallback: HotkeyConfig): HotkeyConfig {
-  const hotkey = isRecord(value) ? value : {}
-  return {
-    altKey: typeof hotkey.altKey === 'boolean' ? hotkey.altKey : fallback.altKey,
-    shiftKey: typeof hotkey.shiftKey === 'boolean' ? hotkey.shiftKey : fallback.shiftKey,
-    ctrlKey: typeof hotkey.ctrlKey === 'boolean' ? hotkey.ctrlKey : fallback.ctrlKey,
-    metaKey: typeof hotkey.metaKey === 'boolean' ? hotkey.metaKey : fallback.metaKey,
-    code:
-      typeof hotkey.code === 'string' && hotkey.code.length <= 64 ? hotkey.code : fallback.code,
-  }
-}
-
 /** Validate persisted/untrusted settings and fill every omitted or malformed field. */
 export function mergeSettings(partial: unknown): UserSettings {
   const p = isRecord(partial) ? partial : {}
@@ -130,8 +95,6 @@ export function mergeSettings(partial: unknown): UserSettings {
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
     targetLang: stringValue(p.targetLang, DEFAULT_SETTINGS.targetLang).slice(0, 64),
-    autoTranslate:
-      typeof p.autoTranslate === 'boolean' ? p.autoTranslate : DEFAULT_SETTINGS.autoTranslate,
     pageTranslationEngine: asTranslationEngine(
       p.pageTranslationEngine,
       DEFAULT_SETTINGS.pageTranslationEngine,
@@ -174,23 +137,12 @@ export function mergeSettings(partial: unknown): UserSettings {
       typeof p.pageTranslationUnderline === 'boolean'
         ? p.pageTranslationUnderline
         : DEFAULT_SETTINGS.pageTranslationUnderline,
-    lensWidthPx: finiteNumber(p.lensWidthPx, DEFAULT_SETTINGS.lensWidthPx, 120, 800),
     minTextLength: finiteNumber(p.minTextLength, DEFAULT_SETTINGS.minTextLength, 1, 1000),
     batchCharLimit: finiteNumber(
       p.batchCharLimit,
       DEFAULT_SETTINGS.batchCharLimit,
       100,
       100_000,
-    ),
-    prefetchMarginRatio: finiteNumber(
-      p.prefetchMarginRatio,
-      DEFAULT_SETTINGS.prefetchMarginRatio,
-      0,
-      5,
-    ),
-    pageTranslationHotkey: hotkeyValue(
-      p.pageTranslationHotkey,
-      DEFAULT_SETTINGS.pageTranslationHotkey,
     ),
     pausedHostnames: Array.isArray(p.pausedHostnames)
       ? p.pausedHostnames

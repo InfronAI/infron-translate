@@ -8,24 +8,15 @@ import {
 } from '../../src/shared/settings-defaults'
 
 describe('DEFAULT_SETTINGS', () => {
-  it('defaults to en→zh with on-demand translate (auto off)', () => {
+  it('defaults to zh full-page translation with automatic page mode off', () => {
     expect(DEFAULT_SETTINGS.targetLang).toBe('zh')
-    expect(DEFAULT_SETTINGS.autoTranslate).toBe(false)
     expect(DEFAULT_SETTINGS.pageTranslationEngine).toBe('browser')
     expect(DEFAULT_SETTINGS.autoPageTranslation).toBe(false)
     expect(DEFAULT_SETTINGS.pageTranslationFontSizePx).toBe(14)
     expect(DEFAULT_SETTINGS.pageTranslationUseCustomColor).toBe(false)
     expect(DEFAULT_SETTINGS.pageTranslationUseBackground).toBe(false)
-    expect(DEFAULT_SETTINGS.lensWidthPx).toBe(320)
     expect(DEFAULT_SETTINGS.minTextLength).toBe(10)
     expect(DEFAULT_SETTINGS.batchCharLimit).toBe(6000)
-    expect(DEFAULT_SETTINGS.pageTranslationHotkey).toEqual({
-      altKey: true,
-      shiftKey: true,
-      ctrlKey: false,
-      metaKey: false,
-      code: 'Semicolon',
-    })
     expect(DEFAULT_SETTINGS.pausedHostnames).toEqual([])
   })
 })
@@ -34,10 +25,8 @@ describe('mergeSettings', () => {
   it('fills missing fields from defaults', () => {
     const merged = mergeSettings({ apiKey: 'sk-test' })
     expect(merged.apiKey).toBe('sk-test')
-    expect(merged.autoTranslate).toBe(false)
     expect(merged.pageTranslationEngine).toBe('browser')
     expect(merged.autoPageTranslation).toBe(false)
-    expect(merged.pageTranslationHotkey).toEqual(DEFAULT_SETTINGS.pageTranslationHotkey)
     expect(merged.pageTranslationFontSizePx).toBe(14)
     expect(merged.model).toBe(DEFAULT_SETTINGS.model)
   })

@@ -3,7 +3,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 export default defineManifest({
   manifest_version: 3,
   name: 'Infron Translate',
-  description: 'Hold a hotkey to peek Chinese translations without leaving English immersion.',
+  description: 'Automatically detect webpage language and add bilingual full-page translations.',
   version: '0.2.0',
   action: {
     default_popup: 'src/popup/index.html',

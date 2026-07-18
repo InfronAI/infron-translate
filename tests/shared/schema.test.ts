@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseImageTranslationResult, parseTranslateBatchResult } from '../../src/shared/schema'
+import { parseTranslateBatchResult } from '../../src/shared/schema'
 
 describe('parseTranslateBatchResult', () => {
   it('keeps only allowed ids', () => {
@@ -25,18 +25,5 @@ describe('parseTranslateBatchResult', () => {
   it('fails when items missing', () => {
     const parsed = parseTranslateBatchResult({}, new Set())
     expect(parsed.ok).toBe(false)
-  })
-})
-
-describe('parseImageTranslationResult', () => {
-  it('accepts non-empty translated image text and rejects empty output', () => {
-    expect(parseImageTranslationResult({ translation: '图片中的文字' })).toEqual({
-      ok: true,
-      translation: '图片中的文字',
-    })
-    expect(parseImageTranslationResult({ translation: '   ' })).toEqual({
-      ok: false,
-      error: 'translation empty',
-    })
   })
 })

@@ -101,7 +101,7 @@ describe('text-hash translation cache', () => {
       'Persisted sentence',
     )
     const get = vi.fn(async () => ({
-      'lens-translation-cache-v1': [[cacheKey, '已缓存']],
+      'infron-translation-cache-v1': [[cacheKey, '已缓存']],
     }))
     const set = vi.fn(async (_payload: Record<string, unknown>) => undefined)
     vi.stubGlobal('chrome', { storage: { session: { get, set } } })
@@ -126,7 +126,7 @@ describe('text-hash translation cache', () => {
 
     expect(set).toHaveBeenCalledOnce()
     const payload = set.mock.calls[0][0] as Record<string, [string, string][]>
-    expect(payload['lens-translation-cache-v1'].map((entry) => entry[1])).toEqual([
+    expect(payload['infron-translation-cache-v1'].map((entry) => entry[1])).toEqual([
       '已缓存',
       '新句子',
     ])
@@ -179,7 +179,7 @@ describe('text-hash translation cache', () => {
 
     expect(set).toHaveBeenCalledTimes(2)
     const newest = set.mock.calls[1][0] as Record<string, [string, string][]>
-    expect(newest['lens-translation-cache-v1'].map((entry) => entry[1])).toEqual([
+    expect(newest['infron-translation-cache-v1'].map((entry) => entry[1])).toEqual([
       '第一句',
       '第二句',
     ])

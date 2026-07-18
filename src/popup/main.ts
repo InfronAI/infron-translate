@@ -1,11 +1,4 @@
-import {
-  isConfigured,
-  loadSettings,
-  saveSettings,
-  missingConfigFields,
-  type UserSettings,
-} from '../shared/settings'
-import { formatHotkeyLabel } from '../shared/hotkey'
+import { isConfigured, loadSettings, saveSettings, missingConfigFields, type UserSettings } from '../shared/settings'
 import type {
   PauseHostnameMsg,
   TogglePageTranslationMsg,
@@ -37,21 +30,13 @@ function renderStatus(settings: UserSettings): void {
   pageEngine.className =
     settings.pageTranslationEngine === 'browser' || configured ? 'pill ok' : 'pill warn'
 
-  const auto = el<HTMLInputElement>('autoToggle')
-  auto.checked = settings.autoTranslate
-  el<HTMLElement>('modeDesc').textContent = settings.autoTranslate
-    ? '开：鼠标移到内容上自动翻译'
-    : '关：点击页面内容后翻译'
-
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
   el<HTMLElement>('pageAutoDesc').textContent = settings.autoPageTranslation
     ? '开：检测到网页语言后自动开启'
-    : '关：使用快捷键手动开启'
+    : '关：使用按钮手动开启'
 
-  el<HTMLElement>('modeHint').textContent = settings.autoTranslate
-    ? '自动翻译已开启'
-    : '点击页面内容后翻译'
+  el<HTMLElement>('modeHint').textContent = '整页双语翻译'
 
   const tip = el<HTMLElement>('unconfiguredTip')
   const needsExternal = true
@@ -65,9 +50,7 @@ function renderStatus(settings: UserSettings): void {
       : '尚未配置 API，请打开设置填写并保存。'
   }
 
-  const pageHotkey = formatHotkeyLabel(settings.pageTranslationHotkey)
-  el<HTMLElement>('usageHint').textContent =
-    `点击页面文本或图片可手动翻译。${pageHotkey}：切换整页中英双语翻译。`
+  el<HTMLElement>('usageHint').textContent = '使用下方按钮切换整页中英双语翻译。'
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {
@@ -127,7 +110,6 @@ async function init(): Promise<void> {
   const hostname = hostnameFromUrl(tab?.url)
   const hostnameEl = el<HTMLElement>('hostname')
   const pauseToggle = el<HTMLInputElement>('pauseToggle')
-  const autoToggle = el<HTMLInputElement>('autoToggle')
   const pageAutoToggle = el<HTMLInputElement>('pageAutoToggle')
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
@@ -174,21 +156,6 @@ async function init(): Promise<void> {
       }
     })
   }
-
-  autoToggle.addEventListener('change', async () => {
-    try {
-      el<HTMLElement>('error').hidden = true
-      const next: UserSettings = { ...settings, autoTranslate: autoToggle.checked }
-      await saveSettings(next)
-      settings = await loadSettings()
-      renderStatus(settings)
-    } catch (err) {
-      autoToggle.checked = !autoToggle.checked
-      const error = el<HTMLElement>('error')
-      error.hidden = false
-      error.textContent = err instanceof Error ? err.message : String(err)
-    }
-  })
 
   pageAutoToggle.addEventListener('change', async () => {
     try {

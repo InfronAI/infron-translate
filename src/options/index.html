@@ -40,7 +40,7 @@
         <div class="content-heading">
           <p class="eyebrow">PREFERENCES</p>
           <h1>设置</h1>
-          <p id="helpHotkey">配置翻译方式、自动行为和页面呈现。</p>
+          <p id="helpSummary">配置翻译方式、自动行为和页面呈现。</p>
         </div>
 
         <form id="settings-form" autocomplete="off">
@@ -48,7 +48,7 @@
             <header class="section-heading">
               <div>
                 <h2>基础翻译</h2>
-                <p>控制翻译透镜的语言和交互方式。</p>
+                <p>控制目标语言和整页翻译行为。</p>
               </div>
             </header>
 
@@ -65,28 +65,6 @@
               </div>
             </div>
 
-            <div class="setting-row">
-              <div class="setting-copy">
-                <h3>自动翻译</h3>
-                <p>启用后鼠标移到文本或图片上自动显示翻译；关闭时点击页面内容后翻译。</p>
-              </div>
-              <label class="switch-control">
-                <input id="autoTranslate" name="autoTranslate" type="checkbox" />
-                <span class="switch-track" aria-hidden="true"></span>
-                <span class="switch-label">启用</span>
-              </label>
-            </div>
-
-            <div class="setting-row">
-              <div class="setting-copy">
-                <h3>透镜宽度</h3>
-                <p>调整悬浮翻译面板的固定宽度。</p>
-              </div>
-              <label class="control number-control">
-                <input id="lensWidthPx" name="lensWidthPx" type="number" min="120" max="800" step="1" />
-                <span>px</span>
-              </label>
-            </div>
           </section>
 
           <section id="page-translation" class="settings-section">
@@ -129,7 +107,7 @@
             <div class="setting-row appearance-row">
               <div class="setting-copy">
                 <h3>译文样式</h3>
-                <p>字号同时调整翻译透镜；颜色和字形用于正文译文，紧凑菜单会自动缩小。</p>
+                <p>控制整页双语模式插入译文的字号、颜色和字形。</p>
               </div>
               <div class="control appearance-controls">
                 <label class="number-field">
@@ -197,22 +175,6 @@
               </div>
             </div>
 
-            <div class="setting-row">
-              <div class="setting-copy">
-                <h3>整页翻译快捷键</h3>
-                <p>再次按下或按 Esc 可退出当前页面的双语模式。</p>
-              </div>
-              <div class="control hotkey-control">
-                <kbd id="pageHotkeyPreview">Option+Shift+;</kbd>
-                <button type="button" id="capturePageHotkey" class="button secondary">录制</button>
-                <span id="capturePageHint" class="capture-hint" hidden>请按下组合键，Esc 取消</span>
-              </div>
-              <input type="hidden" id="pageHotkeyAlt" />
-              <input type="hidden" id="pageHotkeyShift" />
-              <input type="hidden" id="pageHotkeyCtrl" />
-              <input type="hidden" id="pageHotkeyMeta" />
-              <input type="hidden" id="pageHotkeyCode" />
-            </div>
           </section>
 
           <section id="browser-runtime" class="settings-section">
@@ -244,7 +206,7 @@
             <header class="section-heading section-heading-with-status">
               <div>
                 <h2>外部模型</h2>
-                <p>用于外部 LLM 文本翻译和图片视觉翻译。</p>
+                <p>用于外部 LLM 文本翻译。</p>
               </div>
               <span id="configBadge" class="config-badge warn">检测中</span>
             </header>
@@ -335,7 +297,7 @@
             <header class="section-heading">
               <div>
                 <h2>网站管理</h2>
-                <p>暂停的网站不会启动透镜、自动翻译或整页翻译。</p>
+                <p>暂停的网站不会启动整页翻译。</p>
               </div>
             </header>
             <div class="setting-row">
