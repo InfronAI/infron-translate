@@ -138,6 +138,7 @@ function stubChrome(settings = DEFAULT_SETTINGS, configured = false): {
   vi.stubGlobal('chrome', {
     runtime: {
       id: 'extension-id',
+      getURL: (path: string) => `chrome-extension://extension-id/${path}`,
       sendMessage,
       onMessage: {
         addListener: vi.fn((next: RuntimeListener) => {

@@ -269,15 +269,13 @@ export class PageController {
 
 button {
   all: unset;
+  position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  min-width: 118px;
-  max-width: 168px;
-  min-height: 38px;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   box-sizing: border-box;
-  padding: 9px 12px;
+  padding: 8px;
   border: 1px solid rgb(255 255 255 / 58%);
   border-radius: 999px;
   background:
@@ -292,7 +290,7 @@ button {
 }
 
 button:hover {
-  transform: translateX(-2px);
+  transform: translateX(-2px) scale(1.04);
   filter: saturate(1.08) brightness(1.04);
   box-shadow: 0 18px 42px rgb(15 23 42 / 26%), inset 0 1px 0 rgb(255 255 255 / 48%);
 }
@@ -310,6 +308,9 @@ button[data-enabled="false"] {
   background:
     radial-gradient(circle at 22% 12%, rgb(255 255 255 / 86%), transparent 34%),
     linear-gradient(135deg, rgb(71 85 105 / 94%), rgb(100 116 139 / 92%));
+  filter: grayscale(0.28) saturate(0.72);
+  opacity: 0.86;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 18%), inset 0 1px 0 rgb(255 255 255 / 34%);
 }
 
 button[data-busy="true"] {
@@ -317,52 +318,56 @@ button[data-busy="true"] {
   opacity: 0.72;
 }
 
-.dot {
-  width: 9px;
-  height: 9px;
+.logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 22%));
+}
+
+button::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid rgb(255 255 255 / 92%);
   border-radius: 999px;
-  background: #bbf7d0;
-  box-shadow: 0 0 0 4px rgb(187 247 208 / 24%);
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgb(34 197 94 / 18%);
+  opacity: 1;
 }
 
-button[data-enabled="false"] .dot {
-  background: #e2e8f0;
-  box-shadow: 0 0 0 4px rgb(226 232 240 / 22%);
+button[data-enabled="false"]::after {
+  background: #94a3b8;
+  box-shadow: none;
+  opacity: 0.72;
 }
 
-.label {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+button[data-busy="true"]::after {
+  animation: infronAutoTogglePulse 0.8s ease-in-out infinite;
+}
+
+@keyframes infronAutoTogglePulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.56; }
+  50% { transform: scale(1.08); opacity: 1; }
 }
 
 @media (max-width: 520px) {
   :host { right: 10px; }
   button {
-    min-width: 42px;
     width: 42px;
+    height: 42px;
     padding: 10px;
-    grid-template-columns: auto;
-    justify-content: center;
-  }
-  .label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
   }
 }
 `
       const button = document.createElement('button')
       button.type = 'button'
-      button.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="label"></span>'
+      button.innerHTML = '<img class="logo" src="' + chrome.runtime.getURL('icons/infron-mark.png') + '" alt="" aria-hidden="true" />'
       button.addEventListener('click', () => {
         void this.toggleAutoTranslation()
       })
@@ -382,12 +387,6 @@ button[data-enabled="false"] .dot {
     this.autoToggleButton.disabled = this.autoToggleBusy
     this.autoToggleButton.title = label
     this.autoToggleButton.setAttribute('aria-label', label)
-    const labelNode = this.autoToggleButton.querySelector<HTMLElement>('.label')
-    if (labelNode) {
-      labelNode.textContent = this.autoToggleBusy
-        ? uiText(this.settings.uiLanguage, 'updating')
-        : label
-    }
   }
 
   private async toggleAutoTranslation(): Promise<void> {
