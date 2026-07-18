@@ -30,25 +30,25 @@ const TRANSCRIPT_HISTORY_LIMIT = 500
 const MOCK_LINES = [
   {
     channel: 'meeting-output',
-    speakerLabel: 'Speaker 1',
+    speakerLabel: 'Other participants',
     originalText: 'Let us align on the product scope and confirm the launch sequence.',
     translatedText: '我们先对齐产品范围，并确认上线顺序。',
   },
   {
     channel: 'microphone',
-    speakerLabel: 'You',
+    speakerLabel: 'Me',
     originalText: 'The extension should keep the transcript live while the summary stays structured.',
     translatedText: '扩展需要保持转写实时更新，同时让总结保持结构化。',
   },
   {
     channel: 'meeting-output',
-    speakerLabel: 'Speaker 2',
+    speakerLabel: 'Other participants',
     originalText: 'The main risk is audio permission and making sure the capture state is visible.',
     translatedText: '主要风险是音频权限，以及确保采集状态清晰可见。',
   },
   {
     channel: 'meeting-output',
-    speakerLabel: 'Speaker 1',
+    speakerLabel: 'Other participants',
     originalText: 'We should ship the meeting assistant in phases and keep the first version focused.',
     translatedText: '我们应该分阶段发布会议助手，并让第一版保持聚焦。',
   },
@@ -165,7 +165,7 @@ export class MeetingManager {
       id: `${message.sessionId}-${message.endedAt}-${Math.random().toString(36).slice(2, 7)}`,
       sessionId: message.sessionId,
       channel: message.channel,
-      speakerLabel: message.speakerLabel,
+      speakerLabel: participantLabel(this.state.session.uiLanguage, message.channel),
       startedAt: message.startedAt,
       endedAt: message.endedAt,
       sourceLang: message.sourceLang,
@@ -317,11 +317,11 @@ export class MeetingManager {
       speakerLabel:
         message.channel === 'meeting-output'
           ? this.state.session.uiLanguage === 'zh'
-            ? '系统音频'
-            : 'System Audio'
+            ? '与会对方'
+            : 'Other participants'
           : this.state.session.uiLanguage === 'zh'
             ? '我'
-            : 'You',
+            : 'Me',
       sourceLang: message.sourceLang,
       originalText: result.text,
       startedAt: message.startedAt,
@@ -425,7 +425,7 @@ export class MeetingManager {
       id: `${this.state.session.id}-${this.cursor}`,
       sessionId: this.state.session.id,
       channel: line.channel,
-      speakerLabel: line.speakerLabel,
+      speakerLabel: participantLabel(this.state.session.uiLanguage, line.channel),
       startedAt: now - 3000,
       endedAt: now,
       sourceLang: this.state.session.sourceLang,
@@ -783,8 +783,12 @@ function meetingMessage(
 }
 
 function localizedChannel(language: MeetingUiLanguage, channel: string): string {
-  if (language === 'zh') return channel === 'meeting-output' ? '系统' : '麦克风'
-  return channel === 'meeting-output' ? 'System' : 'Microphone'
+  return participantLabel(language, channel)
+}
+
+function participantLabel(language: MeetingUiLanguage, channel: string): string {
+  if (language === 'zh') return channel === 'meeting-output' ? '与会对方' : '我'
+  return channel === 'meeting-output' ? 'Other participants' : 'Me'
 }
 
 const STOP_WORDS = new Set([
