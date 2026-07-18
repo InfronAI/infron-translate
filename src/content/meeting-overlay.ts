@@ -420,7 +420,7 @@ export class MeetingOverlay {
     this.micRecorder.addEventListener('dataavailable', (event) => {
       if (!event.data.size) return
       const endedAt = Date.now()
-      const startedAt = this.micChunkStartedAt || endedAt - 8000
+      const startedAt = this.micChunkStartedAt || endedAt - 4000
       this.micChunkStartedAt = endedAt
       const shouldSend = this.maxMicLevelSinceChunk > 0.025
       this.maxMicLevelSinceChunk = 0
@@ -436,7 +436,7 @@ export class MeetingOverlay {
         endedAt,
       }, event.data)
     })
-    this.micRecorder.start(8000)
+    this.micRecorder.start(4000)
   }
 
   private async sendAudioChunk(message: MeetingAudioChunkMsg, blob: Blob): Promise<void> {

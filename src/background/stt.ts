@@ -44,7 +44,11 @@ export async function transcribeAudioChunk(input: {
       body: form,
     })
     if (!response.ok) {
-      return { ok: false, error: `STT HTTP ${response.status}`, status: response.status }
+      return {
+        ok: false,
+        error: `STT HTTP ${response.status}${await responseErrorDetail(response)}`,
+        status: response.status,
+      }
     }
     const data = await response.json()
     const text = extractText(data)
@@ -55,6 +59,15 @@ export async function transcribeAudioChunk(input: {
       ok: false,
       error: timedOut ? 'STT request timed out' : error instanceof Error ? error.message : 'STT network error',
     }
+  }
+}
+
+async function responseErrorDetail(response: Response): Promise<string> {
+  try {
+    const text = (await response.text()).replace(/\s+/g, ' ').trim()
+    return text ? `: ${text.slice(0, 220)}` : ''
+  } catch {
+    return ''
   }
 }
 

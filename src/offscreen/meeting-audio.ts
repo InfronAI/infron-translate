@@ -133,7 +133,7 @@ function startOutputRecorder(session: MeetingSession, stream: MediaStream): void
   recorder.addEventListener('dataavailable', (event) => {
     if (!event.data.size) return
     const endedAt = Date.now()
-    const startedAt = chunkStartedAt || endedAt - 8000
+    const startedAt = chunkStartedAt || endedAt - 4000
     chunkStartedAt = endedAt
     const shouldSend = maxLevelSinceChunk > 0.025
     maxLevelSinceChunk = 0
@@ -149,7 +149,7 @@ function startOutputRecorder(session: MeetingSession, stream: MediaStream): void
       endedAt,
     }, event.data)
   })
-  recorder.start(8000)
+  recorder.start(4000)
 }
 
 function updateChunkLevel(level: number): number {

@@ -55,6 +55,7 @@ export class MeetingManager {
   private timer: ReturnType<typeof setInterval> | null = null
   private cursor = 0
   private readonly sttInFlight = new Set<string>()
+  private readonly sttQueues = new Map<string, MeetingAudioChunkMsg[]>()
 
   getState(): MeetingRuntimeState | null {
     return this.state
@@ -176,7 +177,47 @@ export class MeetingManager {
   async ingestAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
     if (!this.state || this.state.session.id !== message.sessionId) return
     const key = `${message.sessionId}:${message.channel}`
+    const queue = this.sttQueues.get(key) ?? []
+    queue.push(message)
+    while (queue.length > 4) queue.shift()
+    this.sttQueues.set(key, queue)
+    if (this.sttInFlight.has(key)) {
+      await this.updateAudioStatus({
+        type: 'meeting-audio-status',
+        sessionId: message.sessionId,
+        transcription: {
+          active: true,
+          source: 'external-stt',
+          message: `${labelForChannel(message.channel)} audio queued for Infron Whisper STT (${queue.length} chunk${queue.length === 1 ? '' : 's'}).`,
+        },
+      })
+      return
+    }
+    void this.processSttQueue(key)
+  }
+
+  private async processSttQueue(key: string): Promise<void> {
     if (this.sttInFlight.has(key)) return
+    this.sttInFlight.add(key)
+    try {
+      while (true) {
+        const queue = this.sttQueues.get(key) ?? []
+        const message = queue.shift()
+        if (!message) {
+          this.sttQueues.delete(key)
+          return
+        }
+        if (queue.length === 0) this.sttQueues.delete(key)
+        else this.sttQueues.set(key, queue)
+        await this.transcribeQueuedChunk(message)
+      }
+    } finally {
+      this.sttInFlight.delete(key)
+    }
+  }
+
+  private async transcribeQueuedChunk(message: MeetingAudioChunkMsg): Promise<void> {
+    if (!this.state || this.state.session.id !== message.sessionId) return
     const settings = await loadSettings()
     if (!isConfigured(settings)) {
       await this.updateAudioStatus({
@@ -191,53 +232,56 @@ export class MeetingManager {
       return
     }
 
-    this.sttInFlight.add(key)
     await this.updateAudioStatus({
       type: 'meeting-audio-status',
       sessionId: message.sessionId,
       transcription: {
         active: true,
         source: 'external-stt',
-        message:
-          message.channel === 'meeting-output'
-            ? 'Transcribing system audio with Infron Whisper STT...'
-            : 'Transcribing microphone audio with Infron Whisper STT...',
+        message: `Transcribing ${labelForChannel(message.channel).toLowerCase()} audio with Infron Whisper STT...`,
       },
     })
-    try {
-      const result = await transcribeAudioChunk({
-        audioBase64: message.audioBase64,
-        mimeType: message.mimeType,
-        sourceLang: message.sourceLang,
-        settings,
-      })
-      if (!this.state || this.state.session.id !== message.sessionId) return
-      if (!result.ok) {
-        await this.updateAudioStatus({
-          type: 'meeting-audio-status',
-          sessionId: message.sessionId,
-          transcription: {
-            active: false,
-            source: 'external-stt',
-            message: `Infron Whisper STT failed: ${result.error}`,
-          },
-        })
-        return
-      }
-      if (!result.text) return
-      await this.ingestTranscript({
-        type: 'meeting-transcript-segment',
+    const result = await transcribeAudioChunk({
+      audioBase64: message.audioBase64,
+      mimeType: message.mimeType,
+      sourceLang: message.sourceLang,
+      settings,
+    })
+    if (!this.state || this.state.session.id !== message.sessionId) return
+    if (!result.ok) {
+      await this.updateAudioStatus({
+        type: 'meeting-audio-status',
         sessionId: message.sessionId,
-        channel: message.channel,
-        speakerLabel: message.channel === 'meeting-output' ? 'System Audio' : 'You',
-        sourceLang: message.sourceLang,
-        originalText: result.text,
-        startedAt: message.startedAt,
-        endedAt: message.endedAt,
+        transcription: {
+          active: false,
+          source: 'external-stt',
+          message: `Infron Whisper STT failed: ${result.error}`,
+        },
       })
-    } finally {
-      this.sttInFlight.delete(key)
+      return
     }
+    if (!result.text) {
+      await this.updateAudioStatus({
+        type: 'meeting-audio-status',
+        sessionId: message.sessionId,
+        transcription: {
+          active: true,
+          source: 'external-stt',
+          message: `${labelForChannel(message.channel)} audio detected; Whisper returned no speech for this chunk.`,
+        },
+      })
+      return
+    }
+    await this.ingestTranscript({
+      type: 'meeting-transcript-segment',
+      sessionId: message.sessionId,
+      channel: message.channel,
+      speakerLabel: message.channel === 'meeting-output' ? 'System Audio' : 'You',
+      sourceLang: message.sourceLang,
+      originalText: result.text,
+      startedAt: message.startedAt,
+      endedAt: message.endedAt,
+    })
   }
 
   async setSystemAudioEnabled(sessionId: string, enabled: boolean): Promise<void> {
@@ -444,4 +488,8 @@ export class MeetingManager {
 function clampLevel(value: number): number {
   if (!Number.isFinite(value)) return 0
   return Math.min(1, Math.max(0, value))
+}
+
+function labelForChannel(channel: string): string {
+  return channel === 'meeting-output' ? 'System' : 'Microphone'
 }
