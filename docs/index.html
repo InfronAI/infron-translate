@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Infron Translate is a Chrome extension for full-page translation and meeting assistance."
+    />
+    <meta property="og:title" content="Infron Translate" />
+    <meta
+      property="og:description"
+      content="Translate webpages, compare bilingual text, and capture meeting transcripts with AI assistance."
+    />
+    <meta property="og:type" content="website" />
+    <title>Infron Translate</title>
+    <link rel="icon" href="./assets/infron-mark.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Infron Translate">
+        <img src="./assets/infron-mark.png" alt="" />
+        <span>Infron Translate</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features">Features</a>
+        <a href="#meeting">Meeting Assistant</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/InfronAI/infron-translate">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <img class="wordmark" src="./assets/infron-logo.png" alt="Infron" />
+          <h1>Infron Translate</h1>
+          <p>
+            A Chrome extension for full-page webpage translation, bilingual reading,
+            and lightweight AI meeting assistance.
+          </p>
+          <div class="actions">
+            <a class="primary" href="https://github.com/InfronAI/infron-translate">View on GitHub</a>
+            <a class="secondary" href="#install">Install from source</a>
+          </div>
+        </div>
+        <div class="product-panel" aria-label="Product preview">
+          <div class="browser-bar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="preview-grid">
+            <article>
+              <strong>Page Translation</strong>
+              <p>Detect source language and translate the current webpage in bilingual or translation-only mode.</p>
+            </article>
+            <article>
+              <strong>Cloud Models</strong>
+              <p>Use Chrome built-in translation or OpenAI-compatible model providers.</p>
+            </article>
+            <article>
+              <strong>Meeting Assistant</strong>
+              <p>Capture mic and tab audio, generate transcripts, translations, and periodic summaries.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <div class="section-heading">
+          <span>Translation</span>
+          <h2>Built for everyday reading workflows</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>Language controls</h3>
+            <p>Auto-detect the page language, then manually adjust both source and target languages.</p>
+          </article>
+          <article>
+            <h3>Two display modes</h3>
+            <p>Read bilingual comparison text or replace source text in place with translation-only mode.</p>
+          </article>
+          <article>
+            <h3>Engine choice</h3>
+            <p>Switch between Chrome built-in translation and configurable OpenAI-compatible cloud models.</p>
+          </article>
+          <article>
+            <h3>Site-aware controls</h3>
+            <p>Pause translation per site and toggle automatic webpage translation with the floating logo button.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="meeting" class="section split">
+        <div class="section-heading">
+          <span>Meeting Assistant</span>
+          <h2>Transcript, translation, and summary in one overlay</h2>
+          <p>
+            The meeting assistant captures microphone and current Chrome tab audio, sends collected audio
+            windows to StepFun HTTP + SSE ASR, and updates transcript and summary panels during the call.
+          </p>
+        </div>
+        <div class="timeline">
+          <div><b>1</b><span>Start the assistant from the popup</span></div>
+          <div><b>2</b><span>Enable mic or tab audio input</span></div>
+          <div><b>3</b><span>Review live transcript and translations</span></div>
+          <div><b>4</b><span>Refresh meeting insights every 60 seconds or 6 turns</span></div>
+        </div>
+      </section>
+
+      <section id="install" class="section install">
+        <div class="section-heading">
+          <span>Install</span>
+          <h2>Run it locally as an unpacked Chrome extension</h2>
+        </div>
+        <pre><code>git clone https://github.com/InfronAI/infron-translate.git
+cd infron-translate
+npm install
+npm run build</code></pre>
+        <p>
+          Open <code>chrome://extensions</code>, enable Developer mode, choose
+          <strong>Load unpacked</strong>, and select the generated <code>dist/</code> directory.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <span>Infron Translate</span>
+      <a href="https://github.com/InfronAI/infron-translate">github.com/InfronAI/infron-translate</a>
+    </footer>
+  </body>
+</html>
