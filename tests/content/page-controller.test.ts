@@ -31,6 +31,12 @@ class MockElement {
   setAttribute(name: string, value: string): void {
     this.attributes.set(name, value)
     if (name === 'id') this.id = value
+    if (name === 'title') this.title = value
+  }
+
+  removeAttribute(name: string): void {
+    this.attributes.delete(name)
+    if (name === 'title') this.title = ''
   }
 
   attachShadow(): MockElement {
@@ -213,6 +219,7 @@ describe('PageController', () => {
       }),
     )
     expect(button?.dataset.enabled).toBe('true')
-    expect(button?.title).toBe('关闭自动翻译')
+    expect(button?.title).toBe('')
+    expect(button?.attributes.get('aria-label')).toBe('关闭自动翻译')
   })
 })

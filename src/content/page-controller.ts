@@ -269,7 +269,6 @@ export class PageController {
 
 button {
   all: unset;
-  position: relative;
   display: grid;
   place-items: center;
   width: 44px;
@@ -282,7 +281,10 @@ button {
     radial-gradient(circle at 22% 12%, rgb(255 255 255 / 92%), transparent 34%),
     linear-gradient(135deg, rgb(25 113 235 / 96%), rgb(0 180 160 / 94%));
   color: #fff;
-  box-shadow: 0 14px 34px rgb(15 23 42 / 22%), inset 0 1px 0 rgb(255 255 255 / 42%);
+  box-shadow:
+    0 14px 34px rgb(15 23 42 / 22%),
+    0 0 0 3px rgb(0 180 160 / 24%),
+    inset 0 1px 0 rgb(255 255 255 / 42%);
   cursor: pointer;
   user-select: none;
   -webkit-font-smoothing: antialiased;
@@ -292,7 +294,10 @@ button {
 button:hover {
   transform: translateX(-2px) scale(1.04);
   filter: saturate(1.08) brightness(1.04);
-  box-shadow: 0 18px 42px rgb(15 23 42 / 26%), inset 0 1px 0 rgb(255 255 255 / 48%);
+  box-shadow:
+    0 18px 42px rgb(15 23 42 / 26%),
+    0 0 0 4px rgb(0 180 160 / 28%),
+    inset 0 1px 0 rgb(255 255 255 / 48%);
 }
 
 button:active {
@@ -308,14 +313,18 @@ button[data-enabled="false"] {
   background:
     radial-gradient(circle at 22% 12%, rgb(255 255 255 / 86%), transparent 34%),
     linear-gradient(135deg, rgb(71 85 105 / 94%), rgb(100 116 139 / 92%));
-  filter: grayscale(0.28) saturate(0.72);
-  opacity: 0.86;
-  box-shadow: 0 10px 24px rgb(15 23 42 / 18%), inset 0 1px 0 rgb(255 255 255 / 34%);
+  filter: grayscale(0.64) saturate(0.52);
+  opacity: 0.68;
+  box-shadow:
+    0 10px 24px rgb(15 23 42 / 16%),
+    0 0 0 1px rgb(148 163 184 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 34%);
 }
 
 button[data-busy="true"] {
   pointer-events: none;
   opacity: 0.72;
+  animation: infronAutoTogglePulse 0.8s ease-in-out infinite;
 }
 
 .logo {
@@ -326,34 +335,9 @@ button[data-busy="true"] {
   filter: drop-shadow(0 1px 2px rgb(15 23 42 / 22%));
 }
 
-button::after {
-  content: "";
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 10px;
-  height: 10px;
-  box-sizing: border-box;
-  border: 2px solid rgb(255 255 255 / 92%);
-  border-radius: 999px;
-  background: #22c55e;
-  box-shadow: 0 0 0 4px rgb(34 197 94 / 18%);
-  opacity: 1;
-}
-
-button[data-enabled="false"]::after {
-  background: #94a3b8;
-  box-shadow: none;
-  opacity: 0.72;
-}
-
-button[data-busy="true"]::after {
-  animation: infronAutoTogglePulse 0.8s ease-in-out infinite;
-}
-
 @keyframes infronAutoTogglePulse {
-  0%, 100% { transform: scale(0.82); opacity: 0.56; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%, 100% { transform: scale(0.96); }
+  50% { transform: scale(1.04); }
 }
 
 @media (max-width: 520px) {
@@ -385,7 +369,7 @@ button[data-busy="true"]::after {
     this.autoToggleButton.dataset.enabled = String(enabled)
     this.autoToggleButton.dataset.busy = String(this.autoToggleBusy)
     this.autoToggleButton.disabled = this.autoToggleBusy
-    this.autoToggleButton.title = label
+    this.autoToggleButton.removeAttribute('title')
     this.autoToggleButton.setAttribute('aria-label', label)
   }
 
