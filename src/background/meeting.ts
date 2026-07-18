@@ -709,21 +709,21 @@ function meetingMessage(
       ? {
           demo: '演示转录流正在运行。',
           inputsOff: '麦克风和系统音频均已关闭。准备转录时请手动开启输入源。',
-          systemDetected: '检测到系统音频输入。实时 ASR WebSocket 将在收到音频后开始转录。',
-          systemRunning: '系统音频正在通过 StepFun ASR Stream 实时转录。',
+          systemDetected: '检测到系统音频输入。HTTP + SSE 识别将在收集到音频后开始。',
+          systemRunning: '系统音频正在通过 StepFun HTTP + SSE 识别。',
           micRunning: '麦克风正在实时转录。',
           asrKeyMissing: '请先在“会议转录”中配置 ASR API Key。',
-          streaming: '正在通过 StepFun ASR Stream 实时转录{channel}音频...',
+          streaming: '正在通过 StepFun HTTP + SSE 识别{channel}音频...',
           asrFailed: 'StepFun ASR 失败：{error}',
         }
       : {
           demo: 'Demo transcript stream is running.',
           inputsOff: 'Mic input and system audio are off. Turn on either input when you are ready to transcribe.',
-          systemDetected: 'System audio input detected. Realtime ASR WebSocket transcription will start when audio arrives.',
-          systemRunning: 'Live system audio transcription is running through StepFun ASR Stream.',
+          systemDetected: 'System audio input detected. HTTP + SSE transcription will start after audio is collected.',
+          systemRunning: 'System audio transcription is running through StepFun HTTP + SSE.',
           micRunning: 'Live microphone transcription is running.',
           asrKeyMissing: 'Configure Meeting Transcription with an ASR API Key to enable transcription.',
-          streaming: 'Streaming {channel} audio through StepFun ASR Stream...',
+          streaming: 'Sending {channel} audio through StepFun HTTP + SSE...',
           asrFailed: 'StepFun ASR failed: {error}',
         }
   return Object.entries(params).reduce(

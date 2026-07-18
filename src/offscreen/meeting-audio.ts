@@ -2,13 +2,14 @@ import type { MeetingSession } from '../shared/meeting'
 import type {
   MeetingAudioChunkMsg,
   MeetingAudioStatusMsg,
-  MeetingTranscriptPartialMsg,
   MeetingTranscriptSegmentMsg,
 } from '../shared/messages'
 import type { UserSettings } from '../shared/settings-defaults'
-import { StepFunRealtimeAsrConnection } from '../background/stt-stream'
+import { transcribeAudioChunkSse } from '../background/stt-stream'
 
 const AUDIO_CHUNK_MS = 500
+const SSE_REQUEST_INTERVAL_MS = 13_000
+const SSE_RATE_LIMIT_BACKOFF_MS = 65_000
 
 type InternalMeetingAudioStartMsg = {
   type: 'meeting-audio-start'
@@ -44,8 +45,14 @@ let pcmTimer: ReturnType<typeof setInterval> | null = null
 let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
-const asrStreams = new Map<string, StepFunRealtimeAsrConnection>()
-const asrStatusAt = new Map<string, number>()
+const sseBuffers = new Map<string, SseBuffer>()
+
+type SseBuffer = {
+  messages: InternalMeetingAsrAudioMsg[]
+  timer: ReturnType<typeof setTimeout> | null
+  inFlight: boolean
+  blockedUntil: number
+}
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -114,8 +121,8 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
       source: 'none',
       message:
         session.audioMode === 'tab-only'
-          ? 'Tab audio is captured. StepFun ASR Stream will receive audio in realtime.'
-          : 'Click Start mic in the visible Meeting Assistant window to begin real microphone transcription.',
+          ? 'Tab audio is captured. StepFun HTTP + SSE will receive collected audio chunks.'
+          : 'Click Start mic in the visible Meeting Assistant window to begin microphone transcription.',
     },
   })
 }
@@ -239,100 +246,112 @@ async function sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
 }
 
 async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void> {
+  queueSseTranscription(message)
+}
+
+function queueSseTranscription(message: InternalMeetingAsrAudioMsg): void {
+  const key = asrKey(message.chunk.sessionId, message.chunk.channel)
+  const buffer = sseBuffers.get(key) ?? {
+    messages: [],
+    timer: null,
+    inFlight: false,
+    blockedUntil: 0,
+  }
+  buffer.messages.push(message)
+  sseBuffers.set(key, buffer)
+  void sendAudioStatus({
+    type: 'meeting-audio-status',
+    sessionId: message.chunk.sessionId,
+    transcription: {
+      active: true,
+      source: 'external-stt',
+      message: sseQueuedMessage(message.uiLanguage, message.chunk.channel),
+    },
+  })
+  if (buffer.timer || buffer.inFlight) return
+  const delay = Math.max(SSE_REQUEST_INTERVAL_MS, buffer.blockedUntil - Date.now())
+  buffer.timer = globalThis.setTimeout(() => {
+    buffer.timer = null
+    void flushSseTranscription(key)
+  }, delay)
+}
+
+async function flushSseTranscription(key: string): Promise<void> {
+  const buffer = sseBuffers.get(key)
+  if (!buffer || buffer.inFlight || !buffer.messages.length) return
+  const message = mergeSseMessages(buffer.messages)
+  buffer.messages = []
+  buffer.inFlight = true
   try {
-    await asrStreamFor(message).append(message.chunk)
-  } catch (error) {
-    stopAsr(message.chunk.sessionId, message.chunk.channel)
+    await transcribeWithSse(message, key)
+  } finally {
+    buffer.inFlight = false
+    if (buffer.messages.length) {
+      const delay = Math.max(SSE_REQUEST_INTERVAL_MS, buffer.blockedUntil - Date.now())
+      buffer.timer = globalThis.setTimeout(() => {
+        buffer.timer = null
+        void flushSseTranscription(key)
+      }, delay)
+    }
+  }
+}
+
+function mergeSseMessages(messages: InternalMeetingAsrAudioMsg[]): InternalMeetingAsrAudioMsg {
+  const first = messages[0]
+  const last = messages[messages.length - 1]
+  const bytes = mergeBase64Pcm(messages.map((item) => item.chunk.audioBase64))
+  return {
+    ...last,
+    chunk: {
+      ...last.chunk,
+      audioBase64: bytesToBase64(bytes),
+      startedAt: first.chunk.startedAt,
+      endedAt: last.chunk.endedAt,
+    },
+  }
+}
+
+async function transcribeWithSse(message: InternalMeetingAsrAudioMsg, key: string): Promise<void> {
+  const result = await transcribeAudioChunkSse({
+    audioBase64: message.chunk.audioBase64,
+    mimeType: message.chunk.mimeType,
+    sourceLang: message.chunk.sourceLang,
+    settings: message.settings,
+  })
+  if (!result.ok) {
+    const buffer = sseBuffers.get(key)
+    if (result.status === 429 && buffer) buffer.blockedUntil = Date.now() + SSE_RATE_LIMIT_BACKOFF_MS
     await sendAudioStatus({
       type: 'meeting-audio-status',
       sessionId: message.chunk.sessionId,
       transcription: {
         active: false,
         source: 'external-stt',
-        message: asrFailedMessage(
-          message.uiLanguage,
-          error instanceof Error ? error.message : String(error),
-        ),
+        message: asrFailedMessage(message.uiLanguage, result.error),
       },
     })
+    return
   }
-}
-
-function asrStreamFor(message: InternalMeetingAsrAudioMsg): StepFunRealtimeAsrConnection {
-  const key = asrKey(message.chunk.sessionId, message.chunk.channel)
-  const existing = asrStreams.get(key)
-  if (existing) return existing
-  const stream = new StepFunRealtimeAsrConnection(message.settings, {
-    onReady: () => undefined,
-    onDelta: (text, chunk) => {
-      void chrome.runtime.sendMessage({
-        type: 'meeting-transcript-partial',
-        sessionId: chunk.sessionId,
-        channel: chunk.channel,
-        speakerLabel: '',
-        sourceLang: chunk.sourceLang,
-        text,
-        startedAt: chunk.startedAt,
-        updatedAt: chunk.endedAt,
-      } satisfies MeetingTranscriptPartialMsg)
-    },
-    onCompleted: (text, chunk) => {
-      void chrome.runtime.sendMessage({
-        type: 'meeting-transcript-segment',
-        sessionId: chunk.sessionId,
-        channel: chunk.channel,
-        speakerLabel: '',
-        sourceLang: chunk.sourceLang,
-        originalText: text,
-        startedAt: chunk.startedAt,
-        endedAt: chunk.endedAt,
-      } satisfies MeetingTranscriptSegmentMsg)
-    },
-    onError: (error, chunk) => {
-      asrStreams.get(key)?.close()
-      asrStreams.delete(key)
-      void sendAudioStatus({
-        type: 'meeting-audio-status',
-        sessionId: chunk.sessionId,
-        transcription: {
-          active: false,
-          source: 'external-stt',
-          message: asrFailedMessage(message.uiLanguage, error),
-        },
-      })
-    },
-    onStatus: (status, chunk) => {
-      void sendThrottledAsrStatus(key, {
-        type: 'meeting-audio-status',
-        sessionId: chunk.sessionId,
-        transcription: {
-          active: true,
-          source: 'external-stt',
-          message: asrStatusMessage(message.uiLanguage, status, chunk.channel),
-        },
-      })
-    },
-  })
-  asrStreams.set(key, stream)
-  return stream
-}
-
-async function sendThrottledAsrStatus(key: string, message: MeetingAudioStatusMsg): Promise<void> {
-  const now = Date.now()
-  const previous = asrStatusAt.get(key) ?? 0
-  if (now - previous < 1500) return
-  asrStatusAt.set(key, now)
-  await sendAudioStatus(message)
+  const text = result.text.trim()
+  if (!text) return
+  await chrome.runtime.sendMessage({
+    type: 'meeting-transcript-segment',
+    sessionId: message.chunk.sessionId,
+    channel: message.chunk.channel,
+    speakerLabel: '',
+    sourceLang: message.chunk.sourceLang,
+    originalText: text,
+    startedAt: message.chunk.startedAt,
+    endedAt: message.chunk.endedAt,
+  } satisfies MeetingTranscriptSegmentMsg)
 }
 
 function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']): void {
-  for (const [key, stream] of asrStreams) {
+  for (const key of sseBuffers.keys()) {
     const [streamSessionId, streamChannel] = key.split(':')
     if (sessionId && streamSessionId !== sessionId) continue
     if (channel && streamChannel !== channel) continue
-    stream.close()
-    asrStreams.delete(key)
-    asrStatusAt.delete(key)
+    clearSseBuffer(key)
   }
 }
 
@@ -340,13 +359,18 @@ function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): st
   return `${sessionId}:${channel}`
 }
 
+function clearSseBuffer(key: string): void {
+  const buffer = sseBuffers.get(key)
+  if (buffer?.timer) globalThis.clearTimeout(buffer.timer)
+  sseBuffers.delete(key)
+}
+
 function asrFailedMessage(language: MeetingSession['uiLanguage'], error: string): string {
   return language === 'zh' ? `StepFun ASR 失败：${error}` : `StepFun ASR failed: ${error}`
 }
 
-function asrStatusMessage(
+function sseQueuedMessage(
   language: MeetingSession['uiLanguage'],
-  status: 'connected' | 'configured' | 'speech-started' | 'speech-stopped',
   channel: MeetingAudioChunkMsg['channel'],
 ): string {
   const zh = language === 'zh'
@@ -357,10 +381,30 @@ function asrStatusMessage(
     : channel === 'microphone'
       ? 'microphone'
       : 'system audio'
-  if (status === 'connected') return zh ? `ASR 已连接，正在配置${source}转录。` : `ASR connected; configuring ${source} transcription.`
-  if (status === 'configured') return zh ? `ASR 已就绪，正在发送${source}音频。` : `ASR is ready; sending ${source} audio.`
-  if (status === 'speech-started') return zh ? `检测到${source}语音，正在实时转录。` : `Detected ${source} speech; transcribing live.`
-  return zh ? `${source}语音片段已结束，等待最终转录。` : `${source} speech segment ended; waiting for final transcript.`
+  return zh
+    ? `正在收集${source}音频，并通过 StepFun HTTP + SSE 识别。`
+    : `Collecting ${source} audio for StepFun HTTP + SSE transcription.`
+}
+
+function mergeBase64Pcm(chunks: string[]): Uint8Array {
+  const buffers = chunks.map(base64ToBytes)
+  const byteLength = buffers.reduce((sum, buffer) => sum + buffer.byteLength, 0)
+  const merged = new Uint8Array(byteLength)
+  let offset = 0
+  for (const buffer of buffers) {
+    merged.set(buffer, offset)
+    offset += buffer.byteLength
+  }
+  return merged
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
 }
 
 function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {

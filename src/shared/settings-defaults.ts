@@ -14,6 +14,8 @@ export type UserSettings = {
   asrModel: string
   /** API key used only by the speech recognition endpoint. */
   asrApiKey: string
+  /** Whether Meeting Assistant ASR requests should use Chrome's system proxy mode. */
+  asrUseSystemProxy: boolean
   /** openai | infron | openrouter */
   provider: ProviderId
   /**
@@ -45,16 +47,20 @@ export type UserSettings = {
   uiLanguage: UiLanguage
 }
 
-const LEGACY_ASR_ENDPOINTS = new Set(['https://api.stepfun.com/v1/audio/asr/sse'])
-const LEGACY_ASR_MODELS = new Set(['stepaudio-2.5-asr'])
+const LEGACY_ASR_ENDPOINTS = new Set([
+  'https://api.stepfun.com/v1/audio/asr/sse',
+  'wss://api.stepfun.com/v1/realtime/asr/stream',
+])
+const LEGACY_ASR_MODELS = new Set(['stepaudio-2.5-asr-stream'])
 
 export const DEFAULT_SETTINGS: UserSettings = {
   baseURL: 'https://llm.onerouter.pro/v1',
   apiKey: '',
   model: 'deepseek/deepseek-v3.2',
-  asrEndpoint: 'wss://api.stepfun.com/v1/realtime/asr/stream',
-  asrModel: 'stepaudio-2.5-asr-stream',
+  asrEndpoint: 'https://api.stepfun.com/step_plan/v1/audio/asr/sse',
+  asrModel: 'stepaudio-2.5-asr',
   asrApiKey: '',
+  asrUseSystemProxy: false,
   provider: 'infron',
   reasoningPref: 'off',
   sourceLang: 'auto',
@@ -145,6 +151,10 @@ export function mergeSettings(partial: unknown): UserSettings {
     asrEndpoint: asrEndpointValue(p.asrEndpoint),
     asrModel: asrModelValue(p.asrModel),
     asrApiKey: stringValue(p.asrApiKey, DEFAULT_SETTINGS.asrApiKey),
+    asrUseSystemProxy:
+      typeof p.asrUseSystemProxy === 'boolean'
+        ? p.asrUseSystemProxy
+        : DEFAULT_SETTINGS.asrUseSystemProxy,
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
     sourceLang: languageValue(p.sourceLang, DEFAULT_SETTINGS.sourceLang),

@@ -32,7 +32,7 @@ export default defineManifest({
   },
   content_security_policy: {
     extension_pages:
-      "script-src 'self'; object-src 'self'; connect-src 'self' https://* ws://127.0.0.1:8787 wss://api.stepfun.com",
+      "script-src 'self'; object-src 'self'; connect-src 'self' https://*",
   },
   content_scripts: [
     {
@@ -47,9 +47,9 @@ export default defineManifest({
     'scripting',
     'offscreen',
     'tabCapture',
-    'nativeMessaging',
+    'proxy',
   ],
-  host_permissions: ['http://*/*', 'https://*/*', 'ws://127.0.0.1/*', 'wss://api.stepfun.com/*'],
+  host_permissions: ['http://*/*', 'https://*/*'],
   web_accessible_resources: [
     {
       resources: ['icons/infron-mark.png', 'worklets/pcm-capture.js'],

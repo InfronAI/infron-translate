@@ -126,12 +126,15 @@ const OPTIONS_COPY = {
     reasoning: '推理强度',
     reasoningHelp: '较低推理强度通常能提升翻译速度。',
     asrTitle: '会议转录',
-    asrHelp: '配置会议助手实时音频转录使用的 ASR WebSocket 连接。',
-    asrEndpoint: 'WebSocket 连接',
-    asrEndpointHelp: '用于实时全双工音频转录的 WebSocket 地址。默认 StepFun 地址会通过本地 ASR relay 完成鉴权连接。',
-    asrEndpointLabel: 'WebSocket',
+    asrHelp: '配置会议助手音频转录使用的 StepFun HTTP + SSE 连接。',
+    asrEndpoint: 'HTTP + SSE Endpoint',
+    asrEndpointHelp: '用于会议音频转录的 HTTP + SSE 地址。默认使用 StepFun Step Plan ASR SSE。',
+    asrEndpointLabel: 'Endpoint',
+    asrProxy: '系统代理',
+    asrProxyHelp: '默认不走系统代理。开启后，ASR 请求会使用 Chrome 的系统代理模式。',
+    asrProxyLabel: 'Use system proxy for ASR',
     asrModel: '转录模型',
-    asrModelHelp: '用于实时 ASR 的模型，默认使用 StepFun 推荐的 stream 模型。',
+    asrModelHelp: '用于 HTTP + SSE 语音识别的模型。',
     asrApiKey: '转录 API Key',
     asrApiKeyHelp: '仅用于会议助手音频转录。保存时留空会保留已保存的密钥。',
     asrApiKeyPlaceholder: 'StepFun API Key',
@@ -253,12 +256,15 @@ const OPTIONS_COPY = {
     reasoning: 'Reasoning effort',
     reasoningHelp: 'Lower reasoning usually improves translation speed.',
     asrTitle: 'Meeting Transcription',
-    asrHelp: 'Configure the ASR WebSocket connection used by Meeting Assistant live audio transcription.',
-    asrEndpoint: 'WebSocket Connection',
-    asrEndpointHelp: 'WebSocket URL for realtime full-duplex audio transcription. The default StepFun endpoint is authenticated through the local ASR relay.',
-    asrEndpointLabel: 'WebSocket',
+    asrHelp: 'Configure the StepFun HTTP + SSE connection used by Meeting Assistant audio transcription.',
+    asrEndpoint: 'HTTP + SSE Endpoint',
+    asrEndpointHelp: 'HTTP + SSE endpoint for meeting audio transcription. StepFun Step Plan ASR SSE is used by default.',
+    asrEndpointLabel: 'Endpoint',
+    asrProxy: 'System Proxy',
+    asrProxyHelp: 'Disabled by default. When enabled, ASR requests use Chrome system proxy mode.',
+    asrProxyLabel: 'Use system proxy for ASR',
     asrModel: 'Transcription Model',
-    asrModelHelp: 'Model used for realtime ASR. The recommended StepFun stream model is used by default.',
+    asrModelHelp: 'Model used for HTTP + SSE speech recognition.',
     asrApiKey: 'Transcription API Key',
     asrApiKeyHelp: 'Used only for Meeting Assistant audio transcription. Leave blank when saving to keep the saved key.',
     asrApiKeyPlaceholder: 'StepFun API Key',
@@ -393,6 +399,7 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('asrEndpoint').value = s.asrEndpoint
   el<HTMLInputElement>('asrModel').value = s.asrModel
   el<HTMLInputElement>('asrApiKey').value = s.asrApiKey
+  el<HTMLInputElement>('asrUseSystemProxy').checked = s.asrUseSystemProxy
   el<HTMLInputElement>('asrApiKey').placeholder = s.asrApiKey
     ? OPTIONS_COPY[s.uiLanguage].savedKeyPlaceholder
     : OPTIONS_COPY[s.uiLanguage].asrApiKeyPlaceholder
@@ -443,6 +450,7 @@ function readForm(stored: UserSettings): UserSettings {
       el<HTMLInputElement>('asrEndpoint').value.trim() || DEFAULT_SETTINGS.asrEndpoint,
     asrModel: el<HTMLInputElement>('asrModel').value.trim() || DEFAULT_SETTINGS.asrModel,
     asrApiKey,
+    asrUseSystemProxy: el<HTMLInputElement>('asrUseSystemProxy').checked,
     uiLanguage: el<HTMLSelectElement>('uiLanguage').value as UserSettings['uiLanguage'],
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
     pageTranslationEngine: el<HTMLSelectElement>('pageTranslationEngine')
@@ -691,6 +699,7 @@ function applyStaticI18n(settings: UserSettings): void {
     [copy.apiKey, copy.apiKeyHelp],
     [copy.reasoning, copy.reasoningHelp],
     [copy.asrEndpoint, copy.asrEndpointHelp],
+    [copy.asrProxy, copy.asrProxyHelp],
     [copy.asrModel, copy.asrModelHelp],
     [copy.asrApiKey, copy.asrApiKeyHelp],
     [copy.pausedSites, copy.pausedHelp],
@@ -705,6 +714,8 @@ function applyStaticI18n(settings: UserSettings): void {
   if (smallBadge) smallBadge.textContent = copy.global
   const switchLabel = document.querySelector<HTMLElement>('.switch-label')
   if (switchLabel) switchLabel.textContent = copy.enabled
+  const asrProxyLabel = document.querySelector<HTMLElement>('label[for="asrUseSystemProxy"], .checkbox-row span')
+  if (asrProxyLabel) asrProxyLabel.textContent = copy.asrProxyLabel
   const privacyWarning = document.querySelector<HTMLElement>('.privacy-warning')
   if (privacyWarning) privacyWarning.textContent = copy.privacyWarn
   const labels = document.querySelectorAll<HTMLElement>('label > span')
@@ -934,7 +945,7 @@ async function init(): Promise<void> {
     })
   }
 
-  for (const id of ['asrEndpoint', 'asrModel', 'asrApiKey']) {
+  for (const id of ['asrEndpoint', 'asrModel', 'asrApiKey', 'asrUseSystemProxy']) {
     el<HTMLInputElement>(id).addEventListener('input', () => {
       updateEngineSummary(readForm(stored))
     })

@@ -335,25 +335,25 @@
             <header class="section-heading">
               <div>
                 <h2>会议转录</h2>
-                <p>配置会议助手实时音频转录使用的 ASR WebSocket 连接。</p>
+                <p>配置会议助手音频转录使用的 StepFun HTTP + SSE 连接。</p>
               </div>
             </header>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h3>WebSocket 连接</h3>
-                <p>用于实时全双工音频转录的 WebSocket 地址。默认 StepFun 地址会通过本地 ASR relay 完成鉴权连接。</p>
+                <h3>HTTP + SSE Endpoint</h3>
+                <p>用于会议音频转录的 HTTP + SSE 地址。默认使用 StepFun Step Plan ASR SSE。</p>
               </div>
               <div class="control">
                 <label>
-                  <span>WebSocket</span>
+                  <span>Endpoint</span>
                   <input
                     id="asrEndpoint"
                     name="asrEndpoint"
                     type="text"
                     inputmode="url"
                     spellcheck="false"
-                    placeholder="wss://api.stepfun.com/v1/realtime/asr/stream"
+                    placeholder="https://api.stepfun.com/step_plan/v1/audio/asr/sse"
                   />
                 </label>
               </div>
@@ -361,8 +361,21 @@
 
             <div class="setting-row">
               <div class="setting-copy">
+                <h3>系统代理</h3>
+                <p>默认不走系统代理。开启后，ASR 请求会使用 Chrome 的系统代理模式。</p>
+              </div>
+              <div class="control compact-control">
+                <label class="checkbox-row">
+                  <input id="asrUseSystemProxy" name="asrUseSystemProxy" type="checkbox" />
+                  <span>Use system proxy for ASR</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-copy">
                 <h3>转录模型</h3>
-                <p>用于实时 ASR 的模型，默认使用 StepFun 推荐的 stream 模型。</p>
+                <p>用于 HTTP + SSE 语音识别的模型。</p>
               </div>
               <div class="control">
                 <label>
@@ -372,7 +385,7 @@
                     name="asrModel"
                     type="text"
                     spellcheck="false"
-                    placeholder="stepaudio-2.5-asr-stream"
+                    placeholder="stepaudio-2.5-asr"
                   />
                 </label>
               </div>

@@ -32,7 +32,7 @@ The default extension UI language is Chinese. Users can switch the extension int
   - Capture microphone input when permission is granted.
   - Request current-tab meeting audio through Chrome tab capture.
   - Show two full-screen panels on the current page: meeting outline and live transcript with translations.
-  - Stream microphone and current-tab audio through a realtime ASR WebSocket pipeline.
+  - Send collected microphone and current-tab audio chunks through StepFun HTTP + SSE ASR.
 
 ## Architecture
 
@@ -56,8 +56,7 @@ flowchart LR
   SW -->|meeting overlay updates| Content
 
   SW -->|cloud translation| LLM[OpenAI-Compatible LLM Endpoint]
-  Offscreen -->|realtime audio frames| Relay[Local ASR Relay]
-  Relay -->|authorized WebSocket| StepFun[StepFun ASR Stream]
+  SW -->|HTTP + SSE ASR requests| StepFun[StepFun ASR SSE]
 ```
 
 ### Page Translation Flow
@@ -94,8 +93,7 @@ sequenceDiagram
   participant P as Popup
   participant SW as Service Worker
   participant O as Offscreen Audio Document
-  participant R as Local ASR Relay
-  participant A as StepFun ASR Stream
+  participant A as StepFun ASR SSE
   participant CS as Meeting Overlay
   participant L as Cloud Translation Model
 
@@ -103,27 +101,27 @@ sequenceDiagram
   SW->>CS: Open resizable meeting overlay
   SW->>O: Start microphone and/or tab-audio capture
   O-->>SW: Audio input status and level meters
-  loop Every audio chunk
-    O->>R: WebSocket audio frame
-    R->>A: Authorized realtime WebSocket frame
-    A-->>R: Delta or completed transcript event
-    R-->>O: Realtime transcript event
-    O-->>SW: Partial or completed transcript
+  loop Collected audio window
+    O-->>SW: Audio chunks and levels
+    SW->>A: HTTP request, SSE response
+    A-->>SW: Transcript text
     SW->>L: Translate completed transcript text
     SW->>CS: Update transcript, summary, and context alignment
   end
 ```
 
-### Realtime ASR Relay
+### Speech Recognition
 
-StepFun ASR Stream requires the WebSocket endpoint `wss://api.stepfun.com/v1/realtime/asr/stream` and an `Authorization: Bearer $STEPFUN_API_KEY` header. Browser `WebSocket` does not allow extensions to attach custom request headers, so Infron Translate uses a local relay for realtime ASR authentication.
+Meeting Assistant uses StepFun HTTP + SSE speech recognition at `https://api.stepfun.com/step_plan/v1/audio/asr/sse` by default. The settings page lets users change the ASR endpoint, model, API key, and whether ASR requests use Chrome system proxy mode. System proxy is disabled by default.
 
 ```mermaid
 flowchart LR
-  Offscreen[Offscreen Audio Document] -->|ws://127.0.0.1:8787/realtime/asr/stream| Relay[Local Node Relay]
-  Relay -->|Authorization header + audio frames| StepFun[wss://api.stepfun.com/v1/realtime/asr/stream]
-  StepFun -->|delta and completed events| Relay
-  Relay -->|same realtime events| Offscreen
+  Mic[Microphone] --> Content[Meeting Overlay]
+  Tab[Chrome Tab Audio] --> Offscreen[Offscreen Audio Document]
+  Content -->|PCM chunks| SW[Service Worker]
+  Offscreen -->|PCM chunks| SW
+  SW -->|POST + text/event-stream| StepFun[StepFun ASR SSE]
+  StepFun -->|transcript text| SW
 ```
 
 ## Installation
@@ -174,35 +172,13 @@ Current implementation:
 - Provides a Pre-meeting Material entry in the overlay for agenda, goals, planned strategy, risks, and expected outcomes.
 - Cross-checks the live transcript against the pre-meeting material throughout the call.
 - Shows context alignment in the live summary panel, including plan status, completed goals, unmet goals, evidence, and course-correction suggestions.
-- Streams microphone audio to the configured ASR WebSocket endpoint.
-- Streams captured system audio to the configured ASR WebSocket endpoint.
-- Defaults to StepFun ASR Stream at `wss://api.stepfun.com/v1/realtime/asr/stream` with the `stepaudio-2.5-asr-stream` model.
-- Sends 16 kHz mono `pcm_s16le` audio and reads realtime delta/completed transcript events.
-- Uses a local ASR relay for StepFun realtime WebSocket authentication because browser extensions cannot attach the required `Authorization` header to a native `WebSocket` connection.
+- Sends microphone audio to the configured HTTP + SSE ASR endpoint.
+- Sends captured system audio to the configured HTTP + SSE ASR endpoint.
+- Defaults to StepFun ASR SSE at `https://api.stepfun.com/step_plan/v1/audio/asr/sse` with the `stepaudio-2.5-asr` model.
+- Sends 16 kHz mono `pcm_s16le` audio and reads SSE transcript events.
+- Allows ASR requests to use Chrome system proxy mode, disabled by default.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
-
-For local development, the relay can be started manually:
-
-```bash
-npm run asr:relay
-```
-
-For automatic startup, install the Chrome Native Messaging host once. After installation, clicking **Start Meeting Assistant** asks Chrome to launch the local relay host automatically.
-
-```bash
-EXTENSION_ID=<id-from-chrome-extensions> npm run native:install
-```
-
-The extension ID is shown on the unpacked extension card in `chrome://extensions` after loading `dist/`. The relay uses the ASR API key saved in the extension settings. You can also provide `STEPFUN_API_KEY` as an environment variable. If the upstream StepFun connection must use a proxy, start the relay or native host with `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY`.
-
-Quick relay check:
-
-```bash
-lsof -nP -iTCP:8787 -sTCP:LISTEN
-```
-
-If the meeting overlay reports that the local ASR relay is not reachable, either keep `npm run asr:relay` running in a terminal or install the native host, then rebuild the extension and reload the unpacked extension in `chrome://extensions`.
 
 Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Meeting Transcription with an ASR endpoint and API key before using live ASR.
 
@@ -285,8 +261,6 @@ Scripts:
 - `npm run build`: run TypeScript checks and build the extension into `dist/`.
 - `npm test`: run the Vitest suite.
 - `npm run test:watch`: run Vitest in watch mode.
-- `npm run asr:relay`: start the local ASR WebSocket relay manually.
-- `npm run native:install`: install the local Native Messaging host for automatic ASR relay startup.
 
 ## Manual QA Checklist
 

@@ -482,8 +482,8 @@ export class MeetingOverlay {
         source: 'external-stt',
         message:
           session.uiLanguage === 'zh'
-            ? '麦克风正在通过 StepFun ASR Stream 实时转录。'
-            : 'Microphone transcription is streaming through StepFun ASR Stream.',
+            ? '麦克风正在通过 StepFun HTTP + SSE 识别。'
+            : 'Microphone transcription is running through StepFun HTTP + SSE.',
       })
       this.render()
       return
