@@ -7,9 +7,11 @@ import type {
 import type { UserSettings } from '../shared/settings-defaults'
 import { transcribeAudioChunkSse } from '../background/stt-stream'
 
-const AUDIO_CHUNK_MS = 500
-const SSE_REQUEST_INTERVAL_MS = 13_000
+const AUDIO_CHUNK_MS = 350
+const SSE_FIRST_REQUEST_DELAY_MS = 2_500
+const SSE_MIN_REQUEST_INTERVAL_MS = 6_500
 const SSE_RATE_LIMIT_BACKOFF_MS = 65_000
+const MIN_AUDIO_CHUNK_BYTES = 1_600
 
 type InternalMeetingAudioStartMsg = {
   type: 'meeting-audio-start'
@@ -46,11 +48,14 @@ let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
 const sseBuffers = new Map<string, SseBuffer>()
+const pendingSseKeys = new Set<string>()
+let sseSchedulerTimer: ReturnType<typeof setTimeout> | null = null
+let sseSchedulerDueAt = 0
+let sseRequestInFlight = false
+let lastSseRequestAt = 0
 
 type SseBuffer = {
   messages: InternalMeetingAsrAudioMsg[]
-  timer: ReturnType<typeof setTimeout> | null
-  inFlight: boolean
   blockedUntil: number
 }
 
@@ -213,7 +218,7 @@ async function startOutputRecorder(session: MeetingSession, stream: MediaStream)
     maxLevelSinceChunk = 0
     const bytes = mergePcmBuffers(pcmBuffers)
     pcmBuffers = []
-    if (bytes.byteLength < 8000) return
+    if (bytes.byteLength < MIN_AUDIO_CHUNK_BYTES) return
     void sendAudioChunk({
       type: 'meeting-audio-chunk',
       sessionId: session.id,
@@ -251,14 +256,15 @@ async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void
 
 function queueSseTranscription(message: InternalMeetingAsrAudioMsg): void {
   const key = asrKey(message.chunk.sessionId, message.chunk.channel)
-  const buffer = sseBuffers.get(key) ?? {
+  const existing = sseBuffers.get(key)
+  const firstMessage = !existing?.messages.length
+  const buffer = existing ?? {
     messages: [],
-    timer: null,
-    inFlight: false,
     blockedUntil: 0,
   }
   buffer.messages.push(message)
   sseBuffers.set(key, buffer)
+  pendingSseKeys.add(key)
   void sendAudioStatus({
     type: 'meeting-audio-status',
     sessionId: message.chunk.sessionId,
@@ -268,32 +274,69 @@ function queueSseTranscription(message: InternalMeetingAsrAudioMsg): void {
       message: sseQueuedMessage(message.uiLanguage, message.chunk.channel),
     },
   })
-  if (buffer.timer || buffer.inFlight) return
-  const delay = Math.max(SSE_REQUEST_INTERVAL_MS, buffer.blockedUntil - Date.now())
-  buffer.timer = globalThis.setTimeout(() => {
-    buffer.timer = null
-    void flushSseTranscription(key)
+  scheduleSseFlush(firstMessage ? SSE_FIRST_REQUEST_DELAY_MS : 0)
+}
+
+function scheduleSseFlush(delayMs: number): void {
+  if (sseRequestInFlight || !pendingSseKeys.size) return
+  const cooldownMs = Math.max(0, lastSseRequestAt + SSE_MIN_REQUEST_INTERVAL_MS - Date.now())
+  const delay = Math.max(delayMs, cooldownMs)
+  const dueAt = Date.now() + delay
+  if (sseSchedulerTimer) {
+    if (dueAt >= sseSchedulerDueAt) return
+    globalThis.clearTimeout(sseSchedulerTimer)
+  }
+  sseSchedulerDueAt = dueAt
+  sseSchedulerTimer = globalThis.setTimeout(() => {
+    sseSchedulerTimer = null
+    sseSchedulerDueAt = 0
+    void flushNextSseTranscription()
   }, delay)
 }
 
-async function flushSseTranscription(key: string): Promise<void> {
+async function flushNextSseTranscription(): Promise<void> {
+  if (sseRequestInFlight) return
+  const key = nextReadySseKey()
+  if (!key) {
+    scheduleSseFlush(nextBlockedDelay())
+    return
+  }
   const buffer = sseBuffers.get(key)
-  if (!buffer || buffer.inFlight || !buffer.messages.length) return
+  if (!buffer || !buffer.messages.length) {
+    pendingSseKeys.delete(key)
+    scheduleSseFlush(0)
+    return
+  }
+  pendingSseKeys.delete(key)
   const message = mergeSseMessages(buffer.messages)
   buffer.messages = []
-  buffer.inFlight = true
+  sseRequestInFlight = true
   try {
     await transcribeWithSse(message, key)
   } finally {
-    buffer.inFlight = false
-    if (buffer.messages.length) {
-      const delay = Math.max(SSE_REQUEST_INTERVAL_MS, buffer.blockedUntil - Date.now())
-      buffer.timer = globalThis.setTimeout(() => {
-        buffer.timer = null
-        void flushSseTranscription(key)
-      }, delay)
-    }
+    lastSseRequestAt = Date.now()
+    sseRequestInFlight = false
+    if (buffer.messages.length) pendingSseKeys.add(key)
+    scheduleSseFlush(0)
   }
+}
+
+function nextReadySseKey(): string | null {
+  const now = Date.now()
+  for (const key of pendingSseKeys) {
+    const buffer = sseBuffers.get(key)
+    if (buffer?.messages.length && buffer.blockedUntil <= now) return key
+  }
+  return null
+}
+
+function nextBlockedDelay(): number {
+  let next = Number.POSITIVE_INFINITY
+  for (const key of pendingSseKeys) {
+    const buffer = sseBuffers.get(key)
+    if (buffer?.messages.length) next = Math.min(next, buffer.blockedUntil)
+  }
+  return Number.isFinite(next) ? Math.max(0, next - Date.now()) : 0
 }
 
 function mergeSseMessages(messages: InternalMeetingAsrAudioMsg[]): InternalMeetingAsrAudioMsg {
@@ -360,9 +403,13 @@ function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): st
 }
 
 function clearSseBuffer(key: string): void {
-  const buffer = sseBuffers.get(key)
-  if (buffer?.timer) globalThis.clearTimeout(buffer.timer)
+  pendingSseKeys.delete(key)
   sseBuffers.delete(key)
+  if (!pendingSseKeys.size && sseSchedulerTimer) {
+    globalThis.clearTimeout(sseSchedulerTimer)
+    sseSchedulerTimer = null
+    sseSchedulerDueAt = 0
+  }
 }
 
 function asrFailedMessage(language: MeetingSession['uiLanguage'], error: string): string {
@@ -382,8 +429,8 @@ function sseQueuedMessage(
       ? 'microphone'
       : 'system audio'
   return zh
-    ? `正在收集${source}音频，并通过 StepFun HTTP + SSE 识别。`
-    : `Collecting ${source} audio for StepFun HTTP + SSE transcription.`
+    ? `正在收集短音频片段，并通过 StepFun HTTP + SSE 识别${source}。`
+    : `Collecting short ${source} audio windows for StepFun HTTP + SSE transcription.`
 }
 
 function mergeBase64Pcm(chunks: string[]): Uint8Array {

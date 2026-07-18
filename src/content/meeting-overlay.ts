@@ -17,7 +17,8 @@ import type {
 const HOST_ID = 'infron-meeting-assistant-root'
 const MIN_WIDTH = 520
 const MIN_HEIGHT = 360
-const AUDIO_CHUNK_MS = 500
+const AUDIO_CHUNK_MS = 350
+const MIN_MIC_AUDIO_CHUNK_BYTES = 1_600
 
 type MeetingWindowState = {
   x: number
@@ -634,11 +635,11 @@ export class MeetingOverlay {
       const endedAt = Date.now()
       const startedAt = this.micChunkStartedAt || endedAt - AUDIO_CHUNK_MS
       this.micChunkStartedAt = endedAt
-      const shouldSend = this.maxMicLevelSinceChunk > 0.01
+      const shouldSend = this.maxMicLevelSinceChunk > 0.006
       this.maxMicLevelSinceChunk = 0
       const bytes = mergePcmBuffers(this.micPcmBuffers)
       this.micPcmBuffers = []
-      if (!shouldSend || bytes.byteLength < 1600) return
+      if (!shouldSend || bytes.byteLength < MIN_MIC_AUDIO_CHUNK_BYTES) return
       void this.sendAudioChunk({
         type: 'meeting-audio-chunk',
         sessionId,
