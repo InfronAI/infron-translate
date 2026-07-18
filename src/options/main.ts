@@ -35,6 +35,7 @@ const OPTIONS_COPY = {
     navPageMode: '页面模式',
     navChrome: 'Chrome 支持',
     navCloud: 'Cloud Model',
+    navAsr: '语音识别',
     navRules: '网站规则',
     privacyTitle: '隐私',
     privacyText: 'Chrome 在设备本地处理。Cloud Model 只会把文本发送到你配置的端点。',
@@ -124,6 +125,14 @@ const OPTIONS_COPY = {
     hide: '隐藏',
     reasoning: '推理强度',
     reasoningHelp: '较低推理强度通常能提升翻译速度。',
+    asrTitle: '语音识别',
+    asrHelp: '配置会议助手实时转录使用的 ASR SSE 接口。',
+    asrEndpoint: 'ASR Endpoint',
+    asrEndpointHelp: '用于音频转录的 SSE 接口地址，默认使用 StepFun ASR。',
+    asrEndpointLabel: 'Endpoint',
+    asrApiKey: 'ASR API Key',
+    asrApiKeyHelp: '仅用于会议助手音频转录。保存时留空会保留已保存的密钥。',
+    asrApiKeyPlaceholder: 'StepFun API Key',
     offLowest: '关闭 / 最低',
     low: '低',
     medium: '中',
@@ -151,6 +160,7 @@ const OPTIONS_COPY = {
     navPageMode: 'Page mode',
     navChrome: 'Chrome support',
     navCloud: 'Cloud Model',
+    navAsr: 'Speech Recognition',
     navRules: 'Site rules',
     privacyTitle: 'Privacy',
     privacyText: 'Chrome stays on device. Cloud Model sends text only to your endpoint.',
@@ -240,6 +250,14 @@ const OPTIONS_COPY = {
     hide: 'Hide',
     reasoning: 'Reasoning effort',
     reasoningHelp: 'Lower reasoning usually improves translation speed.',
+    asrTitle: 'Speech Recognition',
+    asrHelp: 'Configure the ASR SSE endpoint used by Meeting Assistant live transcription.',
+    asrEndpoint: 'ASR Endpoint',
+    asrEndpointHelp: 'SSE endpoint for audio transcription. StepFun ASR is used by default.',
+    asrEndpointLabel: 'Endpoint',
+    asrApiKey: 'ASR API Key',
+    asrApiKeyHelp: 'Used only for Meeting Assistant audio transcription. Leave blank when saving to keep the saved key.',
+    asrApiKeyPlaceholder: 'StepFun API Key',
     offLowest: 'Off / lowest',
     low: 'Low',
     medium: 'Medium',
@@ -368,6 +386,11 @@ function fillForm(s: UserSettings): void {
     ? OPTIONS_COPY[s.uiLanguage].savedKeyPlaceholder
     : OPTIONS_COPY[s.uiLanguage].apiKeyPlaceholder
   el<HTMLInputElement>('model').value = s.model
+  el<HTMLInputElement>('asrEndpoint').value = s.asrEndpoint
+  el<HTMLInputElement>('asrApiKey').value = s.asrApiKey
+  el<HTMLInputElement>('asrApiKey').placeholder = s.asrApiKey
+    ? OPTIONS_COPY[s.uiLanguage].savedKeyPlaceholder
+    : OPTIONS_COPY[s.uiLanguage].asrApiKeyPlaceholder
   el<HTMLSelectElement>('reasoningPref').value = s.reasoningPref
   setLanguageValue('targetLang', s.targetLang)
   el<HTMLSelectElement>('pageTranslationEngine').value = s.pageTranslationEngine
@@ -399,6 +422,8 @@ function fillForm(s: UserSettings): void {
 function readForm(stored: UserSettings): UserSettings {
   const typedKey = el<HTMLInputElement>('apiKey').value
   const apiKey = typedKey.trim() ? typedKey : stored.apiKey
+  const typedAsrKey = el<HTMLInputElement>('asrApiKey').value
+  const asrApiKey = typedAsrKey.trim() ? typedAsrKey : stored.asrApiKey
   const provider = el<HTMLSelectElement>('provider').value as ProviderId
   const reasoningPref = el<HTMLSelectElement>('reasoningPref').value as ReasoningPref
 
@@ -409,6 +434,9 @@ function readForm(stored: UserSettings): UserSettings {
     baseURL: el<HTMLInputElement>('baseURL').value.trim(),
     apiKey,
     model: el<HTMLInputElement>('model').value.trim(),
+    asrEndpoint:
+      el<HTMLInputElement>('asrEndpoint').value.trim() || DEFAULT_SETTINGS.asrEndpoint,
+    asrApiKey,
     uiLanguage: el<HTMLSelectElement>('uiLanguage').value as UserSettings['uiLanguage'],
     targetLang: el<HTMLSelectElement>('targetLang').value || DEFAULT_SETTINGS.targetLang,
     pageTranslationEngine: el<HTMLSelectElement>('pageTranslationEngine')
@@ -616,7 +644,8 @@ function applyStaticI18n(settings: UserSettings): void {
   if (nav[1]) nav[1].textContent = copy.navPageMode
   if (nav[2]) nav[2].textContent = copy.navChrome
   if (nav[3]) nav[3].textContent = copy.navCloud
-  if (nav[4]) nav[4].textContent = copy.navRules
+  if (nav[4]) nav[4].textContent = copy.navAsr
+  if (nav[5]) nav[5].textContent = copy.navRules
   const sidebarTitle = document.querySelector<HTMLElement>('.sidebar-note span')
   const sidebarText = document.querySelector<HTMLElement>('.sidebar-note p')
   if (sidebarTitle) sidebarTitle.textContent = copy.privacyTitle
@@ -633,6 +662,7 @@ function applyStaticI18n(settings: UserSettings): void {
     [copy.pageModeTitle, copy.pageModeHelp],
     [copy.chromeTitle, copy.chromeHelp],
     [copy.cloudTitle, copy.cloudHelp],
+    [copy.asrTitle, copy.asrHelp],
     [copy.rulesTitle, copy.rulesHelp],
   ] as const
   sections.forEach((section, index) => {
@@ -653,6 +683,8 @@ function applyStaticI18n(settings: UserSettings): void {
     [copy.endpoint, copy.endpointHelp],
     [copy.apiKey, copy.apiKeyHelp],
     [copy.reasoning, copy.reasoningHelp],
+    [copy.asrEndpoint, copy.asrEndpointHelp],
+    [copy.asrApiKey, copy.asrApiKeyHelp],
     [copy.pausedSites, copy.pausedHelp],
   ] as const
   rows.forEach((row, index) => {
@@ -674,6 +706,7 @@ function applyStaticI18n(settings: UserSettings): void {
     if (/Target language|目标语言/u.test(text)) node.textContent = uiText(lang, 'targetLanguage')
     else if (/Font size|字号/u.test(text)) node.textContent = copy.fontSize
     else if (/Base URL|基础 URL/u.test(text)) node.textContent = copy.baseUrl
+    else if (/Endpoint/u.test(text)) node.textContent = copy.asrEndpointLabel
     else if (/Model/u.test(text)) node.textContent = copy.model
   }
   const colorLabels = document.querySelectorAll<HTMLElement>('.color-option > span')
@@ -696,6 +729,9 @@ function applyStaticI18n(settings: UserSettings): void {
   el<HTMLInputElement>('apiKey').placeholder = el<HTMLInputElement>('apiKey').value
     ? copy.savedKeyPlaceholder
     : copy.apiKeyPlaceholder
+  el<HTMLInputElement>('asrApiKey').placeholder = el<HTMLInputElement>('asrApiKey').value
+    ? copy.savedKeyPlaceholder
+    : copy.asrApiKeyPlaceholder
   el<HTMLInputElement>('model').placeholder = copy.modelPlaceholder
   el<HTMLInputElement>('pausedHostnames').placeholder = copy.pausedPlaceholder
   const facts = document.querySelectorAll<HTMLElement>('.runtime-facts div')
@@ -716,6 +752,9 @@ function applyStaticI18n(settings: UserSettings): void {
   el<HTMLButtonElement>('fetchModels').textContent = copy.models
   const apiToggle = el<HTMLButtonElement>('toggleApiKey')
   apiToggle.textContent = el<HTMLInputElement>('apiKey').type === 'text' ? copy.hide : copy.show
+  const asrApiToggle = el<HTMLButtonElement>('toggleAsrApiKey')
+  asrApiToggle.textContent =
+    el<HTMLInputElement>('asrApiKey').type === 'text' ? copy.hide : copy.show
   el<HTMLButtonElement>('reset').textContent = copy.reset
   el<HTMLButtonElement>('save').textContent = copy.save
   const displayMode = el<HTMLSelectElement>('translationDisplayMode')
@@ -883,6 +922,12 @@ async function init(): Promise<void> {
     })
   }
 
+  for (const id of ['asrEndpoint', 'asrApiKey']) {
+    el<HTMLInputElement>(id).addEventListener('input', () => {
+      updateEngineSummary(readForm(stored))
+    })
+  }
+
   el<HTMLSelectElement>('provider').addEventListener('change', () => {
     const v = el<HTMLSelectElement>('provider').value
     updateProviderHint(v)
@@ -900,6 +945,15 @@ async function init(): Promise<void> {
   el<HTMLButtonElement>('toggleApiKey').addEventListener('click', () => {
     const input = el<HTMLInputElement>('apiKey')
     const button = el<HTMLButtonElement>('toggleApiKey')
+    const visible = input.type === 'text'
+    input.type = visible ? 'password' : 'text'
+    const copy = optionsCopy()
+    button.textContent = visible ? copy.show : copy.hide
+  })
+
+  el<HTMLButtonElement>('toggleAsrApiKey').addEventListener('click', () => {
+    const input = el<HTMLInputElement>('asrApiKey')
+    const button = el<HTMLButtonElement>('toggleAsrApiKey')
     const visible = input.type === 'text'
     input.type = visible ? 'password' : 'text'
     const copy = optionsCopy()

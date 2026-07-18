@@ -1,6 +1,5 @@
 import type { UserSettings } from '../shared/settings-defaults'
 
-const STEPFUN_ASR_SSE_URL = 'https://api.stepfun.com/v1/audio/asr/sse'
 const STEPFUN_ASR_MODEL = 'stepaudio-2.5-asr'
 
 export type SttResult =
@@ -20,17 +19,20 @@ export async function transcribeAudioChunk(input: {
   sourceLang: string
   settings: UserSettings
 }): Promise<SttResult> {
-  if (!input.settings.apiKey.trim()) return { ok: false, error: 'StepFun API Key is not configured' }
+  const endpoint = input.settings.asrEndpoint.trim()
+  const endpointError = asrEndpointError(endpoint)
+  if (endpointError) return { ok: false, error: endpointError }
+  if (!input.settings.asrApiKey.trim()) return { ok: false, error: 'ASR API Key is not configured' }
   if (!input.audioBase64.trim()) return { ok: true, text: '' }
 
   try {
-    const response = await fetch(STEPFUN_ASR_SSE_URL, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       redirect: 'error',
       signal: AbortSignal.timeout(45_000),
       headers: {
         Accept: 'text/event-stream',
-        Authorization: `Bearer ${input.settings.apiKey.trim()}`,
+        Authorization: `Bearer ${input.settings.asrApiKey.trim()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -157,6 +159,18 @@ function audioFormat(mimeType: string): Record<string, string | number> {
     rate: 16000,
     bits: 16,
     channel: 1,
+  }
+}
+
+function asrEndpointError(endpoint: string): string | null {
+  if (!endpoint) return 'ASR endpoint is not configured'
+  try {
+    const url = new URL(endpoint)
+    if (url.username || url.password) return 'ASR endpoint must not include credentials'
+    if (url.protocol !== 'https:') return 'ASR endpoint must use HTTPS'
+    return null
+  } catch {
+    return 'ASR endpoint is invalid'
   }
 }
 

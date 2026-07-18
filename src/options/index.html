@@ -28,6 +28,7 @@
           <a href="#page-translation">页面模式</a>
           <a href="#browser-runtime">Chrome 支持</a>
           <a href="#external-api">Cloud Model</a>
+          <a href="#speech-recognition">语音识别</a>
           <a href="#site-rules">网站规则</a>
         </nav>
         <div class="sidebar-note">
@@ -326,6 +327,57 @@
                   <option value="medium">中</option>
                   <option value="high">高</option>
                 </select>
+              </div>
+            </div>
+          </section>
+
+          <section id="speech-recognition" class="settings-section">
+            <header class="section-heading">
+              <div>
+                <h2>语音识别</h2>
+                <p>配置会议助手实时转录使用的 ASR SSE 接口。</p>
+              </div>
+            </header>
+
+            <div class="setting-row">
+              <div class="setting-copy">
+                <h3>ASR Endpoint</h3>
+                <p>用于音频转录的 SSE 接口地址，默认使用 StepFun ASR。</p>
+              </div>
+              <div class="control">
+                <label>
+                  <span>Endpoint</span>
+                  <input
+                    id="asrEndpoint"
+                    name="asrEndpoint"
+                    type="text"
+                    inputmode="url"
+                    spellcheck="false"
+                    placeholder="https://api.stepfun.com/v1/audio/asr/sse"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-copy">
+                <h3>ASR API Key</h3>
+                <p>仅用于会议助手音频转录。保存时留空会保留已保存的密钥。</p>
+              </div>
+              <div class="control">
+                <span class="secret-field">
+                  <input
+                    id="asrApiKey"
+                    name="asrApiKey"
+                    type="password"
+                    placeholder="StepFun API Key"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button type="button" id="toggleAsrApiKey" class="button secondary compact">
+                    显示
+                  </button>
+                </span>
               </div>
             </div>
           </section>

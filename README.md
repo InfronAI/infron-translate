@@ -83,13 +83,14 @@ Current implementation:
 - Provides a Pre-meeting Material entry in the overlay for agenda, goals, planned strategy, risks, and expected outcomes.
 - Cross-checks the live transcript against the pre-meeting material throughout the call.
 - Shows context alignment in the live summary panel, including plan status, completed goals, unmet goals, evidence, and course-correction suggestions.
-- Automatically streams microphone audio chunks to StepFun ASR SSE when Cloud Model is configured with a StepFun API key.
-- Automatically streams captured system-audio chunks to StepFun ASR SSE when Cloud Model is configured with a StepFun API key.
-- Sends 16 kHz mono `pcm_s16le` audio chunks to `https://api.stepfun.com/v1/audio/asr/sse` with the `stepaudio-2.5-asr` model.
+- Automatically streams microphone audio chunks to the configured ASR SSE endpoint.
+- Automatically streams captured system-audio chunks to the configured ASR SSE endpoint.
+- Defaults to StepFun ASR SSE at `https://api.stepfun.com/v1/audio/asr/sse` with the `stepaudio-2.5-asr` model.
+- Sends 16 kHz mono `pcm_s16le` audio chunks and reads streamed transcript events.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 
-Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Cloud Model with a StepFun API key before using live ASR.
+Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Speech Recognition with an ASR endpoint and API key before using live ASR.
 
 ### Floating Auto-Translation Button
 

@@ -8,6 +8,10 @@ export type UserSettings = {
   baseURL: string
   apiKey: string
   model: string
+  /** Endpoint used by Meeting Assistant speech recognition. */
+  asrEndpoint: string
+  /** API key used only by the speech recognition endpoint. */
+  asrApiKey: string
   /** openai | infron | openrouter */
   provider: ProviderId
   /**
@@ -43,6 +47,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   baseURL: 'https://llm.onerouter.pro/v1',
   apiKey: '',
   model: 'deepseek/deepseek-v3.2',
+  asrEndpoint: 'https://api.stepfun.com/v1/audio/asr/sse',
+  asrApiKey: '',
   provider: 'infron',
   reasoningPref: 'off',
   sourceLang: 'auto',
@@ -120,6 +126,8 @@ export function mergeSettings(partial: unknown): UserSettings {
     baseURL: stringValue(p.baseURL, DEFAULT_SETTINGS.baseURL),
     apiKey: stringValue(p.apiKey, DEFAULT_SETTINGS.apiKey),
     model: stringValue(p.model, DEFAULT_SETTINGS.model),
+    asrEndpoint: stringValue(p.asrEndpoint, DEFAULT_SETTINGS.asrEndpoint),
+    asrApiKey: stringValue(p.asrApiKey, DEFAULT_SETTINGS.asrApiKey),
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
     sourceLang: languageValue(p.sourceLang, DEFAULT_SETTINGS.sourceLang),

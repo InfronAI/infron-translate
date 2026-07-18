@@ -230,14 +230,14 @@ export class MeetingManager {
   private async transcribeQueuedChunk(message: MeetingAudioChunkMsg): Promise<void> {
     if (!this.state || this.state.session.id !== message.sessionId) return
     const settings = await loadSettings()
-    if (!settings.apiKey.trim()) {
+    if (!settings.asrApiKey.trim()) {
       await this.updateAudioStatus({
         type: 'meeting-audio-status',
         sessionId: message.sessionId,
         transcription: {
           active: false,
           source: 'external-stt',
-          message: 'Configure Cloud Model with a StepFun API Key to enable ASR transcription.',
+          message: 'Configure Speech Recognition with an ASR API Key to enable transcription.',
         },
       })
       return
