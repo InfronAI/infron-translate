@@ -6,7 +6,10 @@ import type {
   MeetingTranscriptSegmentMsg,
 } from '../shared/messages'
 import type { UserSettings } from '../shared/settings-defaults'
-import { StepFunRealtimeAsrConnection } from '../background/stt-stream'
+import {
+  StepFunRealtimeAsrConnection,
+  transcribeAudioChunkSse,
+} from '../background/stt-stream'
 
 const AUDIO_CHUNK_MS = 500
 
@@ -45,6 +48,7 @@ let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
 const asrStreams = new Map<string, StepFunRealtimeAsrConnection>()
+const fallbackChannels = new Set<string>()
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -238,9 +242,29 @@ async function sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
 }
 
 async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void> {
+  const key = asrKey(message.chunk.sessionId, message.chunk.channel)
+  if (fallbackChannels.has(key)) {
+    await transcribeWithSseFallback(message)
+    return
+  }
   try {
     await asrStreamFor(message).append(message.chunk)
   } catch (error) {
+    stopAsr(message.chunk.sessionId, message.chunk.channel)
+    if (isWebSocketHandshakeFailure(error)) {
+      fallbackChannels.add(key)
+      await sendAudioStatus({
+        type: 'meeting-audio-status',
+        sessionId: message.chunk.sessionId,
+        transcription: {
+          active: true,
+          source: 'external-stt',
+          message: fallbackMessage(message.uiLanguage),
+        },
+      })
+      await transcribeWithSseFallback(message)
+      return
+    }
     await sendAudioStatus({
       type: 'meeting-audio-status',
       sessionId: message.chunk.sessionId,
@@ -254,6 +278,38 @@ async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void
       },
     })
   }
+}
+
+async function transcribeWithSseFallback(message: InternalMeetingAsrAudioMsg): Promise<void> {
+  const result = await transcribeAudioChunkSse({
+    audioBase64: message.chunk.audioBase64,
+    mimeType: message.chunk.mimeType,
+    sourceLang: message.chunk.sourceLang,
+    settings: message.settings,
+  })
+  if (!result.ok) {
+    await sendAudioStatus({
+      type: 'meeting-audio-status',
+      sessionId: message.chunk.sessionId,
+      transcription: {
+        active: false,
+        source: 'external-stt',
+        message: asrFailedMessage(message.uiLanguage, result.error),
+      },
+    })
+    return
+  }
+  if (!result.text.trim()) return
+  await chrome.runtime.sendMessage({
+    type: 'meeting-transcript-segment',
+    sessionId: message.chunk.sessionId,
+    channel: message.chunk.channel,
+    speakerLabel: '',
+    sourceLang: message.chunk.sourceLang,
+    originalText: result.text,
+    startedAt: message.chunk.startedAt,
+    endedAt: message.chunk.endedAt,
+  } satisfies MeetingTranscriptSegmentMsg)
 }
 
 function asrStreamFor(message: InternalMeetingAsrAudioMsg): StepFunRealtimeAsrConnection {
@@ -311,6 +367,7 @@ function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']):
     if (channel && streamChannel !== channel) continue
     stream.close()
     asrStreams.delete(key)
+    fallbackChannels.delete(key)
   }
 }
 
@@ -320,6 +377,17 @@ function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): st
 
 function asrFailedMessage(language: MeetingSession['uiLanguage'], error: string): string {
   return language === 'zh' ? `StepFun ASR 失败：${error}` : `StepFun ASR failed: ${error}`
+}
+
+function fallbackMessage(language: MeetingSession['uiLanguage']): string {
+  return language === 'zh'
+    ? 'StepFun Realtime WebSocket 握手失败，已自动切换到兼容转录模式。'
+    : 'StepFun Realtime WebSocket handshake failed; switched to compatibility transcription mode.'
+}
+
+function isWebSocketHandshakeFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /WebSocket closed during handshake|code 1006|WebSocket connection failed/u.test(message)
 }
 
 function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {
