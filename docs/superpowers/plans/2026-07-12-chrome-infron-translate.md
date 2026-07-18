@@ -1,4 +1,4 @@
-# Chrome Lens Translator Implementation Plan
+# Chrome Infron Translate Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Vite, `@crxjs/vite-plugin`, Vitest, Chrome Extension Manifest V3 APIs (`chrome.storage`, `chrome.runtime`, content scripts).
 
-**Spec:** `docs/superpowers/specs/2026-07-12-chrome-lens-translator-design.md`
+**Spec:** `docs/superpowers/specs/2026-07-12-chrome-infron-translate-design.md`
 
 ---
 
@@ -128,12 +128,12 @@ import { defineManifest } from '@crxjs/vite-plugin'
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'Lens Translator',
+  name: 'Infron Translate',
   description: 'Hold a hotkey to peek Chinese translations without leaving English immersion.',
   version: '0.1.0',
   action: {
     default_popup: 'src/popup/index.html',
-    default_title: 'Lens Translator',
+    default_title: 'Infron Translate',
   },
   options_ui: {
     page: 'src/options/index.html',
@@ -188,13 +188,13 @@ export default defineConfig({
 `src/background/index.ts`:
 ```ts
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Lens Translator installed')
+  console.log('Infron Translate installed')
 })
 ```
 
 `src/content/index.ts`:
 ```ts
-console.log('Lens Translator content script loaded')
+console.log('Infron Translate content script loaded')
 ```
 
 `src/options/index.html`:
@@ -203,10 +203,10 @@ console.log('Lens Translator content script loaded')
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <title>Lens Translator Options</title>
+    <title>Infron Translate Options</title>
   </head>
   <body>
-    <h1>Lens Translator</h1>
+    <h1>Infron Translate</h1>
     <div id="app"></div>
     <script type="module" src="./main.ts"></script>
   </body>
@@ -1441,7 +1441,7 @@ export function extractVisibleBlocks(minTextLength: number, prefetchMarginPx: nu
 
   for (const el of nodes) {
     if (el.closest(SKIP_CLOSEST)) continue
-    if (el.closest('#lens-translator-root')) continue
+    if (el.closest('#infron-translate-root')) continue
     if (!isVisible(el, prefetchMarginPx)) continue
 
     const text = normalizeText(el.textContent ?? '')
@@ -1506,7 +1506,7 @@ export class LensOverlay {
   constructor(widthPx = 320) {
     this.widthPx = widthPx
     this.host = document.createElement('div')
-    this.host.id = 'lens-translator-root'
+    this.host.id = 'infron-translate-root'
     Object.assign(this.host.style, {
       all: 'initial',
       position: 'fixed',
@@ -1960,7 +1960,7 @@ npm run build
 
 ```bash
 git add README.md
-git commit -m "docs: README and manual QA for lens translator"
+git commit -m "docs: README and manual QA for infron translate"
 ```
 
 ---
@@ -1990,7 +1990,7 @@ git commit -m "docs: README and manual QA for lens translator"
 
 ## Execution handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-07-12-chrome-lens-translator.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-07-12-chrome-infron-translate.md`.
 
 **Two execution options:**
 

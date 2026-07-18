@@ -313,7 +313,7 @@ export class LensController {
       if (this.settings.autoPageTranslation) await this.maybeStartPageTranslation()
     } catch (error) {
       console.warn(
-        '[Lens Translator] settings refresh failed',
+        '[Infron Translate] settings refresh failed',
         error instanceof Error ? error.message : String(error),
       )
     }

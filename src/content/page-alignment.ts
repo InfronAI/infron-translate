@@ -48,7 +48,7 @@ type HighlightGlobal = typeof globalThis & {
 }
 
 const TRANSLATED_SELECTOR = '[data-lens-page-translated]'
-const OVERLAY_ID = 'lens-translator-page-alignment-overlay'
+const OVERLAY_ID = 'infron-translate-page-alignment-overlay'
 
 function fallbackWordSegments(text: string): WordSegment[] {
   const words: WordSegment[] = []

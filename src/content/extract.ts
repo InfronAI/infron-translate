@@ -1,7 +1,7 @@
 import { makeBlockId } from '../shared/block-id'
 import { isTranslatableText, normalizeText } from '../shared/text'
 
-export const PAGE_SOURCE_ATTR = 'data-lens-translator-source'
+export const PAGE_SOURCE_ATTR = 'data-infron-translate-source'
 
 /**
  * Primary block-level candidates: HTML semantics + common rich-text / markdown hosts.
@@ -194,7 +194,7 @@ const SKIP_CLOSEST =
     'tool-tip',
     '[data-lens-ignore]',
     '[data-lens-page-translation]',
-    '#lens-translator-root',
+    '#infron-translate-root',
   ].join(', ')
 
 const SKIP_SELF_TAGS = new Set([
@@ -478,7 +478,7 @@ function shouldSkipAsNestedContainer(el: Element, minTextLength: number): boolea
 }
 
 function shouldSkipElement(el: Element): boolean {
-  if (el.closest('#lens-translator-root')) return true
+  if (el.closest('#infron-translate-root')) return true
   if (
     !el.hasAttribute(PAGE_SOURCE_ATTR) &&
     el.querySelector('[data-lens-page-translation]')

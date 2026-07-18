@@ -1,5 +1,5 @@
 {
-  "name": "feat-lens-translator",
+  "name": "infron-translate",
   "version": "0.2.0",
   "description": "Hold a hotkey to peek Chinese translations without leaving English immersion.",
   "private": true,

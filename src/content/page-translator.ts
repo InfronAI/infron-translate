@@ -28,8 +28,8 @@ const TRANSLATION_TEXT_ATTR = 'data-lens-page-translation-text'
 const UI_TRANSLATION_ATTR = 'data-lens-page-ui-translation'
 const UI_STACKED_TRANSLATION_ATTR = 'data-lens-page-ui-stacked-translation'
 const UI_CONTROL_TRANSLATION_ATTR = 'data-lens-page-ui-control-translation'
-const STYLE_ID = 'lens-translator-page-style'
-const STATUS_ID = 'lens-translator-page-status'
+const STYLE_ID = 'infron-translate-page-style'
+const STATUS_ID = 'infron-translate-page-status'
 
 // A translated host that keeps mutating (clocks, counters, live chat) would loop
 // forever between invalidate and re-translate. After this many re-invalidations

@@ -1,6 +1,6 @@
-# Lens Translator
+# Infron Translate
 
-Lens Translator 是一个 Chrome Manifest V3 沉浸式翻译扩展。网页默认保持原文；启动翻译透镜后，扩展会自动框选鼠标下的文本 DOM 或图片，并在旁边显示原文和译文，不修改网页内容。
+Infron Translate 是一个 Chrome Manifest V3 沉浸式翻译扩展。网页默认保持原文；启动翻译透镜后，扩展会自动框选鼠标下的文本 DOM 或图片，并在旁边显示原文和译文，不修改网页内容。
 
 ## 功能
 

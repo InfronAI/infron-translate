@@ -45,7 +45,7 @@ export class LensOverlay {
   constructor(widthPx = 340) {
     this.widthPx = widthPx
     this.host = document.createElement('div')
-    this.host.id = 'lens-translator-root'
+    this.host.id = 'infron-translate-root'
     Object.assign(this.host.style, {
       all: 'initial',
       position: 'fixed',
