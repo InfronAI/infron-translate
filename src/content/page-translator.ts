@@ -25,6 +25,7 @@ const DISPLAY_MODE_ATTR = 'data-infron-page-display-mode'
 const UI_TRANSLATION_ATTR = 'data-infron-page-ui-translation'
 const UI_STACKED_TRANSLATION_ATTR = 'data-infron-page-ui-stacked-translation'
 const UI_CONTROL_TRANSLATION_ATTR = 'data-infron-page-ui-control-translation'
+const EXPANDED_CONTAINER_ATTR = 'data-infron-page-expanded-container'
 const STYLE_ID = 'infron-translate-page-style'
 const STATUS_ID = 'infron-translate-page-status'
 
@@ -46,6 +47,16 @@ const INITIAL_CONTENT_GRACE_MS = 8000
 const INITIAL_RETRY_INTERVAL_MS = 600
 
 type ChurnRecord = { count: number; since: number }
+type ExpandedContainerRecord = {
+  height: string
+  maxHeight: string
+  minHeight: string
+  overflow: string
+  overflowX: string
+  overflowY: string
+  contain: string
+  minHeightVar: string
+}
 
 function pageStyles(settings: PageSettings): string {
   const color = settings.pageTranslationUseCustomColor
@@ -83,6 +94,22 @@ function pageStyles(settings: PageSettings): string {
   unicode-bidi: plaintext !important;
   white-space: pre-wrap !important;
   opacity: ${opacity} !important;
+}
+
+[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"]:not([${UI_TRANSLATION_ATTR}]) {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  max-height: none !important;
+}
+
+[${EXPANDED_CONTAINER_ATTR}] {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: var(--infron-translate-expanded-min-height, auto) !important;
+  contain: none !important;
 }
 
 [${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"][${UI_TRANSLATION_ATTR}]::after {
@@ -272,6 +299,50 @@ function isButtonLikeUi(block: ExtractedBlock): boolean {
   return /(?:^|[\s_-])(?:button|btn|submit)(?:$|[\s_-])/iu.test(marker)
 }
 
+function numericCssPx(value: string): number | null {
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function canExpandTranslationContainer(el: Element, host: Element): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false
+  if (el === document.documentElement || el === document.body) return false
+  if (el.closest('[data-infron-ignore]')) return false
+  if (el.closest(PAGE_LAYOUT_LOCKED_SELECTOR)) return false
+  const style = window.getComputedStyle(el)
+  if (style.position === 'fixed' || style.position === 'sticky') return false
+  const display = style.display
+  if (display === 'none' || display === 'contents' || display.includes('table')) return false
+  if (el !== host && el.matches(PAGE_CONTROL_SELECTOR)) return false
+  return true
+}
+
+function hasTranslationOverflowRisk(el: HTMLElement): boolean {
+  const style = window.getComputedStyle(el)
+  const clipsOverflow =
+    /(hidden|clip|auto|scroll)/.test(`${style.overflow} ${style.overflowX} ${style.overflowY}`)
+  const height = numericCssPx(style.height)
+  const maxHeight = numericCssPx(style.maxHeight)
+  const fixedHeight = height !== null && Math.abs(height - el.clientHeight) <= 2
+  const constrainedHeight = maxHeight !== null && maxHeight <= el.scrollHeight + 2
+  const verticalOverflow = el.scrollHeight > el.clientHeight + 2
+  const horizontalOverflow = el.scrollWidth > el.clientWidth + 2
+  return (verticalOverflow || horizontalOverflow) && (clipsOverflow || fixedHeight || constrainedHeight)
+}
+
+function expandedContainerRecord(el: HTMLElement): ExpandedContainerRecord {
+  return {
+    height: el.style.height,
+    maxHeight: el.style.maxHeight,
+    minHeight: el.style.minHeight,
+    overflow: el.style.overflow,
+    overflowX: el.style.overflowX,
+    overflowY: el.style.overflowY,
+    contain: el.style.contain,
+    minHeightVar: el.style.getPropertyValue('--infron-translate-expanded-min-height'),
+  }
+}
+
 /** Attach generated UI copy to the text label instead of the outer flex control. */
 export function pageTranslationHost(block: ExtractedBlock): Element {
   if (!isPageUiTranslationCandidate(block)) return block.el
@@ -327,6 +398,7 @@ export class PageTranslator {
   private readonly translatedHosts = new Set<Element>()
   private readonly sourceHosts = new Map<Element, string | null>()
   private readonly originalTextNodes = new Map<Element, Array<{ node: Text; value: string }>>()
+  private readonly expandedContainers = new Map<HTMLElement, ExpandedContainerRecord>()
   private attemptedTextByHost = new WeakMap<Element, string>()
   private sourceBlockByHost = new WeakMap<Element, Element>()
   private volatileHosts = new WeakSet<Element>()
@@ -368,6 +440,7 @@ export class PageTranslator {
       host.removeAttribute(UI_STACKED_TRANSLATION_ATTR)
       host.removeAttribute(UI_CONTROL_TRANSLATION_ATTR)
     }
+    this.restoreExpandedContainers()
     for (const [host, previous] of this.sourceHosts) {
       if (previous === null) host.removeAttribute(PAGE_SOURCE_ATTR)
       else host.setAttribute(PAGE_SOURCE_ATTR, previous)
@@ -670,6 +743,8 @@ export class PageTranslator {
             host.setAttribute(UI_STACKED_TRANSLATION_ATTR, '')
           }
         }
+      } else if (settings.translationDisplayMode === 'bilingual') {
+        this.expandOverflowContainers(host)
       }
       this.translatedHosts.add(host)
       this.sourceBlockByHost.set(host, block.el)
@@ -710,6 +785,13 @@ export class PageTranslator {
           ? (record.target as Element)
           : record.target.parentElement
       if (!target || target.closest('[data-infron-ignore]')) continue
+      if (
+        record.type === 'attributes' &&
+        target.hasAttribute(EXPANDED_CONTAINER_ATTR) &&
+        record.attributeName === 'style'
+      ) {
+        continue
+      }
 
       if (record.type === 'childList') {
         const changed = [...record.addedNodes, ...record.removedNodes]
@@ -804,6 +886,52 @@ export class PageTranslator {
     if (!textNodes) return
     for (const { node, value } of textNodes) node.nodeValue = value
     this.originalTextNodes.delete(host)
+  }
+
+  private expandOverflowContainers(host: Element): void {
+    const candidates: HTMLElement[] = []
+    for (let el: Element | null = host; el && el.parentElement; el = el.parentElement) {
+      if (candidates.length >= 5) break
+      if (!canExpandTranslationContainer(el, host)) continue
+      candidates.push(el)
+    }
+
+    for (const el of candidates) {
+      if (!hasTranslationOverflowRisk(el)) continue
+      if (!this.expandedContainers.has(el)) {
+        this.expandedContainers.set(el, expandedContainerRecord(el))
+      }
+      el.setAttribute(EXPANDED_CONTAINER_ATTR, '')
+      el.style.setProperty(
+        '--infron-translate-expanded-min-height',
+        `${Math.ceil(el.scrollHeight)}px`,
+      )
+      el.style.overflow = 'visible'
+      el.style.overflowX = 'visible'
+      el.style.overflowY = 'visible'
+      el.style.maxHeight = 'none'
+      el.style.height = 'auto'
+      el.style.contain = 'none'
+    }
+  }
+
+  private restoreExpandedContainers(): void {
+    for (const [el, previous] of this.expandedContainers) {
+      el.removeAttribute(EXPANDED_CONTAINER_ATTR)
+      el.style.height = previous.height
+      el.style.maxHeight = previous.maxHeight
+      el.style.minHeight = previous.minHeight
+      el.style.overflow = previous.overflow
+      el.style.overflowX = previous.overflowX
+      el.style.overflowY = previous.overflowY
+      el.style.contain = previous.contain
+      if (previous.minHeightVar) {
+        el.style.setProperty('--infron-translate-expanded-min-height', previous.minHeightVar)
+      } else {
+        el.style.removeProperty('--infron-translate-expanded-min-height')
+      }
+    }
+    this.expandedContainers.clear()
   }
 
   private cleanupDisconnectedHosts(): void {
