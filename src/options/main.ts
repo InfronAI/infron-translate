@@ -209,7 +209,7 @@ function updateStyleControlStates(): void {
 
 function updateEngineSummary(settings: UserSettings): void {
   const page = settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '云端 AI 模型'
-  el<HTMLElement>('engineSummary').textContent = `整页 ${page}`
+  el<HTMLElement>('engineSummary').textContent = `翻译引擎：${page}`
 }
 
 function browserVersion(): string {

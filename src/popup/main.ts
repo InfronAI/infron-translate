@@ -1,4 +1,12 @@
-import { DEFAULT_SETTINGS, isConfigured, loadSettings, saveSettings, missingConfigFields, type UserSettings } from '../shared/settings'
+import {
+  DEFAULT_SETTINGS,
+  isConfigured,
+  loadSettings,
+  saveSettings,
+  missingConfigFields,
+  type TranslationEngine,
+  type UserSettings,
+} from '../shared/settings'
 import { LANGUAGE_OPTIONS, languageLabel } from '../shared/languages'
 import type { TranslationDisplayMode } from '../shared/settings-defaults'
 import type {
@@ -65,11 +73,7 @@ function setLanguageSelectValue(id: string, value: string, fallback: string): vo
 
 function renderStatus(settings: UserSettings): void {
   const configured = isConfigured(settings)
-  const pageEngine = el<HTMLElement>('pageEngineStatus')
-  pageEngine.textContent =
-    settings.pageTranslationEngine === 'browser' ? 'Chrome 内置' : '云端 AI'
-  pageEngine.className =
-    settings.pageTranslationEngine === 'browser' || configured ? 'pill ok' : 'pill warn'
+  el<HTMLSelectElement>('pageEngineSelect').value = settings.pageTranslationEngine
 
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
@@ -192,6 +196,7 @@ async function init(): Promise<void> {
   const sourceLangSelect = el<HTMLSelectElement>('sourceLangSelect')
   const targetLangSelect = el<HTMLSelectElement>('targetLangSelect')
   const displayModeSelect = el<HTMLSelectElement>('displayModeSelect')
+  const pageEngineSelect = el<HTMLSelectElement>('pageEngineSelect')
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
@@ -267,7 +272,12 @@ async function init(): Promise<void> {
   })
 
   async function saveLanguageSetting(
-    next: Partial<Pick<UserSettings, 'sourceLang' | 'targetLang' | 'translationDisplayMode'>>,
+    next: Partial<
+      Pick<
+        UserSettings,
+        'sourceLang' | 'targetLang' | 'translationDisplayMode' | 'pageTranslationEngine'
+      >
+    >,
   ): Promise<void> {
     try {
       el<HTMLElement>('error').hidden = true
@@ -282,6 +292,7 @@ async function init(): Promise<void> {
       setSourceLanguageValue(settings.sourceLang)
       setTargetLanguageValue(settings.targetLang)
       displayModeSelect.value = settings.translationDisplayMode
+      pageEngineSelect.value = settings.pageTranslationEngine
       const error = el<HTMLElement>('error')
       error.hidden = false
       error.textContent = err instanceof Error ? err.message : String(err)
@@ -299,6 +310,12 @@ async function init(): Promise<void> {
   displayModeSelect.addEventListener('change', () => {
     void saveLanguageSetting({
       translationDisplayMode: displayModeSelect.value as TranslationDisplayMode,
+    })
+  })
+
+  pageEngineSelect.addEventListener('change', () => {
+    void saveLanguageSetting({
+      pageTranslationEngine: pageEngineSelect.value as TranslationEngine,
     })
   })
 }

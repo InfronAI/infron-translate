@@ -90,10 +90,13 @@
           </section>
 
           <section class="menu-item card">
-            <div class="row">
-              <span class="label">整页引擎</span>
-              <span id="pageEngineStatus" class="pill">…</span>
-            </div>
+            <label class="select-row">
+              <span class="label">翻译引擎</span>
+              <select id="pageEngineSelect" class="select">
+                <option value="browser">Chrome 内置翻译</option>
+                <option value="external">云端 AI 模型</option>
+              </select>
+            </label>
             <label class="switch-row menu-item nested">
               <div class="switch-text-block">
                 <span class="switch-text">自动翻译网页</span>
