@@ -271,10 +271,10 @@ button {
   all: unset;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   box-sizing: border-box;
-  padding: 7px;
+  padding: 6px;
   border: 1px solid rgb(255 255 255 / 64%);
   border-radius: 999px;
   background:
@@ -284,9 +284,9 @@ button {
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   color: #fff;
   box-shadow:
-    0 16px 36px rgb(15 23 42 / 22%),
-    0 0 0 3px rgb(14 165 233 / 18%),
-    0 0 26px rgb(0 180 160 / 26%),
+    0 12px 28px rgb(15 23 42 / 20%),
+    0 0 0 2px rgb(14 165 233 / 16%),
+    0 0 20px rgb(0 180 160 / 22%),
     inset 0 1px 0 rgb(255 255 255 / 68%);
   cursor: pointer;
   user-select: none;
@@ -298,9 +298,9 @@ button:hover {
   transform: translateX(-2px) scale(1.04);
   filter: saturate(1.08) brightness(1.04);
   box-shadow:
-    0 18px 42px rgb(15 23 42 / 26%),
-    0 0 0 4px rgb(14 165 233 / 24%),
-    0 0 32px rgb(0 180 160 / 34%),
+    0 14px 34px rgb(15 23 42 / 24%),
+    0 0 0 3px rgb(14 165 233 / 22%),
+    0 0 24px rgb(0 180 160 / 30%),
     inset 0 1px 0 rgb(255 255 255 / 72%);
 }
 
@@ -320,7 +320,7 @@ button[data-enabled="false"] {
   filter: none;
   opacity: 0.78;
   box-shadow:
-    0 10px 24px rgb(15 23 42 / 16%),
+    0 8px 20px rgb(15 23 42 / 14%),
     0 0 0 1px rgb(148 163 184 / 22%),
     inset 0 1px 0 rgb(255 255 255 / 54%);
 }
@@ -332,14 +332,14 @@ button[data-busy="true"] {
 }
 
 .logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   object-fit: contain;
   filter:
     saturate(1.12)
-    drop-shadow(0 2px 4px rgb(15 23 42 / 24%))
-    drop-shadow(0 0 10px rgb(0 180 160 / 32%));
+    drop-shadow(0 2px 3px rgb(15 23 42 / 22%))
+    drop-shadow(0 0 8px rgb(0 180 160 / 28%));
   transition: transform 0.16s ease, filter 0.16s ease, opacity 0.16s ease;
 }
 
@@ -347,8 +347,8 @@ button:hover .logo {
   transform: translateY(-1px) scale(1.04);
   filter:
     saturate(1.2)
-    drop-shadow(0 3px 5px rgb(15 23 42 / 26%))
-    drop-shadow(0 0 14px rgb(0 180 160 / 42%));
+    drop-shadow(0 2px 4px rgb(15 23 42 / 24%))
+    drop-shadow(0 0 11px rgb(0 180 160 / 38%));
 }
 
 button[data-enabled="false"] .logo {
@@ -367,11 +367,11 @@ button[data-enabled="false"] .logo {
 @media (max-width: 520px) {
   :host { right: 10px; }
   button {
-    width: 44px;
-    height: 44px;
-    padding: 7px;
+    width: 38px;
+    height: 38px;
+    padding: 6px;
   }
-  .logo { width: 30px; height: 30px; }
+  .logo { width: 25px; height: 25px; }
 }
 `
       const button = document.createElement('button')
