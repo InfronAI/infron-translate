@@ -57,6 +57,7 @@ type ExpandedContainerRecord = {
   contain: string
   minHeightVar: string
 }
+type StatusState = 'working' | 'success' | 'error'
 
 function pageStyles(settings: PageSettings): string {
   const color = settings.pageTranslationUseCustomColor
@@ -155,7 +156,8 @@ function pageStyles(settings: PageSettings): string {
   top: 16px !important;
   right: 16px !important;
   max-width: min(360px, calc(100vw - 32px)) !important;
-  padding: 9px 12px !important;
+  min-width: min(280px, calc(100vw - 32px)) !important;
+  padding: 10px 12px 11px !important;
   border: 1px solid rgb(15 23 42 / 14%) !important;
   border-radius: 7px !important;
   background: rgb(255 255 255 / 96%) !important;
@@ -163,11 +165,92 @@ function pageStyles(settings: PageSettings): string {
   color: #172033 !important;
   font: 500 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif !important;
   letter-spacing: 0 !important;
+  pointer-events: none !important;
 }
 
-#${STATUS_ID}[data-error="true"] {
+#${STATUS_ID}[data-state="error"] {
   border-color: rgb(185 28 28 / 24%) !important;
   color: #991b1b !important;
+}
+
+#${STATUS_ID}[data-state="success"] {
+  border-color: rgb(22 101 52 / 22%) !important;
+  color: #166534 !important;
+}
+
+#${STATUS_ID} [data-infron-status-head] {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+#${STATUS_ID} [data-infron-status-dot] {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: #2563eb !important;
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 12%) !important;
+  animation: infronTranslateStatusPulse 1.1s ease-in-out infinite !important;
+}
+
+#${STATUS_ID}[data-state="success"] [data-infron-status-dot] {
+  background: #16a34a !important;
+  box-shadow: 0 0 0 4px rgb(22 163 74 / 12%) !important;
+  animation: none !important;
+}
+
+#${STATUS_ID}[data-state="error"] [data-infron-status-dot] {
+  background: #dc2626 !important;
+  box-shadow: 0 0 0 4px rgb(220 38 38 / 12%) !important;
+  animation: none !important;
+}
+
+#${STATUS_ID} [data-infron-status-title] {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#${STATUS_ID} [data-infron-status-count] {
+  color: rgb(71 85 105 / 78%) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+
+#${STATUS_ID} [data-infron-status-track] {
+  position: relative !important;
+  height: 4px !important;
+  margin-top: 9px !important;
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  background: rgb(15 23 42 / 9%) !important;
+}
+
+#${STATUS_ID} [data-infron-status-fill] {
+  position: absolute !important;
+  inset: 0 auto 0 0 !important;
+  width: var(--infron-translate-progress, 0%) !important;
+  border-radius: inherit !important;
+  background: currentColor !important;
+  transition: width 0.2s ease !important;
+}
+
+#${STATUS_ID}[data-progress="indeterminate"] [data-infron-status-fill] {
+  width: 42% !important;
+  animation: infronTranslateProgress 1.05s ease-in-out infinite !important;
+}
+
+@keyframes infronTranslateProgress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(260%); }
+}
+
+@keyframes infronTranslateStatusPulse {
+  0%, 100% { opacity: 0.62; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.08); }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -176,7 +259,10 @@ function pageStyles(settings: PageSettings): string {
     background: rgb(24 24 27 / 96%) !important;
     color: #f4f4f5 !important;
   }
-  #${STATUS_ID}[data-error="true"] { color: #fca5a5 !important; }
+  #${STATUS_ID}[data-state="error"] { color: #fca5a5 !important; }
+  #${STATUS_ID}[data-state="success"] { color: #86efac !important; }
+  #${STATUS_ID} [data-infron-status-count] { color: rgb(226 232 240 / 72%) !important; }
+  #${STATUS_ID} [data-infron-status-track] { background: rgb(255 255 255 / 14%) !important; }
 }
 `
 }
@@ -512,7 +598,7 @@ export class PageTranslator {
       this.dirtyRoots.clear()
       this.observePageRoots(scanRoots)
       this.cleanupDisconnectedHosts()
-      if (initial) this.showStatus('Analyzing page text...')
+      if (initial) this.showStatus('Analyzing page text', { progress: null })
 
       const blocksByElement = new Map<Element, ExtractedBlock>()
       for (const root of scanRoots) {
@@ -538,7 +624,7 @@ export class PageTranslator {
           // content is picked up immediately) and retry the initial scan until the
           // grace window elapses, only then declaring the page empty.
           if (Date.now() < this.activationDeadline) {
-            this.showStatus('Waiting for page content...')
+            this.showStatus('Waiting for page content', { progress: null })
             this.scheduleInitialRetry(generation)
           } else {
             this.failActivation('No translatable text found on this page')
@@ -548,7 +634,7 @@ export class PageTranslator {
         }
         return
       }
-      if (!initial) this.showStatus('New content detected. Translating...')
+      if (!initial) this.showStatus('Translating new content', { progress: null })
       for (const group of groups) {
         for (const block of group.blocks) {
           this.attemptedTextByHost.set(block.el, block.text)
@@ -582,19 +668,25 @@ export class PageTranslator {
         return
       }
       const failed = this.totalCount - this.translatedCount
-      this.showStatus(
-        failed > 0
-          ? `Translation complete: ${this.translatedCount} blocks succeeded, ${failed} failed`
-          : `Translation complete: ${this.translatedCount} blocks`,
-        failed > 0,
-      )
+      this.showStatus(failed > 0 ? 'Translation partially complete' : 'Translation complete', {
+        state: failed > 0 ? 'error' : 'success',
+        detail:
+          failed > 0
+            ? `${this.translatedCount} translated, ${failed} failed`
+            : `${this.translatedCount} translated`,
+        progress: 1,
+      })
       this.scheduleStatusRemoval()
     } catch (error) {
       if (!this.isCurrent(generation)) return
       const message = error instanceof Error ? error.message : String(error)
       if (initial && this.translatedHosts.size === 0) this.failActivation(message)
       else {
-        this.showStatus(`Page translation partially failed: ${message}`, true)
+        this.showStatus('Page translation partially failed', {
+          state: 'error',
+          detail: message,
+          progress: this.totalCount > 0 ? this.processedCount / this.totalCount : undefined,
+        })
         this.scheduleStatusRemoval(5000)
       }
     } finally {
@@ -972,7 +1064,14 @@ export class PageTranslator {
     style.textContent = pageStyles(settings)
   }
 
-  private showStatus(text: string, error = false): void {
+  private showStatus(
+    text: string,
+    options: {
+      state?: StatusState
+      detail?: string
+      progress?: number | null
+    } = {},
+  ): void {
     let status = document.getElementById(STATUS_ID)
     if (!status) {
       status = document.createElement('div')
@@ -980,14 +1079,49 @@ export class PageTranslator {
       status.setAttribute('data-infron-ignore', '')
       status.setAttribute('role', 'status')
       status.setAttribute('aria-live', 'polite')
+      const head = document.createElement('div')
+      head.setAttribute('data-infron-status-head', '')
+      const dot = document.createElement('span')
+      dot.setAttribute('data-infron-status-dot', '')
+      const title = document.createElement('span')
+      title.setAttribute('data-infron-status-title', '')
+      const count = document.createElement('span')
+      count.setAttribute('data-infron-status-count', '')
+      head.append(dot, title, count)
+      const track = document.createElement('div')
+      track.setAttribute('data-infron-status-track', '')
+      const fill = document.createElement('span')
+      fill.setAttribute('data-infron-status-fill', '')
+      track.append(fill)
+      status.append(head, track)
       document.documentElement.append(status)
     }
-    status.dataset.error = error ? 'true' : 'false'
-    status.textContent = text
+    const state = options.state ?? 'working'
+    const progress = options.progress
+    const safeProgress =
+      typeof progress === 'number' && Number.isFinite(progress)
+        ? Math.max(0, Math.min(1, progress))
+        : progress
+    status.dataset.state = state
+    status.dataset.progress = safeProgress === null ? 'indeterminate' : 'determinate'
+    status.style.setProperty(
+      '--infron-translate-progress',
+      safeProgress === null
+        ? '0%'
+        : `${Math.round((typeof safeProgress === 'number' ? safeProgress : 0) * 100)}%`,
+    )
+    const title = status.querySelector<HTMLElement>('[data-infron-status-title]')
+    const count = status.querySelector<HTMLElement>('[data-infron-status-count]')
+    if (title) title.textContent = text
+    if (count) count.textContent = options.detail ?? ''
   }
 
   private updateProgress(): void {
-    this.showStatus(`Page translation ${Math.min(this.processedCount, this.totalCount)}/${this.totalCount}`)
+    const done = Math.min(this.processedCount, this.totalCount)
+    this.showStatus('Translating page', {
+      detail: `${done}/${this.totalCount}`,
+      progress: this.totalCount > 0 ? done / this.totalCount : null,
+    })
   }
 
   private failActivation(message: string): void {
@@ -995,7 +1129,7 @@ export class PageTranslator {
     window.clearTimeout(this.initialRetryTimer)
     this.observer?.disconnect()
     this.observer = null
-    this.showStatus(message, true)
+    this.showStatus(message, { state: 'error', progress: 1 })
     this.scheduleStatusRemoval(5000)
   }
 
