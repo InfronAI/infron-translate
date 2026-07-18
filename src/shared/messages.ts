@@ -122,6 +122,12 @@ export type StopMeetingAssistantMsg = {
   sessionId?: string
 }
 
+export type SetMeetingSystemAudioMsg = {
+  type: 'set-meeting-system-audio'
+  sessionId: string
+  enabled: boolean
+}
+
 export type GetMeetingAssistantStateMsg = { type: 'get-meeting-assistant-state' }
 
 export type MeetingTranscriptSegmentMsg = {
@@ -193,6 +199,7 @@ export type ToBackground =
   | SetAutoPageTranslationMsg
   | StartMeetingAssistantMsg
   | StopMeetingAssistantMsg
+  | SetMeetingSystemAudioMsg
   | GetMeetingAssistantStateMsg
   | MeetingTranscriptSegmentMsg
   | MeetingAudioChunkMsg

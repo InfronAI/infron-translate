@@ -236,6 +236,13 @@ function isToBackground(value: unknown): value is ToBackground {
   if (value.type === 'stop-meeting-assistant') {
     return value.sessionId === undefined || typeof value.sessionId === 'string'
   }
+  if (value.type === 'set-meeting-system-audio') {
+    return (
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length <= 128 &&
+      typeof value.enabled === 'boolean'
+    )
+  }
   if (value.type === 'get-meeting-assistant-state') return true
   if (value.type === 'meeting-transcript-segment') {
     return (
@@ -382,6 +389,11 @@ async function handle(
 
   if (message.type === 'get-meeting-assistant-state') {
     return { type: 'meeting-assistant-state', state: meetingManager.getState() }
+  }
+
+  if (message.type === 'set-meeting-system-audio') {
+    await meetingManager.setSystemAudioEnabled(message.sessionId, message.enabled)
+    return { type: 'meeting-internal-result', ok: true }
   }
 
   if (message.type === 'meeting-audio-status') {

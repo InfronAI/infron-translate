@@ -6,6 +6,7 @@ import type {
 import type {
   MeetingAudioStatusMsg,
   MeetingAudioChunkMsg,
+  SetMeetingSystemAudioMsg,
   StopMeetingAssistantMsg,
 } from '../shared/messages'
 
@@ -102,7 +103,6 @@ export class MeetingOverlay {
       dock.innerHTML = `
         <img class="dock-logo" src="${chrome.runtime.getURL('icons/infron-mark.png')}" alt="" aria-hidden="true" />
         <span>Meeting Assistant</span>
-        <strong>${statusLabel(session.status)}</strong>
       `
       dock.addEventListener('click', () => {
         this.windowState = { ...this.windowState!, minimized: false }
@@ -126,23 +126,15 @@ export class MeetingOverlay {
           <button class="traffic minimize" type="button" aria-label="Minimize Meeting Assistant"></button>
           <button class="traffic maximize" type="button" aria-label="${this.windowState.maximized ? 'Restore Meeting Assistant' : 'Maximize Meeting Assistant'}"></button>
         </div>
-        <div class="brand">
-          <img class="logo" src="${chrome.runtime.getURL('icons/infron-mark.png')}" alt="" aria-hidden="true" />
-          <div>
-            <h2>Meeting Assistant</h2>
-            <p>${languageLabel(session.sourceLang)} -> ${languageLabel(session.targetLang)}</p>
-          </div>
-        </div>
-        <div class="status">
-          <span class="badge ${session.status === 'listening' ? 'ok' : ''}">${statusLabel(session.status)}</span>
-          <span class="badge ${audio.microphone ? 'ok' : ''}">Mic</span>
-          <span class="badge ${audio.output ? 'ok' : ''}">System audio</span>
-          <div class="toolbar" role="group" aria-label="Meeting Assistant controls">
-            <button class="mic-pill ${this.isMicActive() ? 'recording' : ''} mic-toggle" type="button">
-              <span aria-hidden="true"></span>
-              ${this.isMicActive() ? 'Stop Mic' : this.autoMicAttempted ? 'Retry Mic' : 'Mic Auto'}
-            </button>
-          </div>
+        <div class="input-switches" role="group" aria-label="Audio input controls">
+          <button class="input-pill system-toggle ${audio.output ? 'active' : ''}" type="button">
+            <span aria-hidden="true"></span>
+            ${audio.output ? 'Stop System Audio' : 'Start System Audio'}
+          </button>
+          <button class="input-pill mic-toggle ${this.isMicActive() ? 'active recording' : ''}" type="button">
+            <span aria-hidden="true"></span>
+            ${this.isMicActive() ? 'Stop Mic' : this.autoMicAttempted ? 'Retry Mic' : 'Start Mic'}
+          </button>
         </div>
       </header>
       <main class="screens">
@@ -172,6 +164,13 @@ export class MeetingOverlay {
     shell.querySelector<HTMLButtonElement>('.mic-toggle')?.addEventListener('click', () => {
       if (this.isMicActive()) this.stopLocalSpeechRecognition()
       else void this.startLocalSpeechRecognition(false)
+    })
+    shell.querySelector<HTMLButtonElement>('.system-toggle')?.addEventListener('click', () => {
+      void chrome.runtime.sendMessage({
+        type: 'set-meeting-system-audio',
+        sessionId: session.id,
+        enabled: !audio.output,
+      } satisfies SetMeetingSystemAudioMsg)
     })
     shell.querySelector<HTMLButtonElement>('.traffic.close')?.addEventListener('click', () => {
       void chrome.runtime.sendMessage({
@@ -590,21 +589,6 @@ function section(title: string, items: string[]): HTMLElement {
   return node
 }
 
-function statusLabel(status: string): string {
-  if (status === 'listening') return 'Listening'
-  if (status === 'starting') return 'Starting'
-  if (status === 'stopping') return 'Stopping'
-  if (status === 'error') return 'Error'
-  return 'Stopped'
-}
-
-function languageLabel(code: string): string {
-  if (code === 'auto') return 'Auto'
-  if (code === 'cn') return 'Chinese'
-  if (code === 'en') return 'English'
-  return code.toUpperCase()
-}
-
 function timeLabel(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
@@ -653,9 +637,8 @@ const css = `
 }
 
 .topbar,
-.status,
-.brand,
 .traffic-lights,
+.input-switches,
 .title-block,
 .segment-head {
   display: flex;
@@ -730,20 +713,6 @@ const css = `
   filter: saturate(1.06) brightness(0.98);
 }
 
-.brand {
-  gap: 11px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: #fff;
-  box-shadow: 0 8px 20px rgb(15 23 42 / 16%);
-}
-
 h2,
 h3,
 h4,
@@ -752,43 +721,12 @@ ul {
   margin: 0;
 }
 
-h2 {
-  font-size: 18px;
-  line-height: 1.15;
-  font-weight: 720;
-}
-
-.brand p {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #64748b;
-}
-
-.status {
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.badge {
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: rgb(148 163 184 / 18%);
-  color: #475569;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.badge.ok {
-  background: rgb(16 185 129 / 18%);
-  color: #047857;
-}
-
-.toolbar {
+.input-switches {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0;
+  margin-left: auto;
+  padding: 3px;
   border: 1px solid rgb(15 23 42 / 7%);
   border-radius: 999px;
   background: rgb(255 255 255 / 54%);
@@ -796,12 +734,12 @@ h2 {
   cursor: default;
 }
 
-.mic-pill {
+.input-pill {
   border: 0;
   border-radius: 999px;
   padding: 7px 12px;
-  background: #0f766e;
-  color: #fff;
+  background: rgb(15 23 42 / 8%);
+  color: #334155;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -813,36 +751,42 @@ h2 {
   transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.mic-pill:hover {
+.input-pill:hover {
   transform: translateY(-1px);
+  background: rgb(15 118 110 / 12%);
+  color: #0f766e;
+}
+
+.input-pill:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.input-pill span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgb(148 163 184 / 14%);
+}
+
+.input-pill.active {
+  background: #0f766e;
+  color: #fff;
+  box-shadow: 0 8px 18px rgb(15 118 110 / 20%);
+}
+
+.input-pill.active:hover {
   background: #115e59;
   color: #fff;
   box-shadow: 0 10px 22px rgb(15 118 110 / 26%);
 }
 
-.mic-pill:active {
-  transform: translateY(0) scale(0.98);
-}
-
-.mic-pill span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 72%);
+.input-pill.active span {
+  background: rgb(255 255 255 / 78%);
   box-shadow: 0 0 0 3px rgb(255 255 255 / 16%);
 }
 
-.mic-pill.recording {
-  background: #b91c1c;
-  box-shadow: 0 8px 18px rgb(185 28 28 / 18%);
-}
-
-.mic-pill.recording:hover {
-  background: #991b1b;
-  box-shadow: 0 10px 22px rgb(185 28 28 / 24%);
-}
-
-.mic-pill.recording span {
+.input-pill.recording span {
   animation: micPulse 1.1s ease-in-out infinite;
 }
 
@@ -884,11 +828,6 @@ h2 {
   height: 24px;
   border-radius: 7px;
   background: #fff;
-}
-
-.dock strong {
-  color: #0f766e;
-  font-size: 12px;
 }
 
 .screens {
@@ -1133,6 +1072,5 @@ ul {
   .screens { grid-template-columns: 1fr; }
   .audio-meters { grid-template-columns: 1fr; }
   .topbar { align-items: flex-start; flex-direction: column; }
-  .status { justify-content: flex-start; }
 }
 `

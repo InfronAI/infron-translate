@@ -240,6 +240,31 @@ export class MeetingManager {
     }
   }
 
+  async setSystemAudioEnabled(sessionId: string, enabled: boolean): Promise<void> {
+    if (!this.state || this.state.session.id !== sessionId) return
+    if (!enabled) {
+      try {
+        await chrome.runtime.sendMessage({ type: 'meeting-audio-stop' })
+      } catch {
+        // The offscreen document may already be stopped.
+      }
+      this.state = {
+        ...this.state,
+        audio: { ...this.state.audio, output: false, outputLevel: 0 },
+      }
+      await this.broadcastUpdate()
+      return
+    }
+
+    const outputStreamId = await this.getTabAudioStreamId(this.state.session.tabId)
+    await this.notifyOffscreenStart(this.state.session, outputStreamId)
+    this.state = {
+      ...this.state,
+      audio: { ...this.state.audio, output: Boolean(outputStreamId), outputLevel: 0 },
+    }
+    await this.broadcastUpdate()
+  }
+
   async stop(): Promise<void> {
     if (!this.state) return
     if (this.timer) globalThis.clearInterval(this.timer)
