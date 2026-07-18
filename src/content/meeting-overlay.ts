@@ -5,7 +5,7 @@ import type {
 } from '../shared/meeting'
 import type {
   MeetingAudioStatusMsg,
-  MeetingTranscriptSegmentMsg,
+  MeetingAudioChunkMsg,
   StopMeetingAssistantMsg,
 } from '../shared/messages'
 
@@ -36,49 +36,19 @@ type DragState = {
   windowY: number
 }
 
-type SpeechRecognitionResultItem = {
-  transcript: string
-}
-
-type SpeechRecognitionResult = {
-  isFinal: boolean
-  length: number
-  item(index: number): SpeechRecognitionResultItem
-}
-
-type SpeechRecognitionEventLike = {
-  resultIndex: number
-  results: {
-    length: number
-    item(index: number): SpeechRecognitionResult
-  }
-}
-
-type SpeechRecognitionLike = EventTarget & {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start: () => void
-  stop: () => void
-  abort: () => void
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  onerror: ((event: { error?: string }) => void) | null
-  onend: (() => void) | null
-}
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
-
 export class MeetingOverlay {
   private host: HTMLElement | null = null
   private root: ShadowRoot | null = null
   private state: MeetingRuntimeState | null = null
   private windowState: MeetingWindowState | null = null
   private dragState: DragState | null = null
-  private recognition: SpeechRecognitionLike | null = null
   private recognitionShouldRun = false
   private micStream: MediaStream | null = null
   private micAudioContext: AudioContext | null = null
   private micLevelTimer: ReturnType<typeof setInterval> | null = null
+  private micRecorder: MediaRecorder | null = null
+  private micChunkStartedAt = 0
+  private maxMicLevelSinceChunk = 0
   private autoMicAttempted = false
 
   show(state: MeetingRuntimeState): void {
@@ -168,9 +138,9 @@ export class MeetingOverlay {
           <span class="badge ${audio.microphone ? 'ok' : ''}">Mic</span>
           <span class="badge ${audio.output ? 'ok' : ''}">System audio</span>
           <div class="toolbar" role="group" aria-label="Meeting Assistant controls">
-            <button class="mic-pill ${this.recognition ? 'recording' : ''} mic-toggle" type="button">
+            <button class="mic-pill ${this.isMicActive() ? 'recording' : ''} mic-toggle" type="button">
               <span aria-hidden="true"></span>
-              ${this.recognition ? 'Stop Mic' : this.autoMicAttempted ? 'Retry Mic' : 'Mic Auto'}
+              ${this.isMicActive() ? 'Stop Mic' : this.autoMicAttempted ? 'Retry Mic' : 'Mic Auto'}
             </button>
           </div>
         </div>
@@ -200,7 +170,7 @@ export class MeetingOverlay {
       this.toggleMaximize(shell)
     })
     shell.querySelector<HTMLButtonElement>('.mic-toggle')?.addEventListener('click', () => {
-      if (this.recognition) this.stopLocalSpeechRecognition()
+      if (this.isMicActive()) this.stopLocalSpeechRecognition()
       else void this.startLocalSpeechRecognition(false)
     })
     shell.querySelector<HTMLButtonElement>('.traffic.close')?.addEventListener('click', () => {
@@ -323,7 +293,7 @@ export class MeetingOverlay {
     if (
       !this.state ||
       this.state.session.status !== 'listening' ||
-      this.recognition ||
+      this.isMicActive() ||
       this.autoMicAttempted
     ) {
       return
@@ -334,105 +304,29 @@ export class MeetingOverlay {
 
   private async startLocalSpeechRecognition(automatic: boolean): Promise<void> {
     if (!this.state) return
-    const Recognition = speechRecognitionConstructor()
-    if (!Recognition) {
-      await this.sendAudioStatus({
-        active: false,
-        source: 'none',
-        message: 'Browser speech recognition is unavailable. Connect an external STT provider for automatic transcription.',
-      })
-      return
-    }
-
     const session = this.state.session
     try {
       await this.startMicLevelMeter(session.id)
+      this.startMicRecorder(session.id, session.sourceLang)
+      this.recognitionShouldRun = true
+      await this.sendAudioStatus({
+        active: true,
+        source: 'external-stt',
+        message: automatic
+          ? 'Automatic microphone transcription is streaming to Infron Whisper STT.'
+          : 'Microphone transcription is streaming to Infron Whisper STT.',
+      })
+      this.render()
+      return
     } catch {
       this.render()
       return
-    }
-    const next = new Recognition()
-    next.continuous = true
-    next.interimResults = true
-    next.lang = speechRecognitionLang(session.sourceLang)
-    next.onresult = (event) => {
-      for (let index = event.resultIndex; index < event.results.length; index++) {
-        const result = event.results.item(index)
-        if (!result.isFinal) continue
-        const text = Array.from({ length: result.length }, (_, itemIndex) =>
-          result.item(itemIndex).transcript,
-        ).join(' ').trim()
-        if (!text || !this.state) continue
-        const now = Date.now()
-        void chrome.runtime.sendMessage({
-          type: 'meeting-transcript-segment',
-          sessionId: this.state.session.id,
-          channel: 'microphone',
-          speakerLabel: 'You',
-          sourceLang: this.state.session.sourceLang,
-          originalText: text,
-          startedAt: now - 3000,
-          endedAt: now,
-        } satisfies MeetingTranscriptSegmentMsg)
-      }
-    }
-    next.onerror = (event) => {
-      const detail = speechRecognitionErrorMessage(event.error)
-      const active = event.error === 'no-speech'
-      if (!active) this.recognitionShouldRun = false
-      void this.sendAudioStatus({
-        active,
-        source: 'browser-speech',
-        message: detail,
-      })
-    }
-    next.onend = () => {
-      if (!this.recognitionShouldRun) return
-      try {
-        next.start()
-      } catch {
-        void this.sendAudioStatus({
-          active: false,
-          source: 'browser-speech',
-          message: 'Microphone transcription stopped. Click Start mic to retry.',
-        })
-      }
-    }
-
-    this.recognitionShouldRun = true
-    this.recognition = next
-    try {
-      next.start()
-      await this.sendAudioStatus({
-        active: true,
-        source: 'browser-speech',
-        message: automatic
-          ? 'Automatic microphone transcription is listening. System audio is detected separately and requires external STT for transcription.'
-          : 'Microphone transcription is listening. System audio is detected separately and requires external STT for transcription.',
-      })
-    } catch (error) {
-      this.recognitionShouldRun = false
-      this.recognition = null
-      this.stopMicLevelMeter()
-      await this.sendAudioStatus({
-        active: false,
-        source: 'browser-speech',
-        message: `Could not start microphone transcription: ${error instanceof Error ? error.message : String(error)}`,
-      })
-    } finally {
-      this.render()
     }
   }
 
   private stopLocalSpeechRecognition(): void {
     this.recognitionShouldRun = false
     this.stopMicLevelMeter()
-    if (!this.recognition) return
-    this.recognition.onresult = null
-    this.recognition.onerror = null
-    this.recognition.onend = null
-    this.recognition.abort()
-    this.recognition = null
     if (this.state) {
       void chrome.runtime.sendMessage({
         type: 'meeting-audio-status',
@@ -441,7 +335,7 @@ export class MeetingOverlay {
         microphoneLevel: 0,
         transcription: {
           active: false,
-          source: 'browser-speech',
+          source: 'external-stt',
           message: 'Microphone transcription is stopped.',
         },
       } satisfies MeetingAudioStatusMsg)
@@ -482,17 +376,19 @@ export class MeetingOverlay {
       const data = new Uint8Array(analyser.fftSize)
       this.micLevelTimer = globalThis.setInterval(() => {
         analyser.getByteTimeDomainData(data)
+        const level = rmsLevel(data)
+        this.maxMicLevelSinceChunk = Math.max(this.maxMicLevelSinceChunk, level)
         void chrome.runtime.sendMessage({
           type: 'meeting-audio-status',
           sessionId,
           microphone: true,
-          microphoneLevel: rmsLevel(data),
+          microphoneLevel: level,
         } satisfies MeetingAudioStatusMsg)
       }, 500)
     } catch (error) {
       await this.sendAudioStatus({
         active: false,
-        source: 'browser-speech',
+        source: 'external-stt',
         message: `Microphone access failed: ${error instanceof Error ? error.message : String(error)}`,
       })
       throw error
@@ -500,6 +396,10 @@ export class MeetingOverlay {
   }
 
   private stopMicLevelMeter(): void {
+    if (this.micRecorder && this.micRecorder.state !== 'inactive') this.micRecorder.stop()
+    this.micRecorder = null
+    this.micChunkStartedAt = 0
+    this.maxMicLevelSinceChunk = 0
     if (this.micLevelTimer) {
       globalThis.clearInterval(this.micLevelTimer)
       this.micLevelTimer = null
@@ -512,6 +412,45 @@ export class MeetingOverlay {
       for (const track of this.micStream.getTracks()) track.stop()
       this.micStream = null
     }
+  }
+
+  private startMicRecorder(sessionId: string, sourceLang: string): void {
+    if (!this.micStream || !MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return
+    this.micRecorder = new MediaRecorder(this.micStream, { mimeType: 'audio/webm;codecs=opus' })
+    this.micChunkStartedAt = Date.now()
+    this.micRecorder.addEventListener('dataavailable', (event) => {
+      if (!event.data.size) return
+      const endedAt = Date.now()
+      const startedAt = this.micChunkStartedAt || endedAt - 8000
+      this.micChunkStartedAt = endedAt
+      const shouldSend = this.maxMicLevelSinceChunk > 0.025
+      this.maxMicLevelSinceChunk = 0
+      if (!shouldSend) return
+      void this.sendAudioChunk({
+        type: 'meeting-audio-chunk',
+        sessionId,
+        channel: 'microphone',
+        sourceLang,
+        mimeType: event.data.type || 'audio/webm',
+        audioBase64: '',
+        startedAt,
+        endedAt,
+      }, event.data)
+    })
+    this.micRecorder.start(8000)
+  }
+
+  private async sendAudioChunk(message: MeetingAudioChunkMsg, blob: Blob): Promise<void> {
+    try {
+      const audioBase64 = await blobToBase64(blob)
+      await chrome.runtime.sendMessage({ ...message, audioBase64 } satisfies MeetingAudioChunkMsg)
+    } catch {
+      // Best-effort streaming.
+    }
+  }
+
+  private isMicActive(): boolean {
+    return Boolean(this.micRecorder)
   }
 }
 
@@ -561,45 +500,14 @@ function rmsLevel(data: Uint8Array): number {
   return Math.min(1, Math.sqrt(sum / data.length) * 4)
 }
 
-function speechRecognitionConstructor(): SpeechRecognitionConstructor | null {
-  const scope = globalThis as typeof globalThis & {
-    SpeechRecognition?: SpeechRecognitionConstructor
-    webkitSpeechRecognition?: SpeechRecognitionConstructor
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  let binary = ''
+  const bytes = new Uint8Array(buffer)
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   }
-  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null
-}
-
-function speechRecognitionErrorMessage(error: string | undefined): string {
-  if (error === 'no-speech') {
-    return 'Listening, but no clear speech was detected yet. Move closer to the microphone or check the input device.'
-  }
-  if (error === 'audio-capture') {
-    return 'No microphone input was captured. Check the selected microphone in Chrome or system settings.'
-  }
-  if (error === 'not-allowed' || error === 'service-not-allowed') {
-    return 'Microphone permission was blocked. Allow microphone access for this page, then click Start mic again.'
-  }
-  if (error === 'network') {
-    return 'Speech recognition network service is unavailable. Check the network or try again later.'
-  }
-  if (error === 'aborted') {
-    return 'Microphone transcription was interrupted. Click Start mic to retry.'
-  }
-  if (error === 'language-not-supported') {
-    return 'The selected source language is not supported by browser speech recognition.'
-  }
-  return `Microphone transcription error: ${error ?? 'unknown error'}`
-}
-
-function speechRecognitionLang(sourceLang: string): string {
-  if (sourceLang === 'cn' || sourceLang === 'zh') return 'zh-CN'
-  if (sourceLang === 'ja') return 'ja-JP'
-  if (sourceLang === 'ko') return 'ko-KR'
-  if (sourceLang === 'fr') return 'fr-FR'
-  if (sourceLang === 'de') return 'de-DE'
-  if (sourceLang === 'es') return 'es-ES'
-  if (sourceLang === 'auto') return navigator.language || 'en-US'
-  return `${sourceLang}-${sourceLang.toUpperCase()}`
+  return btoa(binary)
 }
 
 function renderSummary(summary: MeetingSummaryState): HTMLElement {

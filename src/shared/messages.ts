@@ -135,6 +135,17 @@ export type MeetingTranscriptSegmentMsg = {
   endedAt: number
 }
 
+export type MeetingAudioChunkMsg = {
+  type: 'meeting-audio-chunk'
+  sessionId: string
+  channel: MeetingChannel
+  sourceLang: string
+  mimeType: string
+  audioBase64: string
+  startedAt: number
+  endedAt: number
+}
+
 export type MeetingAudioStatusMsg = {
   type: 'meeting-audio-status'
   sessionId: string
@@ -184,6 +195,7 @@ export type ToBackground =
   | StopMeetingAssistantMsg
   | GetMeetingAssistantStateMsg
   | MeetingTranscriptSegmentMsg
+  | MeetingAudioChunkMsg
   | MeetingAudioStatusMsg
   | OpenOptionsMsg
   | TestConnectionMsg

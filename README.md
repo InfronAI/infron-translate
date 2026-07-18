@@ -80,13 +80,13 @@ Current implementation:
 - Opens a two-panel overlay on the active webpage.
 - Uses an offscreen document for tab-audio capture setup.
 - Shows microphone and system-audio capture state plus live input level meters in the overlay.
-- Automatically starts microphone transcription from the visible overlay when browser speech recognition is available.
-- Streams real microphone transcription when browser speech recognition is available.
-- Detects system-audio input automatically; system-audio transcription requires an external STT adapter.
+- Automatically streams microphone audio chunks to Infron Whisper STT when Cloud Model is configured.
+- Automatically streams captured system-audio chunks to Infron Whisper STT when Cloud Model is configured.
+- Uses `openai/whisper-1/audio-to-text` through the OpenAI-compatible `/audio/transcriptions` endpoint.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 
-Important current limitation: browser speech recognition reads the microphone, not arbitrary desktop/system audio. Captured tab audio is available to the offscreen document, but transcribing that stream requires an external STT adapter. That adapter can be connected in `src/background/meeting.ts` / `src/offscreen/meeting-audio.ts` while keeping the popup and overlay UI intact.
+Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Cloud Model with an Infron API key before using Whisper STT.
 
 ### Floating Auto-Translation Button
 

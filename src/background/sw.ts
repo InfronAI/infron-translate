@@ -53,6 +53,7 @@ function errorResponse(message: ToBackground, error: unknown): FromBackground {
   }
   if (
     message.type === 'meeting-transcript-segment' ||
+    message.type === 'meeting-audio-chunk' ||
     message.type === 'meeting-audio-status'
   ) {
     return { type: 'meeting-internal-result', ok: false }
@@ -251,6 +252,22 @@ function isToBackground(value: unknown): value is ToBackground {
       typeof value.endedAt === 'number'
     )
   }
+  if (value.type === 'meeting-audio-chunk') {
+    return (
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length <= 128 &&
+      isMeetingChannel(value.channel) &&
+      typeof value.sourceLang === 'string' &&
+      value.sourceLang.length <= 64 &&
+      typeof value.mimeType === 'string' &&
+      value.mimeType.length <= 128 &&
+      typeof value.audioBase64 === 'string' &&
+      value.audioBase64.length <= 4_500_000 &&
+      /^[A-Za-z0-9+/=]+$/u.test(value.audioBase64) &&
+      typeof value.startedAt === 'number' &&
+      typeof value.endedAt === 'number'
+    )
+  }
   if (value.type === 'meeting-audio-status') {
     return (
       typeof value.sessionId === 'string' &&
@@ -374,6 +391,11 @@ async function handle(
 
   if (message.type === 'meeting-transcript-segment') {
     await meetingManager.ingestTranscript(message)
+    return { type: 'meeting-internal-result', ok: true }
+  }
+
+  if (message.type === 'meeting-audio-chunk') {
+    await meetingManager.ingestAudioChunk(message)
     return { type: 'meeting-internal-result', ok: true }
   }
 

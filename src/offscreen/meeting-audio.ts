@@ -1,5 +1,5 @@
 import type { MeetingSession } from '../shared/meeting'
-import type { MeetingAudioStatusMsg } from '../shared/messages'
+import type { MeetingAudioChunkMsg, MeetingAudioStatusMsg } from '../shared/messages'
 
 type InternalMeetingAudioStartMsg = {
   type: 'meeting-audio-start'
@@ -15,6 +15,9 @@ let streams: MediaStream[] = []
 let playback: HTMLAudioElement | null = null
 let audioContext: AudioContext | null = null
 let levelTimer: ReturnType<typeof setInterval> | null = null
+let recorder: MediaRecorder | null = null
+let chunkStartedAt = 0
+let maxLevelSinceChunk = 0
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -53,6 +56,7 @@ async function startCapture(session: MeetingSession, outputStreamId?: string): P
       playback.srcObject = tabAudio
       await playback.play()
       startOutputLevelMeter(session.id, tabAudio)
+      startOutputRecorder(session, tabAudio)
       outputReady = true
     } catch (error) {
       console.warn(
@@ -83,6 +87,10 @@ function stopCapture(): void {
     globalThis.clearInterval(levelTimer)
     levelTimer = null
   }
+  if (recorder && recorder.state !== 'inactive') recorder.stop()
+  recorder = null
+  chunkStartedAt = 0
+  maxLevelSinceChunk = 0
   if (audioContext) {
     void audioContext.close()
     audioContext = null
@@ -113,9 +121,59 @@ function startOutputLevelMeter(sessionId: string, stream: MediaStream): void {
       type: 'meeting-audio-status',
       sessionId,
       output: true,
-      outputLevel: rmsLevel(data),
+      outputLevel: updateChunkLevel(rmsLevel(data)),
     })
   }, 500)
+}
+
+function startOutputRecorder(session: MeetingSession, stream: MediaStream): void {
+  if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return
+  recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+  chunkStartedAt = Date.now()
+  recorder.addEventListener('dataavailable', (event) => {
+    if (!event.data.size) return
+    const endedAt = Date.now()
+    const startedAt = chunkStartedAt || endedAt - 8000
+    chunkStartedAt = endedAt
+    const shouldSend = maxLevelSinceChunk > 0.025
+    maxLevelSinceChunk = 0
+    if (!shouldSend) return
+    void sendAudioChunk({
+      type: 'meeting-audio-chunk',
+      sessionId: session.id,
+      channel: 'meeting-output',
+      sourceLang: session.sourceLang,
+      mimeType: event.data.type || 'audio/webm',
+      audioBase64: '',
+      startedAt,
+      endedAt,
+    }, event.data)
+  })
+  recorder.start(8000)
+}
+
+function updateChunkLevel(level: number): number {
+  maxLevelSinceChunk = Math.max(maxLevelSinceChunk, level)
+  return level
+}
+
+async function sendAudioChunk(message: MeetingAudioChunkMsg, blob: Blob): Promise<void> {
+  try {
+    const audioBase64 = await blobToBase64(blob)
+    await chrome.runtime.sendMessage({ ...message, audioBase64 } satisfies MeetingAudioChunkMsg)
+  } catch {
+    // Best-effort streaming: dropping one chunk should not stop capture.
+  }
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  let binary = ''
+  const bytes = new Uint8Array(buffer)
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  }
+  return btoa(binary)
 }
 
 function rmsLevel(data: Uint8Array): number {
