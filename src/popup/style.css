@@ -211,9 +211,17 @@ h1 {
 
 .select-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 4.2em minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+.language-card {
+  gap: 7px;
+}
+
+.select-row .label {
+  text-align: left;
 }
 
 .select {
