@@ -9,6 +9,7 @@ import {
 
 describe('DEFAULT_SETTINGS', () => {
   it('defaults to zh full-page translation with automatic page mode off', () => {
+    expect(DEFAULT_SETTINGS.sourceLang).toBe('auto')
     expect(DEFAULT_SETTINGS.targetLang).toBe('zh')
     expect(DEFAULT_SETTINGS.pageTranslationEngine).toBe('browser')
     expect(DEFAULT_SETTINGS.autoPageTranslation).toBe(false)
@@ -27,6 +28,7 @@ describe('mergeSettings', () => {
     expect(merged.apiKey).toBe('sk-test')
     expect(merged.pageTranslationEngine).toBe('browser')
     expect(merged.autoPageTranslation).toBe(false)
+    expect(merged.sourceLang).toBe('auto')
     expect(merged.pageTranslationFontSizePx).toBe(14)
     expect(merged.model).toBe(DEFAULT_SETTINGS.model)
   })
@@ -62,6 +64,10 @@ describe('mergeSettings', () => {
     expect(merged.baseURL).toBe('123')
     expect(merged.apiKey).toBe('')
     expect(merged.model).toBe(DEFAULT_SETTINGS.model)
+  })
+
+  it('preserves a manual source language from storage', () => {
+    expect(mergeSettings({ sourceLang: 'ja' }).sourceLang).toBe('ja')
   })
 
   it('validates full-page translation appearance settings', () => {

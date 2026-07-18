@@ -83,6 +83,7 @@ async function injectIntoOpenTabs(): Promise<void> {
 /** The only settings shape allowed to cross from the trusted background boundary. */
 function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg {
   const {
+    sourceLang,
     targetLang,
     pageTranslationEngine,
     autoPageTranslation,
@@ -100,6 +101,7 @@ function settingsForContent(settings: UserSettings, hostname = ''): SettingsMsg 
   return {
     type: 'settings',
     settings: {
+      sourceLang,
       targetLang,
       pageTranslationEngine,
       autoPageTranslation,

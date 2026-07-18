@@ -58,9 +58,20 @@
               <span class="label">当前站点</span>
               <span id="hostname" class="value mono">—</span>
             </div>
+            <div class="row">
+              <span class="label">检测语言</span>
+              <span id="detectedSourceLang" class="value">检测中…</span>
+            </div>
             <label class="switch-row menu-item nested">
               <span class="switch-text">暂停此站</span>
               <input id="pauseToggle" type="checkbox" class="switch" disabled />
+            </label>
+          </section>
+
+          <section class="menu-item card">
+            <label class="select-row">
+              <span class="label">源语言</span>
+              <select id="sourceLangSelect" class="select"></select>
             </label>
           </section>
 

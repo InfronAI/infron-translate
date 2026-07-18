@@ -1,6 +1,10 @@
 import type { UserSettings } from '../shared/settings-defaults'
 import { DEFAULT_SETTINGS, mergeSettings } from '../shared/settings-defaults'
-import type { SettingsMsg, TogglePageTranslationResult } from '../shared/messages'
+import type {
+  PageLanguageResult,
+  SettingsMsg,
+  TogglePageTranslationResult,
+} from '../shared/messages'
 import { BrowserTranslator } from './browser-translator'
 import { PageTranslator } from './page-translator'
 import { detectPageSourceLanguage } from './page-language'
@@ -20,9 +24,14 @@ function backgroundError(value: unknown): string | null {
   return 'error' in value && typeof value.error === 'string' ? value.error : null
 }
 
-export function pageTranslationSigOf(s: UserSettings, isConfiguredFlag: boolean): string {
+export function pageTranslationSigOf(
+  s: UserSettings,
+  isConfiguredFlag: boolean,
+  effectiveSourceLang = s.sourceLang,
+): string {
   return [
     s.pageTranslationEngine === 'external' ? isConfiguredFlag : true,
+    effectiveSourceLang,
     s.targetLang,
     s.pageTranslationEngine,
     s.minTextLength,
@@ -67,12 +76,10 @@ export class PageController {
     })
 
     chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
-      if (
-        sender.id === chrome.runtime.id &&
-        message &&
-        typeof message === 'object' &&
-        (message as { type?: unknown }).type === 'toggle-page-translation'
-      ) {
+      if (sender.id !== chrome.runtime.id || !message || typeof message !== 'object') return false
+
+      const type = (message as { type?: unknown }).type
+      if (type === 'toggle-page-translation') {
         const result = this.validatePageTranslation()
         if (!result.ok) {
           sendResponse(result)
@@ -82,6 +89,16 @@ export class PageController {
         sendResponse({ ok: true } satisfies TogglePageTranslationResult)
         return false
       }
+
+      if (type === 'get-page-language') {
+        sendResponse({
+          type: 'page-language-result',
+          detectedSourceLang: this.detectedSourceLang,
+          effectiveSourceLang: this.effectiveSourceLang(),
+        } satisfies PageLanguageResult)
+        return false
+      }
+
       return false
     })
   }
@@ -100,7 +117,11 @@ export class PageController {
       this.pausedHere = response.paused
       if (this.pausedHere && this.pageTranslator.isActive()) this.pageTranslator.deactivate()
 
-      const pageSig = pageTranslationSigOf(this.settings, this.configured)
+      const pageSig = pageTranslationSigOf(
+        this.settings,
+        this.configured,
+        this.effectiveSourceLang(),
+      )
       const pageChanged = pageSig !== this.pageSettingsSig
       const previousPageSig = this.pageSettingsSig
       this.pageSettingsSig = pageSig
@@ -130,7 +151,7 @@ export class PageController {
       this.pausedHere ||
       !this.settings.autoPageTranslation ||
       this.pageTranslator.isActive() ||
-      this.detectedSourceLang === this.settings.targetLang
+      this.effectiveSourceLang() === this.settings.targetLang
     ) {
       return
     }
@@ -138,7 +159,7 @@ export class PageController {
 
     const settingsGeneration = this.settingsGeneration
     const settings = this.settings
-    const sourceLang = this.detectedSourceLang
+    const sourceLang = this.effectiveSourceLang()
     const configured = this.configured
     this.autoPageStartPending = true
     try {
@@ -183,6 +204,12 @@ export class PageController {
   }
 
   private pageSettings(): PageSettings {
-    return { ...this.settings, sourceLang: this.detectedSourceLang }
+    return { ...this.settings, sourceLang: this.effectiveSourceLang() }
+  }
+
+  private effectiveSourceLang(): string {
+    return this.settings.sourceLang === 'auto'
+      ? this.detectedSourceLang
+      : this.settings.sourceLang
   }
 }

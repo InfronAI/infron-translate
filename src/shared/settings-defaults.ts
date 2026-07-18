@@ -13,6 +13,8 @@ export type UserSettings = {
    * Default off (or lowest where off is unavailable, e.g. StepFun → low).
    */
   reasoningPref: ReasoningPref
+  /** auto means use the detected language for the active webpage. */
+  sourceLang: string
   targetLang: string
   /** Engine used by the full-page bilingual DOM translation mode. */
   pageTranslationEngine: TranslationEngine
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   model: 'gpt-4o-mini',
   provider: 'auto',
   reasoningPref: 'off',
+  sourceLang: 'auto',
   targetLang: 'zh',
   pageTranslationEngine: 'browser',
   autoPageTranslation: false,
@@ -94,6 +97,7 @@ export function mergeSettings(partial: unknown): UserSettings {
     model: stringValue(p.model, DEFAULT_SETTINGS.model),
     provider: asProviderId(p.provider),
     reasoningPref: asReasoningPref(p.reasoningPref),
+    sourceLang: stringValue(p.sourceLang, DEFAULT_SETTINGS.sourceLang).slice(0, 64),
     targetLang: stringValue(p.targetLang, DEFAULT_SETTINGS.targetLang).slice(0, 64),
     pageTranslationEngine: asTranslationEngine(
       p.pageTranslationEngine,

@@ -1,5 +1,8 @@
 import { isConfigured, loadSettings, saveSettings, missingConfigFields, type UserSettings } from '../shared/settings'
+import { LANGUAGE_OPTIONS, languageLabel } from '../shared/languages'
 import type {
+  GetPageLanguageMsg,
+  PageLanguageResult,
   PauseHostnameMsg,
   TogglePageTranslationMsg,
   TogglePageTranslationResult,
@@ -20,6 +23,29 @@ function hostnameFromUrl(url: string | undefined): string {
   } catch {
     return ''
   }
+}
+
+function populateSourceLanguageSelect(): void {
+  const select = el<HTMLSelectElement>('sourceLangSelect')
+  select.replaceChildren(
+    option('auto', '自动检测'),
+    ...LANGUAGE_OPTIONS.map(([code, name]) => option(code, `${name} · ${code}`)),
+  )
+}
+
+function option(value: string, label: string): HTMLOptionElement {
+  const node = document.createElement('option')
+  node.value = value
+  node.textContent = label
+  return node
+}
+
+function setSourceLanguageValue(value: string): void {
+  const select = el<HTMLSelectElement>('sourceLangSelect')
+  if (![...select.options].some((item) => item.value === value)) {
+    select.append(option(value, `自定义 · ${value}`))
+  }
+  select.value = value
 }
 
 function renderStatus(settings: UserSettings): void {
@@ -51,6 +77,7 @@ function renderStatus(settings: UserSettings): void {
   }
 
   el<HTMLElement>('usageHint').textContent = '使用下方按钮切换整页中英双语翻译。'
+  setSourceLanguageValue(settings.sourceLang)
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {
@@ -101,7 +128,37 @@ function isTogglePageTranslationResult(value: unknown): value is TogglePageTrans
   return value.ok === false && 'error' in value && typeof value.error === 'string'
 }
 
+async function queryPageLanguage(tabId: number): Promise<PageLanguageResult | null> {
+  const message: GetPageLanguageMsg = { type: 'get-page-language' }
+  let response: unknown
+  try {
+    response = await chrome.tabs.sendMessage(tabId, message)
+  } catch {
+    const files = (chrome.runtime.getManifest().content_scripts ?? []).flatMap((s) => s.js ?? [])
+    if (!files.length) return null
+    await chrome.scripting.executeScript({ target: { tabId }, files })
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    response = await chrome.tabs.sendMessage(tabId, message)
+  }
+  return isPageLanguageResult(response) ? response : null
+}
+
+function isPageLanguageResult(value: unknown): value is PageLanguageResult {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'type' in value &&
+      value.type === 'page-language-result' &&
+      'detectedSourceLang' in value &&
+      typeof value.detectedSourceLang === 'string' &&
+      'effectiveSourceLang' in value &&
+      typeof value.effectiveSourceLang === 'string',
+  )
+}
+
 async function init(): Promise<void> {
+  populateSourceLanguageSelect()
+
   el<HTMLButtonElement>('openOptions').addEventListener('click', () => {
     void chrome.runtime.openOptionsPage()
   })
@@ -111,12 +168,22 @@ async function init(): Promise<void> {
   const hostnameEl = el<HTMLElement>('hostname')
   const pauseToggle = el<HTMLInputElement>('pauseToggle')
   const pageAutoToggle = el<HTMLInputElement>('pageAutoToggle')
+  const sourceLangSelect = el<HTMLSelectElement>('sourceLangSelect')
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
     translatePageBtn.disabled = true
+    sourceLangSelect.disabled = true
   } else {
     const tabId = tab.id
+    const pageLanguage = await queryPageLanguage(tabId)
+    if (pageLanguage) {
+      el<HTMLElement>('detectedSourceLang').textContent = languageLabel(
+        pageLanguage.detectedSourceLang,
+      )
+    } else {
+      el<HTMLElement>('detectedSourceLang').textContent = '无法检测'
+    }
     translatePageBtn.addEventListener('click', async () => {
       try {
         el<HTMLElement>('error').hidden = true
@@ -132,6 +199,7 @@ async function init(): Promise<void> {
 
   if (!hostname) {
     hostnameEl.textContent = '（无法读取此页）'
+    el<HTMLElement>('detectedSourceLang').textContent = '无法检测'
     pauseToggle.disabled = true
   } else {
     hostnameEl.textContent = hostname
@@ -169,6 +237,24 @@ async function init(): Promise<void> {
       renderStatus(settings)
     } catch (err) {
       pageAutoToggle.checked = !pageAutoToggle.checked
+      const error = el<HTMLElement>('error')
+      error.hidden = false
+      error.textContent = err instanceof Error ? err.message : String(err)
+    }
+  })
+
+  sourceLangSelect.addEventListener('change', async () => {
+    try {
+      el<HTMLElement>('error').hidden = true
+      const next: UserSettings = {
+        ...settings,
+        sourceLang: sourceLangSelect.value || 'auto',
+      }
+      await saveSettings(next)
+      settings = await loadSettings()
+      renderStatus(settings)
+    } catch (err) {
+      setSourceLanguageValue(settings.sourceLang)
       const error = el<HTMLElement>('error')
       error.hidden = false
       error.textContent = err instanceof Error ? err.message : String(err)

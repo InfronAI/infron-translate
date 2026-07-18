@@ -31,6 +31,7 @@ export type TranslateBatchResultErr = {
 export type GetSettingsMsg = { type: 'get-settings' }
 export type ContentSettings = Pick<
   UserSettings,
+  | 'sourceLang'
   | 'targetLang'
   | 'pageTranslationEngine'
   | 'autoPageTranslation'
@@ -86,6 +87,13 @@ export type TogglePageTranslationMsg = { type: 'toggle-page-translation' }
 export type TogglePageTranslationResult =
   | { ok: true }
   | { ok: false; error: string }
+
+export type GetPageLanguageMsg = { type: 'get-page-language' }
+export type PageLanguageResult = {
+  type: 'page-language-result'
+  detectedSourceLang: string
+  effectiveSourceLang: string
+}
 
 export type BackgroundErrorResult = {
   type: 'background-error'
