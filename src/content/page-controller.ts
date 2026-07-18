@@ -35,6 +35,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object'
 }
 
+function isExtensionContextInvalidated(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Extension context invalidated|context invalidated|Extension context was invalidated/u.test(message)
+}
+
 function isShowMeetingAssistantMessage(value: unknown): value is ShowMeetingAssistantMsg {
   return (
     isRecord(value) &&
@@ -195,6 +200,10 @@ export class PageController {
 
       if (this.settings.autoPageTranslation) await this.maybeStartPageTranslation()
     } catch (error) {
+      if (isExtensionContextInvalidated(error)) {
+        this.handleInvalidatedExtensionContext()
+        return
+      }
       console.warn(
         '[Infron Translate] settings refresh failed',
         error instanceof Error ? error.message : String(error),
@@ -280,7 +289,8 @@ export class PageController {
     this.externalConfigPrompted = true
     try {
       await chrome.runtime.sendMessage({ type: 'open-options' } satisfies OpenOptionsMsg)
-    } catch {
+    } catch (error) {
+      if (isExtensionContextInvalidated(error)) this.handleInvalidatedExtensionContext()
       // Opening the options page is a guide; translation validation still returns the real error.
     }
   }
@@ -417,7 +427,17 @@ button[data-enabled="false"] .logo {
 `
       const button = document.createElement('button')
       button.type = 'button'
-      button.innerHTML = '<img class="logo" src="' + chrome.runtime.getURL('icons/infron-mark.png') + '" alt="" aria-hidden="true" />'
+      let logoUrl = ''
+      try {
+        logoUrl = chrome.runtime.getURL('icons/infron-mark.png')
+      } catch (error) {
+        if (isExtensionContextInvalidated(error)) {
+          this.handleInvalidatedExtensionContext()
+          return
+        }
+        throw error
+      }
+      button.innerHTML = '<img class="logo" src="' + logoUrl + '" alt="" aria-hidden="true" />'
       button.addEventListener('click', () => {
         void this.toggleAutoTranslation()
       })
@@ -460,6 +480,10 @@ button[data-enabled="false"] .logo {
       if (this.settings.autoPageTranslation) await this.maybeStartPageTranslation()
       else if (this.pageTranslator.isActive()) this.pageTranslator.deactivate()
     } catch (error) {
+      if (isExtensionContextInvalidated(error)) {
+        this.handleInvalidatedExtensionContext()
+        return
+      }
       console.warn(
         '[Infron Translate] auto translation toggle failed',
         error instanceof Error ? error.message : String(error),
@@ -468,5 +492,12 @@ button[data-enabled="false"] .logo {
       this.autoToggleBusy = false
       this.renderAutoToggle()
     }
+  }
+
+  private handleInvalidatedExtensionContext(): void {
+    this.autoToggleBusy = false
+    this.autoToggleButton = null
+    this.autoToggleRoot = null
+    document.getElementById(AUTO_TOGGLE_HOST_ID)?.remove()
   }
 }
