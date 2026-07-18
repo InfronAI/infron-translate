@@ -37,7 +37,7 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ['storage', 'tabs', 'scripting', 'offscreen', 'tabCapture', 'audioCapture'],
+  permissions: ['storage', 'tabs', 'scripting', 'offscreen', 'tabCapture'],
   host_permissions: ['http://*/*', 'https://*/*'],
   web_accessible_resources: [
     {
