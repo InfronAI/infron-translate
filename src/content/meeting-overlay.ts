@@ -293,10 +293,13 @@ export class MeetingOverlay {
       }
     }
     next.onerror = (event) => {
+      const detail = speechRecognitionErrorMessage(event.error)
+      const active = event.error === 'no-speech'
+      if (!active) this.recognitionShouldRun = false
       void this.sendAudioStatus({
-        active: false,
+        active,
         source: 'browser-speech',
-        message: `Microphone transcription error: ${event.error ?? 'unknown error'}`,
+        message: detail,
       })
     }
     next.onend = () => {
@@ -387,6 +390,28 @@ function speechRecognitionConstructor(): SpeechRecognitionConstructor | null {
     webkitSpeechRecognition?: SpeechRecognitionConstructor
   }
   return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null
+}
+
+function speechRecognitionErrorMessage(error: string | undefined): string {
+  if (error === 'no-speech') {
+    return 'Listening, but no clear speech was detected yet. Move closer to the microphone or check the input device.'
+  }
+  if (error === 'audio-capture') {
+    return 'No microphone input was captured. Check the selected microphone in Chrome or system settings.'
+  }
+  if (error === 'not-allowed' || error === 'service-not-allowed') {
+    return 'Microphone permission was blocked. Allow microphone access for this page, then click Start mic again.'
+  }
+  if (error === 'network') {
+    return 'Speech recognition network service is unavailable. Check the network or try again later.'
+  }
+  if (error === 'aborted') {
+    return 'Microphone transcription was interrupted. Click Start mic to retry.'
+  }
+  if (error === 'language-not-supported') {
+    return 'The selected source language is not supported by browser speech recognition.'
+  }
+  return `Microphone transcription error: ${error ?? 'unknown error'}`
 }
 
 function speechRecognitionLang(sourceLang: string): string {
