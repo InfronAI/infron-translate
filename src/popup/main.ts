@@ -72,7 +72,13 @@ function setLanguageSelectValue(id: string, value: string, fallback: string): vo
 
 function renderStatus(settings: UserSettings): void {
   const configured = isConfigured(settings)
-  el<HTMLSelectElement>('pageEngineSelect').value = settings.pageTranslationEngine
+  const pageEngineSelect = el<HTMLSelectElement>('pageEngineSelect')
+  const externalOption = pageEngineSelect.querySelector<HTMLOptionElement>('option[value="external"]')
+  if (externalOption) externalOption.disabled = !configured
+  pageEngineSelect.value =
+    settings.pageTranslationEngine === 'external' && !configured
+      ? 'browser'
+      : settings.pageTranslationEngine
 
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
@@ -86,8 +92,7 @@ function renderStatus(settings: UserSettings): void {
       : 'Full-page bilingual'
 
   const configureCloudModel = el<HTMLButtonElement>('configureCloudModel')
-  const needsExternal = settings.pageTranslationEngine === 'external'
-  configureCloudModel.hidden = configured || !needsExternal
+  configureCloudModel.hidden = configured
 
   el<HTMLElement>('usageHint').textContent =
     settings.translationDisplayMode === 'translation-only'
@@ -102,6 +107,12 @@ async function openExternalConfigIfNeeded(settings: UserSettings): Promise<boole
   if (settings.pageTranslationEngine !== 'external' || isConfigured(settings)) return false
   await chrome.runtime.openOptionsPage()
   return true
+}
+
+async function normalizeUnavailableEngine(settings: UserSettings): Promise<UserSettings> {
+  if (settings.pageTranslationEngine !== 'external' || isConfigured(settings)) return settings
+  await saveSettings({ ...settings, pageTranslationEngine: 'browser' })
+  return loadSettings()
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {
@@ -235,7 +246,7 @@ async function init(): Promise<void> {
     pauseToggle.disabled = false
   }
 
-  let settings = await loadSettings()
+  let settings = await normalizeUnavailableEngine(await loadSettings())
   renderStatus(settings)
 
   if (hostname) {
@@ -283,6 +294,11 @@ async function init(): Promise<void> {
   ): Promise<void> {
     try {
       el<HTMLElement>('error').hidden = true
+      if (next.pageTranslationEngine === 'external' && !isConfigured(settings)) {
+        pageEngineSelect.value = settings.pageTranslationEngine
+        await chrome.runtime.openOptionsPage()
+        return
+      }
       const nextSettings: UserSettings = {
         ...settings,
         ...next,

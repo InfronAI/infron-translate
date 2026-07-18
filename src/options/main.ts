@@ -60,6 +60,14 @@ function setLanguageValue(id: 'targetLang', value: string): void {
   select.value = value
 }
 
+function syncTranslationEngineAvailability(settings: UserSettings): void {
+  const select = el<HTMLSelectElement>('pageTranslationEngine')
+  const externalOption = select.querySelector<HTMLOptionElement>('option[value="external"]')
+  const configured = isConfigured(settings)
+  if (externalOption) externalOption.disabled = !configured
+  if (!configured && select.value === 'external') select.value = 'browser'
+}
+
 function fillForm(s: UserSettings): void {
   el<HTMLSelectElement>('provider').value = s.provider
   el<HTMLInputElement>('baseURL').value = s.baseURL
@@ -87,10 +95,11 @@ function fillForm(s: UserSettings): void {
   el<HTMLInputElement>('pageTranslationItalic').checked = s.pageTranslationItalic
   el<HTMLInputElement>('pageTranslationUnderline').checked = s.pageTranslationUnderline
   el<HTMLInputElement>('pausedHostnames').value = s.pausedHostnames.join(', ')
+  syncTranslationEngineAvailability(s)
   updateConfigBadge(s)
   updateProviderHint(s.provider)
   updateStyleControlStates()
-  updateEngineSummary(s)
+  updateEngineSummary(readForm(s))
 }
 
 function readForm(stored: UserSettings): UserSettings {
@@ -181,6 +190,12 @@ function updateConfigBadge(s: UserSettings): void {
     badge.textContent = 'Setup required'
     badge.className = 'config-badge warn'
   }
+}
+
+async function normalizeUnavailableEngine(settings: UserSettings): Promise<UserSettings> {
+  if (settings.pageTranslationEngine !== 'external' || isConfigured(settings)) return settings
+  await saveSettings({ ...settings, pageTranslationEngine: 'browser' })
+  return loadSettings()
 }
 
 function updateProviderHint(provider: string): void {
@@ -303,7 +318,7 @@ function setupSectionNavigation(): void {
 
 async function init(): Promise<void> {
   populateLanguageSelects()
-  let stored = await loadSettings()
+  let stored = await normalizeUnavailableEngine(await loadSettings())
   fillForm(stored)
   void checkBrowserCapability()
   setupSectionNavigation()
@@ -323,6 +338,20 @@ async function init(): Promise<void> {
   el<HTMLSelectElement>('targetLang').addEventListener('change', () => void checkBrowserCapability())
   for (const id of ['pageTranslationEngine']) {
     el<HTMLSelectElement>(id).addEventListener('change', () => {
+      const next = readForm(stored)
+      if (next.pageTranslationEngine === 'external' && !isConfigured(next)) {
+        el<HTMLSelectElement>('pageTranslationEngine').value = 'browser'
+        setStatus('Complete Cloud Model setup before selecting it.', false)
+      }
+      updateEngineSummary(readForm(stored))
+    })
+  }
+
+  for (const id of ['baseURL', 'apiKey', 'model']) {
+    el<HTMLInputElement>(id).addEventListener('input', () => {
+      const next = readForm(stored)
+      syncTranslationEngineAvailability(next)
+      updateConfigBadge(next)
       updateEngineSummary(readForm(stored))
     })
   }
@@ -340,10 +369,10 @@ async function init(): Promise<void> {
       const usesExternal = next.pageTranslationEngine === 'external'
       const missing = usesExternal ? missingConfigFields(next) : []
       if (missing.length) {
-        await saveSettings(next)
-        stored = await loadSettings()
-        fillForm(stored)
-        setStatus(`Saved, but Cloud AI model is incomplete: add ${missing.join(', ')}.`, false)
+        el<HTMLSelectElement>('pageTranslationEngine').value = 'browser'
+        syncTranslationEngineAvailability(readForm(stored))
+        updateEngineSummary(readForm(stored))
+        setStatus(`Complete Cloud Model setup before selecting it: add ${missing.join(', ')}.`, false)
         return
       }
       await saveSettings(next)
