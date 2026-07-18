@@ -1,6 +1,6 @@
 {
   "name": "infron-translate",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Chrome extension for automatic full-page bilingual translation.",
   "private": true,
   "type": "module",

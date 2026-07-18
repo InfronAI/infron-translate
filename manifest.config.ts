@@ -4,7 +4,7 @@ export default defineManifest({
   manifest_version: 3,
   name: 'Infron Translate',
   description: 'Full-page translation and meeting assistant for live summaries and bilingual transcripts.',
-  version: '0.2.0',
+  version: '0.2.1',
   icons: {
     16: 'icons/icon16.png',
     32: 'icons/icon32.png',
