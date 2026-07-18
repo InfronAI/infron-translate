@@ -271,20 +271,23 @@ button {
   all: unset;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   box-sizing: border-box;
-  padding: 8px;
-  border: 1px solid rgb(255 255 255 / 58%);
+  padding: 7px;
+  border: 1px solid rgb(255 255 255 / 64%);
   border-radius: 999px;
   background:
-    radial-gradient(circle at 22% 12%, rgb(255 255 255 / 92%), transparent 34%),
-    linear-gradient(135deg, rgb(25 113 235 / 96%), rgb(0 180 160 / 94%));
+    radial-gradient(circle at 28% 18%, rgb(255 255 255 / 96%), rgb(255 255 255 / 48%) 35%, transparent 62%),
+    linear-gradient(145deg, rgb(255 255 255 / 72%), rgb(220 247 255 / 46%));
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
   color: #fff;
   box-shadow:
-    0 14px 34px rgb(15 23 42 / 22%),
-    0 0 0 3px rgb(0 180 160 / 24%),
-    inset 0 1px 0 rgb(255 255 255 / 42%);
+    0 16px 36px rgb(15 23 42 / 22%),
+    0 0 0 3px rgb(14 165 233 / 18%),
+    0 0 26px rgb(0 180 160 / 26%),
+    inset 0 1px 0 rgb(255 255 255 / 68%);
   cursor: pointer;
   user-select: none;
   -webkit-font-smoothing: antialiased;
@@ -296,8 +299,9 @@ button:hover {
   filter: saturate(1.08) brightness(1.04);
   box-shadow:
     0 18px 42px rgb(15 23 42 / 26%),
-    0 0 0 4px rgb(0 180 160 / 28%),
-    inset 0 1px 0 rgb(255 255 255 / 48%);
+    0 0 0 4px rgb(14 165 233 / 24%),
+    0 0 32px rgb(0 180 160 / 34%),
+    inset 0 1px 0 rgb(255 255 255 / 72%);
 }
 
 button:active {
@@ -311,14 +315,14 @@ button:focus-visible {
 
 button[data-enabled="false"] {
   background:
-    radial-gradient(circle at 22% 12%, rgb(255 255 255 / 86%), transparent 34%),
-    linear-gradient(135deg, rgb(71 85 105 / 94%), rgb(100 116 139 / 92%));
-  filter: grayscale(0.64) saturate(0.52);
-  opacity: 0.68;
+    radial-gradient(circle at 28% 18%, rgb(255 255 255 / 88%), rgb(255 255 255 / 32%) 38%, transparent 64%),
+    linear-gradient(145deg, rgb(248 250 252 / 58%), rgb(148 163 184 / 30%));
+  filter: none;
+  opacity: 0.78;
   box-shadow:
     0 10px 24px rgb(15 23 42 / 16%),
     0 0 0 1px rgb(148 163 184 / 22%),
-    inset 0 1px 0 rgb(255 255 255 / 34%);
+    inset 0 1px 0 rgb(255 255 255 / 54%);
 }
 
 button[data-busy="true"] {
@@ -328,11 +332,31 @@ button[data-busy="true"] {
 }
 
 .logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   object-fit: contain;
-  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 22%));
+  filter:
+    saturate(1.12)
+    drop-shadow(0 2px 4px rgb(15 23 42 / 24%))
+    drop-shadow(0 0 10px rgb(0 180 160 / 32%));
+  transition: transform 0.16s ease, filter 0.16s ease, opacity 0.16s ease;
+}
+
+button:hover .logo {
+  transform: translateY(-1px) scale(1.04);
+  filter:
+    saturate(1.2)
+    drop-shadow(0 3px 5px rgb(15 23 42 / 26%))
+    drop-shadow(0 0 14px rgb(0 180 160 / 42%));
+}
+
+button[data-enabled="false"] .logo {
+  opacity: 0.72;
+  filter:
+    grayscale(1)
+    saturate(0.26)
+    drop-shadow(0 1px 2px rgb(15 23 42 / 18%));
 }
 
 @keyframes infronAutoTogglePulse {
@@ -343,10 +367,11 @@ button[data-busy="true"] {
 @media (max-width: 520px) {
   :host { right: 10px; }
   button {
-    width: 42px;
-    height: 42px;
-    padding: 10px;
+    width: 44px;
+    height: 44px;
+    padding: 7px;
   }
+  .logo { width: 30px; height: 30px; }
 }
 `
       const button = document.createElement('button')
