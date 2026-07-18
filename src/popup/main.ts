@@ -25,10 +25,15 @@ function hostnameFromUrl(url: string | undefined): string {
   }
 }
 
-function populateSourceLanguageSelect(): void {
-  const select = el<HTMLSelectElement>('sourceLangSelect')
-  select.replaceChildren(
+function populateLanguageSelects(): void {
+  const source = el<HTMLSelectElement>('sourceLangSelect')
+  source.replaceChildren(
     option('auto', '自动检测'),
+    ...LANGUAGE_OPTIONS.map(([code, name]) => option(code, `${name} · ${code}`)),
+  )
+
+  const target = el<HTMLSelectElement>('targetLangSelect')
+  target.replaceChildren(
     ...LANGUAGE_OPTIONS.map(([code, name]) => option(code, `${name} · ${code}`)),
   )
 }
@@ -41,11 +46,20 @@ function option(value: string, label: string): HTMLOptionElement {
 }
 
 function setSourceLanguageValue(value: string): void {
-  const select = el<HTMLSelectElement>('sourceLangSelect')
-  if (![...select.options].some((item) => item.value === value)) {
-    select.append(option(value, `自定义 · ${value}`))
+  setLanguageSelectValue('sourceLangSelect', value, 'auto')
+}
+
+function setTargetLanguageValue(value: string): void {
+  setLanguageSelectValue('targetLangSelect', value, 'zh')
+}
+
+function setLanguageSelectValue(id: string, value: string, fallback: string): void {
+  const select = el<HTMLSelectElement>(id)
+  const nextValue = value || fallback
+  if (![...select.options].some((item) => item.value === nextValue)) {
+    select.append(option(nextValue, `自定义 · ${nextValue}`))
   }
-  select.value = value
+  select.value = nextValue
 }
 
 function renderStatus(settings: UserSettings): void {
@@ -78,6 +92,7 @@ function renderStatus(settings: UserSettings): void {
 
   el<HTMLElement>('usageHint').textContent = '使用下方按钮切换整页中英双语翻译。'
   setSourceLanguageValue(settings.sourceLang)
+  setTargetLanguageValue(settings.targetLang)
 }
 
 async function setHostnamePaused(hostname: string, paused: boolean): Promise<UserSettings> {
@@ -157,7 +172,7 @@ function isPageLanguageResult(value: unknown): value is PageLanguageResult {
 }
 
 async function init(): Promise<void> {
-  populateSourceLanguageSelect()
+  populateLanguageSelects()
 
   el<HTMLButtonElement>('openOptions').addEventListener('click', () => {
     void chrome.runtime.openOptionsPage()
@@ -169,6 +184,7 @@ async function init(): Promise<void> {
   const pauseToggle = el<HTMLInputElement>('pauseToggle')
   const pageAutoToggle = el<HTMLInputElement>('pageAutoToggle')
   const sourceLangSelect = el<HTMLSelectElement>('sourceLangSelect')
+  const targetLangSelect = el<HTMLSelectElement>('targetLangSelect')
 
   const translatePageBtn = el<HTMLButtonElement>('translatePage')
   if (tab?.id === undefined || !hostname) {
@@ -243,22 +259,33 @@ async function init(): Promise<void> {
     }
   })
 
-  sourceLangSelect.addEventListener('change', async () => {
+  async function saveLanguageSetting(
+    next: Partial<Pick<UserSettings, 'sourceLang' | 'targetLang'>>,
+  ): Promise<void> {
     try {
       el<HTMLElement>('error').hidden = true
-      const next: UserSettings = {
+      const nextSettings: UserSettings = {
         ...settings,
-        sourceLang: sourceLangSelect.value || 'auto',
+        ...next,
       }
-      await saveSettings(next)
+      await saveSettings(nextSettings)
       settings = await loadSettings()
       renderStatus(settings)
     } catch (err) {
       setSourceLanguageValue(settings.sourceLang)
+      setTargetLanguageValue(settings.targetLang)
       const error = el<HTMLElement>('error')
       error.hidden = false
       error.textContent = err instanceof Error ? err.message : String(err)
     }
+  }
+
+  sourceLangSelect.addEventListener('change', () => {
+    void saveLanguageSetting({ sourceLang: sourceLangSelect.value || 'auto' })
+  })
+
+  targetLangSelect.addEventListener('change', () => {
+    void saveLanguageSetting({ targetLang: targetLangSelect.value || 'zh' })
   })
 }
 

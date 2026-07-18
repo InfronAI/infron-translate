@@ -5,7 +5,7 @@ Infron Translate is a Chrome Manifest V3 extension for full-page bilingual trans
 ## Current Capabilities
 
 - Detect the source language from the current page and allow a manual source-language override from the popup.
-- Let users choose the target language from the settings page.
+- Let users choose the target language from the popup or settings page.
 - Translate rendered DOM text and append translations below the original text.
 - Toggle full-page bilingual mode from the popup.
 - Automatically start bilingual mode on eligible pages.
@@ -35,7 +35,7 @@ Open the extension popup and choose **Open settings**.
 
 ### Target Language
 
-The source language is detected from the current webpage. The popup shows the detected language and lets the user keep automatic detection or choose a manual source language.
+The source language is detected from the current webpage. The popup shows the detected language and lets the user keep automatic detection or choose a manual source language. The target language can also be changed directly from the popup.
 
 ### External Model
 
