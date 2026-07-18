@@ -73,8 +73,8 @@ function renderStatus(settings: UserSettings): void {
   const pageAuto = el<HTMLInputElement>('pageAutoToggle')
   pageAuto.checked = settings.autoPageTranslation
   el<HTMLElement>('pageAutoDesc').textContent = settings.autoPageTranslation
-    ? '开：检测到网页语言后自动开启'
-    : '关：使用按钮手动开启'
+    ? '开启：进入网页后自动翻译'
+    : '关闭：点击按钮后翻译'
 
   el<HTMLElement>('modeHint').textContent = '整页双语翻译'
 
