@@ -124,26 +124,6 @@ h1 {
   font-size: clamp(20px, 2.4vw, 27px);
 }
 
-.hero-points {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 24px;
-}
-
-.hero-points span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  border: 1px solid rgb(0 166 166 / 24%);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 74%);
-  color: #24535b;
-  padding: 0 13px;
-  font-size: 14px;
-  font-weight: 720;
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;
