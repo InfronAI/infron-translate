@@ -192,8 +192,8 @@ const SKIP_CLOSEST =
     // lands on top of whatever the tooltip points at (e.g. GitHub's <tool-tip>).
     '[role="tooltip"]',
     'tool-tip',
-    '[data-lens-ignore]',
-    '[data-lens-page-translation]',
+    '[data-infron-ignore]',
+    '[data-infron-page-translation]',
     '#infron-translate-root',
   ].join(', ')
 
@@ -481,7 +481,7 @@ function shouldSkipElement(el: Element): boolean {
   if (el.closest('#infron-translate-root')) return true
   if (
     !el.hasAttribute(PAGE_SOURCE_ATTR) &&
-    el.querySelector('[data-lens-page-translation]')
+    el.querySelector('[data-infron-page-translation]')
   ) {
     return true
   }

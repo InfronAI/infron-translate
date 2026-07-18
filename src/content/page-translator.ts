@@ -17,17 +17,12 @@ import {
 } from './extract'
 import { makePageKey } from './page-key'
 import { BrowserTranslator } from './browser-translator'
-import {
-  PAGE_ALIGNMENT_FALLBACK_ATTR,
-  PAGE_ALIGNMENT_HIGHLIGHT_NAME,
-  PageAlignmentController,
-} from './page-alignment'
 
-const TRANSLATED_ATTR = 'data-lens-page-translated'
-const TRANSLATION_TEXT_ATTR = 'data-lens-page-translation-text'
-const UI_TRANSLATION_ATTR = 'data-lens-page-ui-translation'
-const UI_STACKED_TRANSLATION_ATTR = 'data-lens-page-ui-stacked-translation'
-const UI_CONTROL_TRANSLATION_ATTR = 'data-lens-page-ui-control-translation'
+const TRANSLATED_ATTR = 'data-infron-page-translated'
+const TRANSLATION_TEXT_ATTR = 'data-infron-page-translation-text'
+const UI_TRANSLATION_ATTR = 'data-infron-page-ui-translation'
+const UI_STACKED_TRANSLATION_ATTR = 'data-infron-page-ui-stacked-translation'
+const UI_CONTROL_TRANSLATION_ATTR = 'data-infron-page-ui-control-translation'
 const STYLE_ID = 'infron-translate-page-style'
 const STATUS_ID = 'infron-translate-page-status'
 
@@ -123,18 +118,6 @@ function pageStyles(settings: PageSettings): string {
   font-size: 0.7em !important;
   line-height: inherit !important;
   white-space: nowrap !important;
-}
-
-::highlight(${PAGE_ALIGNMENT_HIGHLIGHT_NAME}) {
-  background: rgb(250 204 21 / 52%);
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: rgb(202 138 4 / 80%);
-  text-decoration-thickness: 2px;
-}
-
-[${PAGE_ALIGNMENT_FALLBACK_ATTR}] {
-  background-color: rgb(250 204 21 / 22%) !important;
 }
 
 #${STATUS_ID} {
@@ -348,7 +331,6 @@ export class PageTranslator {
   private processedCount = 0
   private translatedCount = 0
   private totalCount = 0
-  private readonly alignment = new PageAlignmentController()
 
   constructor(private readonly browserTranslator: BrowserTranslator) {}
 
@@ -369,7 +351,6 @@ export class PageTranslator {
     this.generation++
     this.observer?.disconnect()
     this.observer = null
-    this.alignment.deactivate()
     this.observedRoots = new WeakSet<Node>()
     window.clearTimeout(this.statusTimer)
     window.clearTimeout(this.mutationTimer)
@@ -427,7 +408,6 @@ export class PageTranslator {
       return
     }
 
-    this.alignment.activate()
     this.startObserving()
     this.activationDeadline = Date.now() + INITIAL_CONTENT_GRACE_MS
     await this.scanAndTranslate(settings, generation, true)
@@ -672,14 +652,6 @@ export class PageTranslator {
       }
       this.translatedHosts.add(host)
       this.sourceBlockByHost.set(host, block.el)
-      this.alignment.register(
-        host,
-        block.text,
-        translation,
-        settings.sourceLang,
-        settings.targetLang,
-        isPageUiTranslationCandidate(block),
-      )
       this.translatedCount++
     }
   }
@@ -716,7 +688,7 @@ export class PageTranslator {
         record.target.nodeType === 1
           ? (record.target as Element)
           : record.target.parentElement
-      if (!target || target.closest('[data-lens-ignore]')) continue
+      if (!target || target.closest('[data-infron-ignore]')) continue
 
       if (record.type === 'childList') {
         const changed = [...record.addedNodes, ...record.removedNodes]
@@ -763,14 +735,13 @@ export class PageTranslator {
   private isOwnNode(node: Node): boolean {
     return (
       node.nodeType === 1 &&
-      ((node as Element).hasAttribute('data-lens-ignore') ||
+      ((node as Element).hasAttribute('data-infron-ignore') ||
         (node as Element).id === STYLE_ID ||
         (node as Element).id === STATUS_ID)
     )
   }
 
   private invalidateHost(host: Element): void {
-    this.alignment.unregister(host)
     host.removeAttribute(TRANSLATED_ATTR)
     host.removeAttribute(TRANSLATION_TEXT_ATTR)
     host.removeAttribute(UI_TRANSLATION_ATTR)
@@ -817,7 +788,7 @@ export class PageTranslator {
     if (!style) {
       style = document.createElement('style')
       style.id = STYLE_ID
-      style.setAttribute('data-lens-ignore', '')
+      style.setAttribute('data-infron-ignore', '')
       ;(document.head ?? document.documentElement).append(style)
     }
     style.textContent = pageStyles(settings)
@@ -828,7 +799,7 @@ export class PageTranslator {
     if (!status) {
       status = document.createElement('div')
       status.id = STATUS_ID
-      status.setAttribute('data-lens-ignore', '')
+      status.setAttribute('data-infron-ignore', '')
       status.setAttribute('role', 'status')
       status.setAttribute('aria-live', 'polite')
       document.documentElement.append(status)
@@ -846,7 +817,6 @@ export class PageTranslator {
     window.clearTimeout(this.initialRetryTimer)
     this.observer?.disconnect()
     this.observer = null
-    this.alignment.deactivate()
     this.showStatus(message, true)
     this.scheduleStatusRemoval(5000)
   }
