@@ -221,7 +221,11 @@
                 <h2>Cloud Model</h2>
                 <p>Configure this only when the translation engine is set to Cloud AI model.</p>
               </div>
-              <span id="configBadge" class="config-badge warn">Checking</span>
+              <div id="cloudConnectionStatus" class="connection-status warn">
+                <span class="connection-dot" aria-hidden="true"></span>
+                <span id="configBadge">Setup required</span>
+                <button type="button" id="testConnection" class="button secondary compact">Test</button>
+              </div>
             </header>
 
             <div class="setting-row">
@@ -266,7 +270,7 @@
                       placeholder="deepseek/deepseek-v3.2"
                       spellcheck="false"
                     />
-                    <button type="button" id="fetchModels" class="button secondary compact">Fetch models</button>
+                    <button type="button" id="fetchModels" class="button secondary compact">Models</button>
                   </span>
                   <datalist id="modelCandidates"></datalist>
                   <span id="modelFetchStatus" class="field-status" role="status" aria-live="polite"></span>
@@ -280,14 +284,17 @@
                 <p>The key is stored in chrome.storage.local. Leaving it blank when saving keeps the existing key.</p>
               </div>
               <div class="control">
-                <input
-                  id="apiKey"
-                  name="apiKey"
-                  type="password"
-                  placeholder="sk-... or provider key"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
+                <span class="secret-field">
+                  <input
+                    id="apiKey"
+                    name="apiKey"
+                    type="password"
+                    placeholder="sk-... or provider key"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button type="button" id="toggleApiKey" class="button secondary compact">Show</button>
+                </span>
               </div>
             </div>
 
@@ -303,16 +310,6 @@
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                 </select>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-copy">
-                <h3>Connection test</h3>
-                <p>Verify the current endpoint, model, and key.</p>
-              </div>
-              <div class="control test-connection-control">
-                <button type="button" id="testConnection" class="button secondary">Test connection</button>
-                <span id="testConnectionStatus" class="test-connection-status" role="status" aria-live="polite"></span>
               </div>
             </div>
           </section>

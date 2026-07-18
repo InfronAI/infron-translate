@@ -169,10 +169,14 @@ function setStatus(text: string, ok = true): void {
   node.classList.toggle('status-error', !ok)
 }
 
-function setTestStatus(text: string, state: 'testing' | 'ok' | 'error'): void {
-  const node = el<HTMLElement>('testConnectionStatus')
-  node.textContent = text
-  node.dataset.state = state
+function setCloudConnectionStatus(
+  text: string,
+  state: 'ok' | 'warn' | 'testing' | 'error',
+): void {
+  const wrapper = el<HTMLElement>('cloudConnectionStatus')
+  const label = el<HTMLElement>('configBadge')
+  wrapper.className = `connection-status ${state}`
+  label.textContent = text
 }
 
 function setModelFetchStatus(text: string, state: 'idle' | 'loading' | 'ok' | 'error' = 'idle'): void {
@@ -192,7 +196,7 @@ function isTestConnectionResult(value: unknown): value is TestConnectionResult {
 async function runConnectionTest(settings: UserSettings): Promise<void> {
   const button = el<HTMLButtonElement>('testConnection')
   button.disabled = true
-  setTestStatus('Testing connection...', 'testing')
+  setCloudConnectionStatus('Testing...', 'testing')
   try {
     const response: unknown = await chrome.runtime.sendMessage({
       type: 'test-connection',
@@ -203,26 +207,26 @@ async function runConnectionTest(settings: UserSettings): Promise<void> {
       reasoningPref: settings.reasoningPref,
     })
     if (isTestConnectionResult(response) && response.ok) {
-      setTestStatus('Connection successful · translation endpoint is available', 'ok')
+      setCloudConnectionStatus('Connected', 'ok')
     } else {
       const error = isTestConnectionResult(response) && !response.ok ? response.error : 'Unknown error'
-      setTestStatus(`Connection failed: ${error}`, 'error')
+      setCloudConnectionStatus(`Failed: ${error}`, 'error')
     }
   } catch (err) {
-    setTestStatus(`Connection failed: ${err instanceof Error ? err.message : String(err)}`, 'error')
+    setCloudConnectionStatus(
+      `Failed: ${err instanceof Error ? err.message : String(err)}`,
+      'error',
+    )
   } finally {
     button.disabled = false
   }
 }
 
 function updateConfigBadge(s: UserSettings): void {
-  const badge = el<HTMLElement>('configBadge')
   if (isConfigured(s)) {
-    badge.textContent = 'Configured'
-    badge.className = 'config-badge ok'
+    setCloudConnectionStatus('Configured', 'ok')
   } else {
-    badge.textContent = 'Setup required'
-    badge.className = 'config-badge warn'
+    setCloudConnectionStatus('Setup required', 'warn')
   }
 }
 
@@ -460,6 +464,14 @@ async function init(): Promise<void> {
 
   el<HTMLButtonElement>('fetchModels').addEventListener('click', () => {
     void fetchModels(readForm(stored))
+  })
+
+  el<HTMLButtonElement>('toggleApiKey').addEventListener('click', () => {
+    const input = el<HTMLInputElement>('apiKey')
+    const button = el<HTMLButtonElement>('toggleApiKey')
+    const visible = input.type === 'text'
+    input.type = visible ? 'password' : 'text'
+    button.textContent = visible ? 'Show' : 'Hide'
   })
 
   el<HTMLFormElement>('settings-form').addEventListener('submit', async (e) => {
