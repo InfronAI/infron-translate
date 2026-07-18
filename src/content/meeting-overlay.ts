@@ -634,11 +634,11 @@ export class MeetingOverlay {
       const endedAt = Date.now()
       const startedAt = this.micChunkStartedAt || endedAt - AUDIO_CHUNK_MS
       this.micChunkStartedAt = endedAt
-      const shouldSend = this.maxMicLevelSinceChunk > 0.025
+      const shouldSend = this.maxMicLevelSinceChunk > 0.01
       this.maxMicLevelSinceChunk = 0
       const bytes = mergePcmBuffers(this.micPcmBuffers)
       this.micPcmBuffers = []
-      if (!shouldSend) return
+      if (!shouldSend || bytes.byteLength < 1600) return
       void this.sendAudioChunk({
         type: 'meeting-audio-chunk',
         sessionId,

@@ -45,6 +45,7 @@ let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
 const asrStreams = new Map<string, StepFunRealtimeAsrConnection>()
+const asrStatusAt = new Map<string, number>()
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -300,9 +301,28 @@ function asrStreamFor(message: InternalMeetingAsrAudioMsg): StepFunRealtimeAsrCo
         },
       })
     },
+    onStatus: (status, chunk) => {
+      void sendThrottledAsrStatus(key, {
+        type: 'meeting-audio-status',
+        sessionId: chunk.sessionId,
+        transcription: {
+          active: true,
+          source: 'external-stt',
+          message: asrStatusMessage(message.uiLanguage, status, chunk.channel),
+        },
+      })
+    },
   })
   asrStreams.set(key, stream)
   return stream
+}
+
+async function sendThrottledAsrStatus(key: string, message: MeetingAudioStatusMsg): Promise<void> {
+  const now = Date.now()
+  const previous = asrStatusAt.get(key) ?? 0
+  if (now - previous < 1500) return
+  asrStatusAt.set(key, now)
+  await sendAudioStatus(message)
 }
 
 function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']): void {
@@ -312,6 +332,7 @@ function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']):
     if (channel && streamChannel !== channel) continue
     stream.close()
     asrStreams.delete(key)
+    asrStatusAt.delete(key)
   }
 }
 
@@ -321,6 +342,25 @@ function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): st
 
 function asrFailedMessage(language: MeetingSession['uiLanguage'], error: string): string {
   return language === 'zh' ? `StepFun ASR 失败：${error}` : `StepFun ASR failed: ${error}`
+}
+
+function asrStatusMessage(
+  language: MeetingSession['uiLanguage'],
+  status: 'connected' | 'configured' | 'speech-started' | 'speech-stopped',
+  channel: MeetingAudioChunkMsg['channel'],
+): string {
+  const zh = language === 'zh'
+  const source = zh
+    ? channel === 'microphone'
+      ? '麦克风'
+      : '系统音频'
+    : channel === 'microphone'
+      ? 'microphone'
+      : 'system audio'
+  if (status === 'connected') return zh ? `ASR 已连接，正在配置${source}转录。` : `ASR connected; configuring ${source} transcription.`
+  if (status === 'configured') return zh ? `ASR 已就绪，正在发送${source}音频。` : `ASR is ready; sending ${source} audio.`
+  if (status === 'speech-started') return zh ? `检测到${source}语音，正在实时转录。` : `Detected ${source} speech; transcribing live.`
+  return zh ? `${source}语音片段已结束，等待最终转录。` : `${source} speech segment ended; waiting for final transcript.`
 }
 
 function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {

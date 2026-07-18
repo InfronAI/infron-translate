@@ -1,7 +1,7 @@
 import type { MeetingAudioChunkMsg } from '../shared/messages'
 import type { UserSettings } from '../shared/settings-defaults'
 
-const WS_CONNECT_TIMEOUT_MS = 8_000
+const WS_CONNECT_TIMEOUT_MS = 15_000
 const LOCAL_ASR_RELAY_ENDPOINT = 'ws://127.0.0.1:8787/realtime/asr/stream'
 
 type RealtimeAsrEvent = {
@@ -18,6 +18,7 @@ type RealtimeAsrCallbacks = {
   onCompleted(text: string, message: MeetingAudioChunkMsg): void
   onError(error: string, message: MeetingAudioChunkMsg): void
   onReady(message: MeetingAudioChunkMsg): void
+  onStatus?(status: 'connected' | 'configured' | 'speech-started' | 'speech-stopped', message: MeetingAudioChunkMsg): void
 }
 
 export class StepFunRealtimeAsrConnection {
@@ -82,6 +83,7 @@ export class StepFunRealtimeAsrConnection {
       const ws = new WebSocket(connectEndpoint)
       this.ws = ws
       let connected = false
+      let configured = false
       let settled = false
       const fail = (error: Error) => {
         if (settled) return
@@ -106,12 +108,8 @@ export class StepFunRealtimeAsrConnection {
           return
         }
         connected = true
-        settled = true
-        globalThis.clearTimeout(timeout)
-        if (errorFallback) globalThis.clearTimeout(errorFallback)
+        this.callbacks.onStatus?.('connected', message)
         this.configureSession(message)
-        this.callbacks.onReady(message)
-        resolve()
       })
       ws.addEventListener('message', (event) => {
         if (needsRelayConnect && !connected) {
@@ -119,16 +117,31 @@ export class StepFunRealtimeAsrConnection {
           const relayType = stringValue(relayPayload.type)
           if (relayType === 'relay.ready') {
             connected = true
-            settled = true
-            globalThis.clearTimeout(timeout)
-            if (errorFallback) globalThis.clearTimeout(errorFallback)
+            this.callbacks.onStatus?.('connected', message)
             this.configureSession(message)
-            this.callbacks.onReady(message)
-            resolve()
             return
           }
           if (relayType === 'error') {
             fail(new Error(errorMessage(relayPayload)))
+            ws.close()
+            return
+          }
+        }
+        if (connected && !configured) {
+          const payload = parseEvent(event.data)
+          const type = stringValue(payload.type)
+          if (type === 'session.updated') {
+            configured = true
+            settled = true
+            globalThis.clearTimeout(timeout)
+            if (errorFallback) globalThis.clearTimeout(errorFallback)
+            this.callbacks.onStatus?.('configured', message)
+            this.callbacks.onReady(message)
+            resolve()
+            return
+          }
+          if (type === 'error') {
+            fail(new Error(errorMessage(payload)))
             ws.close()
             return
           }
@@ -143,7 +156,7 @@ export class StepFunRealtimeAsrConnection {
       ws.addEventListener('close', (event) => {
         if (errorFallback) globalThis.clearTimeout(errorFallback)
         const detail = closeDetail(event)
-        if (!connected) {
+        if (!configured) {
           globalThis.clearTimeout(timeout)
           fail(new Error(localRelayCloseMessage(usesLocalRelay, event)))
           return
@@ -199,6 +212,16 @@ export class StepFunRealtimeAsrConnection {
       return
     }
 
+    if (type === 'input_audio_buffer.speech_started') {
+      this.emitStatus('speech-started')
+      return
+    }
+
+    if (type === 'input_audio_buffer.speech_stopped') {
+      this.emitStatus('speech-stopped')
+      return
+    }
+
     if (type.includes('delta')) {
       const text = stringValue(payload.text)
       const delta = stringValue(payload.delta)
@@ -237,6 +260,11 @@ export class StepFunRealtimeAsrConnection {
   private emitError(error: string): void {
     if (!this.lastChunk) return
     this.callbacks.onError(error, this.lastChunk)
+  }
+
+  private emitStatus(status: 'speech-started' | 'speech-stopped'): void {
+    if (!this.lastChunk) return
+    this.callbacks.onStatus?.(status, this.lastChunk)
   }
 }
 
