@@ -206,6 +206,24 @@ export async function clearStepFunAsrAuthorizationRule(): Promise<void> {
   await updateDnrRules({ removeRuleIds: [DNR_RULE_ID] })
 }
 
+export async function ensureSystemProxyMode(): Promise<void> {
+  const proxySettings = chrome.proxy?.settings
+  if (!proxySettings?.set) return
+  await new Promise<void>((resolve, reject) => {
+    proxySettings.set(
+      {
+        value: { mode: 'system' },
+        scope: 'regular',
+      },
+      () => {
+        const error = chrome.runtime.lastError
+        if (error) reject(new Error(error.message))
+        else resolve()
+      },
+    )
+  })
+}
+
 export async function ensureStepFunAsrAuthorizationRule(
   endpoint: string,
   apiKey: string,

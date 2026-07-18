@@ -87,6 +87,7 @@ Current implementation:
 - Streams captured system audio to the configured ASR WebSocket endpoint.
 - Defaults to StepFun ASR Stream at `wss://api.stepfun.com/v1/realtime/asr/stream` with the `stepaudio-2.5-asr-stream` model.
 - Sends 16 kHz mono `pcm_s16le` audio and reads realtime delta/completed transcript events.
+- Uses the system proxy mode for realtime ASR network connections.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 

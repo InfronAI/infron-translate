@@ -27,6 +27,7 @@ import {
 import {
   clearStepFunAsrAuthorizationRule,
   ensureStepFunAsrAuthorizationRule,
+  ensureSystemProxyMode,
 } from './stt-stream'
 
 const OFFSCREEN_URL = 'src/offscreen/meeting-audio.html'
@@ -255,6 +256,7 @@ export class MeetingManager {
           }),
         },
       })
+      await ensureSystemProxyMode()
       await ensureStepFunAsrAuthorizationRule(settings.asrEndpoint, settings.asrApiKey)
       await chrome.runtime.sendMessage({
         type: 'meeting-asr-audio',

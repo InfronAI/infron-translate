@@ -43,6 +43,7 @@ export default defineManifest({
     'scripting',
     'offscreen',
     'tabCapture',
+    'proxy',
     'declarativeNetRequestWithHostAccess',
   ],
   host_permissions: ['http://*/*', 'https://*/*', 'wss://api.stepfun.com/*'],
