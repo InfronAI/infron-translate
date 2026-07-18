@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "asr:relay": "node scripts/asr-relay.mjs",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -21,8 +22,13 @@
     "@crxjs/vite-plugin": "^2.7.0",
     "@types/chrome": "^0.2.2",
     "@types/node": "^26.1.1",
+    "@types/ws": "^8.18.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "https-proxy-agent": "^9.1.0",
+    "ws": "^8.21.1"
   }
 }

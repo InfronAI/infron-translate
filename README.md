@@ -87,11 +87,19 @@ Current implementation:
 - Streams captured system audio to the configured ASR WebSocket endpoint.
 - Defaults to StepFun ASR Stream at `wss://api.stepfun.com/v1/realtime/asr/stream` with the `stepaudio-2.5-asr-stream` model.
 - Sends 16 kHz mono `pcm_s16le` audio and reads realtime delta/completed transcript events.
-- Uses the system proxy mode for realtime ASR network connections.
+- Uses a local ASR relay for StepFun realtime WebSocket authentication because browser extensions cannot attach the required `Authorization` header to a native `WebSocket` connection.
 - Shows the real transcription status in the transcript panel instead of emitting demo meeting text.
 - Can be stopped from the overlay.
 
-Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Speech Recognition with an ASR endpoint and API key before using live ASR.
+Run the relay before testing live ASR:
+
+```bash
+npm run asr:relay
+```
+
+The relay uses the ASR API key saved in the extension settings. You can also provide `STEPFUN_API_KEY` as an environment variable. If the upstream StepFun connection must use a proxy, start the relay with `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY`.
+
+Important current limitation: system audio means the active Chrome tab captured by `tabCapture`, not arbitrary operating-system audio from other apps. Configure Meeting Transcription with an ASR endpoint and API key before using live ASR.
 
 ### Floating Auto-Translation Button
 

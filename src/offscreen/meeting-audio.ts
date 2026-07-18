@@ -6,14 +6,9 @@ import type {
   MeetingTranscriptSegmentMsg,
 } from '../shared/messages'
 import type { UserSettings } from '../shared/settings-defaults'
-import {
-  StepFunRealtimeAsrConnection,
-  transcribeAudioChunkSse,
-} from '../background/stt-stream'
+import { StepFunRealtimeAsrConnection } from '../background/stt-stream'
 
 const AUDIO_CHUNK_MS = 500
-const FALLBACK_REQUEST_INTERVAL_MS = 13_000
-const FALLBACK_RATE_LIMIT_BACKOFF_MS = 65_000
 
 type InternalMeetingAudioStartMsg = {
   type: 'meeting-audio-start'
@@ -50,15 +45,6 @@ let pcmBuffers: Int16Array[] = []
 let chunkStartedAt = 0
 let maxLevelSinceChunk = 0
 const asrStreams = new Map<string, StepFunRealtimeAsrConnection>()
-const fallbackChannels = new Set<string>()
-const fallbackBuffers = new Map<string, FallbackBuffer>()
-
-type FallbackBuffer = {
-  messages: InternalMeetingAsrAudioMsg[]
-  timer: ReturnType<typeof setTimeout> | null
-  inFlight: boolean
-  blockedUntil: number
-}
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRecord(message) || typeof message.type !== 'string') return false
@@ -252,29 +238,10 @@ async function sendAudioChunk(message: MeetingAudioChunkMsg): Promise<void> {
 }
 
 async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void> {
-  const key = asrKey(message.chunk.sessionId, message.chunk.channel)
-  if (fallbackChannels.has(key)) {
-    queueSseFallback(message)
-    return
-  }
   try {
     await asrStreamFor(message).append(message.chunk)
   } catch (error) {
     stopAsr(message.chunk.sessionId, message.chunk.channel)
-    if (isWebSocketHandshakeFailure(error)) {
-      fallbackChannels.add(key)
-      await sendAudioStatus({
-        type: 'meeting-audio-status',
-        sessionId: message.chunk.sessionId,
-        transcription: {
-          active: true,
-          source: 'external-stt',
-          message: fallbackMessage(message.uiLanguage),
-        },
-      })
-      queueSseFallback(message)
-      return
-    }
     await sendAudioStatus({
       type: 'meeting-audio-status',
       sessionId: message.chunk.sessionId,
@@ -288,93 +255,6 @@ async function appendAsrAudio(message: InternalMeetingAsrAudioMsg): Promise<void
       },
     })
   }
-}
-
-function queueSseFallback(message: InternalMeetingAsrAudioMsg): void {
-  const key = asrKey(message.chunk.sessionId, message.chunk.channel)
-  const buffer = fallbackBuffers.get(key) ?? {
-    messages: [],
-    timer: null,
-    inFlight: false,
-    blockedUntil: 0,
-  }
-  buffer.messages.push(message)
-  fallbackBuffers.set(key, buffer)
-  if (buffer.timer || buffer.inFlight) return
-  const delay = Math.max(FALLBACK_REQUEST_INTERVAL_MS, buffer.blockedUntil - Date.now())
-  buffer.timer = globalThis.setTimeout(() => {
-    buffer.timer = null
-    void flushSseFallback(key)
-  }, delay)
-}
-
-async function flushSseFallback(key: string): Promise<void> {
-  const buffer = fallbackBuffers.get(key)
-  if (!buffer || buffer.inFlight || !buffer.messages.length) return
-  const message = mergeFallbackMessages(buffer.messages)
-  buffer.messages = []
-  buffer.inFlight = true
-  try {
-    await transcribeWithSseFallback(message, key)
-  } finally {
-    buffer.inFlight = false
-    if (buffer.messages.length) {
-      const delay = Math.max(FALLBACK_REQUEST_INTERVAL_MS, buffer.blockedUntil - Date.now())
-      buffer.timer = globalThis.setTimeout(() => {
-        buffer.timer = null
-        void flushSseFallback(key)
-      }, delay)
-    }
-  }
-}
-
-function mergeFallbackMessages(messages: InternalMeetingAsrAudioMsg[]): InternalMeetingAsrAudioMsg {
-  const first = messages[0]
-  const last = messages[messages.length - 1]
-  const bytes = mergeBase64Pcm(messages.map((message) => message.chunk.audioBase64))
-  return {
-    ...last,
-    chunk: {
-      ...last.chunk,
-      audioBase64: bytesToBase64(bytes),
-      startedAt: first.chunk.startedAt,
-      endedAt: last.chunk.endedAt,
-    },
-  }
-}
-
-async function transcribeWithSseFallback(message: InternalMeetingAsrAudioMsg, key: string): Promise<void> {
-  const result = await transcribeAudioChunkSse({
-    audioBase64: message.chunk.audioBase64,
-    mimeType: message.chunk.mimeType,
-    sourceLang: message.chunk.sourceLang,
-    settings: message.settings,
-  })
-  if (!result.ok) {
-    const buffer = fallbackBuffers.get(key)
-    if (result.status === 429 && buffer) buffer.blockedUntil = Date.now() + FALLBACK_RATE_LIMIT_BACKOFF_MS
-    await sendAudioStatus({
-      type: 'meeting-audio-status',
-      sessionId: message.chunk.sessionId,
-      transcription: {
-        active: false,
-        source: 'external-stt',
-        message: asrFailedMessage(message.uiLanguage, result.error),
-      },
-    })
-    return
-  }
-  if (!result.text.trim()) return
-  await chrome.runtime.sendMessage({
-    type: 'meeting-transcript-segment',
-    sessionId: message.chunk.sessionId,
-    channel: message.chunk.channel,
-    speakerLabel: '',
-    sourceLang: message.chunk.sourceLang,
-    originalText: result.text,
-    startedAt: message.chunk.startedAt,
-    endedAt: message.chunk.endedAt,
-  } satisfies MeetingTranscriptSegmentMsg)
 }
 
 function asrStreamFor(message: InternalMeetingAsrAudioMsg): StepFunRealtimeAsrConnection {
@@ -432,8 +312,6 @@ function stopAsr(sessionId?: string, channel?: MeetingAudioChunkMsg['channel']):
     if (channel && streamChannel !== channel) continue
     stream.close()
     asrStreams.delete(key)
-    fallbackChannels.delete(key)
-    clearFallbackBuffer(key)
   }
 }
 
@@ -441,25 +319,8 @@ function asrKey(sessionId: string, channel: MeetingAudioChunkMsg['channel']): st
   return `${sessionId}:${channel}`
 }
 
-function clearFallbackBuffer(key: string): void {
-  const buffer = fallbackBuffers.get(key)
-  if (buffer?.timer) globalThis.clearTimeout(buffer.timer)
-  fallbackBuffers.delete(key)
-}
-
 function asrFailedMessage(language: MeetingSession['uiLanguage'], error: string): string {
   return language === 'zh' ? `StepFun ASR 失败：${error}` : `StepFun ASR failed: ${error}`
-}
-
-function fallbackMessage(language: MeetingSession['uiLanguage']): string {
-  return language === 'zh'
-    ? 'StepFun Realtime WebSocket 握手失败，已自动切换到兼容转录模式。'
-    : 'StepFun Realtime WebSocket handshake failed; switched to compatibility transcription mode.'
-}
-
-function isWebSocketHandshakeFailure(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return /WebSocket closed during handshake|code 1006|WebSocket connection failed/u.test(message)
 }
 
 function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {
@@ -469,27 +330,6 @@ function mergePcmBuffers(buffers: Int16Array[]): Uint8Array {
   for (const buffer of buffers) {
     bytes.set(new Uint8Array(buffer.buffer), offset)
     offset += buffer.byteLength
-  }
-  return bytes
-}
-
-function mergeBase64Pcm(chunks: string[]): Uint8Array {
-  const buffers = chunks.map(base64ToBytes)
-  const byteLength = buffers.reduce((sum, buffer) => sum + buffer.byteLength, 0)
-  const merged = new Uint8Array(byteLength)
-  let offset = 0
-  for (const buffer of buffers) {
-    merged.set(buffer, offset)
-    offset += buffer.byteLength
-  }
-  return merged
-}
-
-function base64ToBytes(value: string): Uint8Array {
-  const binary = atob(value)
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
   }
   return bytes
 }

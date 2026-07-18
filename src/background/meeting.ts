@@ -24,11 +24,6 @@ import {
   persistTranslationCache,
   translateBlocksSingleFlight,
 } from './translate'
-import {
-  clearStepFunAsrAuthorizationRule,
-  ensureStepFunAsrAuthorizationRule,
-  ensureSystemProxyMode,
-} from './stt-stream'
 
 const OFFSCREEN_URL = 'src/offscreen/meeting-audio.html'
 const TRANSCRIPT_HISTORY_LIMIT = 500
@@ -256,8 +251,6 @@ export class MeetingManager {
           }),
         },
       })
-      await ensureSystemProxyMode()
-      await ensureStepFunAsrAuthorizationRule(settings.asrEndpoint, settings.asrApiKey)
       await chrome.runtime.sendMessage({
         type: 'meeting-asr-audio',
         settings,
@@ -331,7 +324,6 @@ export class MeetingManager {
     if (this.timer) globalThis.clearInterval(this.timer)
     this.timer = null
     this.closeAllAsrStreams()
-    await clearStepFunAsrAuthorizationRule()
     const stopped: MeetingRuntimeState = {
       ...this.state,
       session: { ...this.state.session, status: 'stopped', stoppedAt: Date.now() },
