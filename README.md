@@ -227,7 +227,7 @@ Required fields:
 | Provider | Infron.ai |
 | Base URL | `https://llm.onerouter.pro/v1` |
 | API Key | Your provider key |
-| Model | `deepseek/deepseek-v3.2` |
+| Model | `moonshotai/kimi-k3` |
 
 Remote endpoints must use HTTPS. HTTP is allowed only for loopback hosts such as `localhost`, `127.0.0.1`, and `[::1]`.
 

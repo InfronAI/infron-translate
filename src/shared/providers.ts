@@ -43,8 +43,9 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     id: 'infron',
     label: 'Infron.ai',
     baseURL: 'https://llm.onerouter.pro/v1',
-    modelHint: 'deepseek/deepseek-v3.2',
+    modelHint: 'moonshotai/kimi-k3',
     modelCandidates: [
+      'moonshotai/kimi-k3',
       'deepseek/deepseek-v3.2',
       'openai/gpt-4o-mini',
       'openai/gpt-4o',
@@ -57,7 +58,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
       'meta-llama/llama-3.3-70b-instruct',
     ],
     hostHints: ['llm.onerouter.pro', 'infron.ai'],
-    modelHints: ['deepseek/', 'openai/', 'anthropic/', 'google/', 'qwen/'],
+    modelHints: ['moonshotai/', 'deepseek/', 'openai/', 'anthropic/', 'google/', 'qwen/'],
   },
   {
     id: 'openrouter',

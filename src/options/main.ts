@@ -115,7 +115,7 @@ const OPTIONS_COPY = {
     apiKeyHelp: '仅用于 Cloud Model 网页翻译。保存时留空会保留已保存的密钥。',
     savedKeyPlaceholder: '已保存（保存时留空会保留当前密钥）',
     apiKeyPlaceholder: 'sk-... 或服务商密钥',
-    modelPlaceholder: 'deepseek/deepseek-v3.2',
+    modelPlaceholder: 'moonshotai/kimi-k3',
     enterBaseUrlFirst: '请先填写基础 URL。',
     loadingModels: '正在加载模型...',
     noModelsFound: '没有找到模型',
@@ -245,7 +245,7 @@ const OPTIONS_COPY = {
     apiKeyHelp: 'Used only for Cloud Model webpage translation. Leave blank when saving to keep the saved key.',
     savedKeyPlaceholder: 'Saved (leave blank when saving to keep the current key)',
     apiKeyPlaceholder: 'sk-... or provider key',
-    modelPlaceholder: 'deepseek/deepseek-v3.2',
+    modelPlaceholder: 'moonshotai/kimi-k3',
     enterBaseUrlFirst: 'Enter a Base URL first.',
     loadingModels: 'Loading models...',
     noModelsFound: 'No models found',
@@ -869,7 +869,10 @@ function applyProviderPreset(id: string): void {
   if (!base.value.trim() || /openai\.com|onerouter\.pro|openrouter\.ai/i.test(base.value)) {
     base.value = preset.baseURL
   }
-  if (!model.value.trim() || /gpt-4o-mini|deepseek\/deepseek|openai\/gpt/i.test(model.value)) {
+  if (
+    !model.value.trim() ||
+    /gpt-4o-mini|deepseek\/deepseek|openai\/gpt|moonshotai\/kimi/i.test(model.value)
+  ) {
     model.value = preset.modelHint
   }
   remoteModelCandidates = []

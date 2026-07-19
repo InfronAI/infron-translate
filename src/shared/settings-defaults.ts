@@ -56,7 +56,7 @@ const LEGACY_ASR_MODELS = new Set(['stepaudio-2.5-asr-stream'])
 export const DEFAULT_SETTINGS: UserSettings = {
   baseURL: 'https://llm.onerouter.pro/v1',
   apiKey: '',
-  model: 'deepseek/deepseek-v3.2',
+  model: 'moonshotai/kimi-k3',
   asrEndpoint: 'https://api.stepfun.com/step_plan/v1/audio/asr/sse',
   asrModel: 'stepaudio-2.5-asr',
   asrApiKey: '',
