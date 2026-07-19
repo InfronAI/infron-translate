@@ -25,6 +25,7 @@
       </a>
       <nav aria-label="Primary navigation">
         <a href="#features">Features</a>
+        <a href="#use-cases">Use cases</a>
         <a href="#meeting">Meeting Assistant</a>
         <a href="#install">Install</a>
         <a href="https://github.com/InfronAI/infron-translate">GitHub</a>
@@ -92,10 +93,29 @@
         </div>
       </section>
 
+      <section class="proof-strip" aria-label="Product highlights">
+        <div>
+          <strong>Local-first</strong>
+          <span>Use Chrome built-in translation with no cloud model required.</span>
+        </div>
+        <div>
+          <strong>Bring your key</strong>
+          <span>Connect Infron.ai when you want stronger AI inference.</span>
+        </div>
+        <div>
+          <strong>Built for flow</strong>
+          <span>Translate, compare, and summarize without leaving the page.</span>
+        </div>
+      </section>
+
       <section id="features" class="section">
-        <div class="section-heading">
+        <div class="section-heading centered">
           <span>Translation</span>
           <h2>Less switching. More understanding.</h2>
+          <p>
+            The extension stays out of the way until you need it, then helps you move
+            through foreign-language pages and meetings with less friction.
+          </p>
         </div>
         <div class="feature-grid">
           <article>
@@ -117,6 +137,30 @@
         </div>
       </section>
 
+      <section id="use-cases" class="section use-cases">
+        <div class="section-heading">
+          <span>Use cases</span>
+          <h2>For reading, research, and calls.</h2>
+        </div>
+        <div class="use-case-grid">
+          <article>
+            <span>01</span>
+            <h3>Read global websites</h3>
+            <p>Open product docs, news, blogs, or research pages and understand them in your language.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Compare meaning side by side</h3>
+            <p>Keep source text visible when accuracy matters, or switch to clean translated text.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Follow multilingual meetings</h3>
+            <p>Capture the conversation and keep a live summary beside the meeting.</p>
+          </article>
+        </div>
+      </section>
+
       <section id="meeting" class="section split">
         <div class="section-heading">
           <span>Meeting Assistant</span>
@@ -134,18 +178,25 @@
       </section>
 
       <section id="install" class="section install">
-        <div class="section-heading">
-          <span>Install</span>
-          <h2>Run it locally as an unpacked Chrome extension</h2>
-        </div>
-        <pre><code>git clone https://github.com/InfronAI/infron-translate.git
+        <div class="install-panel">
+          <div class="section-heading">
+            <span>Install</span>
+            <h2>Run it locally as an unpacked Chrome extension</h2>
+            <p>Clone, build, and load the generated extension directory in Chrome.</p>
+          </div>
+          <pre><code>git clone https://github.com/InfronAI/infron-translate.git
 cd infron-translate
 npm install
 npm run build</code></pre>
-        <p>
-          Open <code>chrome://extensions</code>, enable Developer mode, choose
-          <strong>Load unpacked</strong>, and select the generated <code>dist/</code> directory.
-        </p>
+          <p>
+            Open <code>chrome://extensions</code>, enable Developer mode, choose
+            <strong>Load unpacked</strong>, and select the generated <code>dist/</code> directory.
+          </p>
+          <div class="install-actions">
+            <a class="primary" href="https://github.com/InfronAI/infron-translate">Open GitHub</a>
+            <a class="secondary" href="#top">Back to top</a>
+          </div>
+        </div>
       </section>
     </main>
 
