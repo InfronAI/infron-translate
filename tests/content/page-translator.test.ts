@@ -32,23 +32,30 @@ function block(id: string, text: string, top: number, order: number): ExtractedB
 function candidateElement(
   text: string,
   tagName = 'span',
-  ancestors: Array<{ tagName: string; role?: string; text?: string }> = [],
+  ancestors: Array<{ tagName: string; role?: string; text?: string; attrs?: Record<string, string> }> = [],
+  attrs: Record<string, string> = {},
 ): Element {
-  const self: { tagName: string; role?: string; text?: string } = { tagName, text }
+  const self: { tagName: string; role?: string; text?: string; attrs?: Record<string, string> } = {
+    tagName,
+    text,
+    attrs,
+  }
   const chain = [self, ...ancestors]
   return {
     tagName: tagName.toUpperCase(),
     textContent: text,
     children: [],
     querySelectorAll: () => [],
-    getAttribute: (name: string) => (name === 'role' ? null : null),
+    getAttribute: (name: string) => attrs[name] ?? null,
     closest: (selector: string) => {
       for (const item of chain) {
         const matches = selector.split(',').some((part) => {
           const value = part.trim()
           if (value === item.tagName) return true
           const role = value.match(/^\[role="(.+)"\]$/)?.[1]
-          return role !== undefined && role === item.role
+          if (role !== undefined) return role === item.role
+          const dataTestId = value.match(/^\[data-testid="(.+)"\]$/)?.[1]
+          return dataTestId !== undefined && dataTestId === item.attrs?.['data-testid']
         })
         if (matches) return { textContent: item.text ?? text }
       }
@@ -139,6 +146,7 @@ class MockElement {
     if (selector === 'button') return this.tagName === 'BUTTON'
     if (selector === '[role="button"]') return this.getAttribute('role') === 'button'
     if (selector === '[data-infron-ignore]') return this.hasAttribute('data-infron-ignore')
+    if (selector === '[data-testid="tweetText"]') return this.getAttribute('data-testid') === 'tweetText'
     return false
   }
 
@@ -163,6 +171,7 @@ function setupMockDom(): void {
     getElementById: () => null,
   })
   vi.stubGlobal('window', {
+    location: { hostname: 'example.com' },
     clearTimeout: () => undefined,
     setTimeout: () => 0,
     getComputedStyle: (el: MockElement) => el.computed,
@@ -274,6 +283,33 @@ describe('isPageTranslationCandidate', () => {
 
     expect(isPageTranslationCandidate(candidate, 10)).toBe(true)
   })
+
+  it('keeps Twitter chrome untouched while anchoring tweet text to the tweet body', () => {
+    vi.stubGlobal('window', { location: { hostname: 'x.com' } })
+    const action = {
+      id: 'like',
+      el: candidateElement('Like', 'span', [{ tagName: 'button', role: 'button' }]),
+      tag: 'span',
+      text: 'Like',
+    }
+    expect(isPageTranslationCandidate(action, 2)).toBe(false)
+
+    const tweetBody = candidateElement('This is a useful product update.', 'div', [], {
+      'data-testid': 'tweetText',
+    })
+    const tweetSpan = candidateElement(
+      'This is a useful product update.',
+      'span',
+      [{ tagName: 'div', text: 'This is a useful product update.', attrs: { 'data-testid': 'tweetText' } }],
+    )
+    const candidate = { id: 'tweet', el: tweetSpan, tag: 'span', text: 'This is a useful product update.' }
+
+    tweetSpan.closest = ((selector: string) =>
+      selector === '[data-testid="tweetText"]' ? tweetBody : null) as unknown as typeof tweetSpan.closest
+
+    expect(isPageTranslationCandidate(candidate, 10)).toBe(true)
+    expect(pageTranslationHost(candidate)).toBe(tweetBody)
+  })
 })
 
 describe('PageTranslator bilingual overflow handling', () => {
@@ -358,5 +394,47 @@ describe('PageTranslator bilingual overflow handling', () => {
     expect(container.hasAttribute('data-infron-page-expanded-container')).toBe(false)
     expect(container.style.height).toBe('')
     expect(container.style.overflow).toBe('')
+  })
+
+  it('does not expand Twitter virtualized containers in bilingual mode', () => {
+    setupMockDom()
+    vi.stubGlobal('window', {
+      location: { hostname: 'x.com' },
+      clearTimeout: () => undefined,
+      setTimeout: () => 0,
+      getComputedStyle: (el: MockElement) => el.computed,
+    })
+    const container = new MockElement('div')
+    container.computed = {
+      ...container.computed,
+      overflow: 'hidden',
+      overflowY: 'hidden',
+      height: '80px',
+    }
+    container.clientHeight = 80
+    container.scrollHeight = 180
+    const host = new MockElement('div', 'Original tweet text that should be translated.')
+    host.setAttribute('data-testid', 'tweetText')
+    append(container, host)
+    append(document.body as unknown as MockElement, container)
+
+    const translator = new PageTranslator({} as never)
+    ;(translator as unknown as {
+      renderGroup: (
+        group: { representative: { id: string; tag: string; text: string }; blocks: ExtractedBlock[] },
+        translation: string,
+        settings: typeof pageSettings,
+      ) => void
+    }).renderGroup(
+      {
+        representative: { id: 'tweet', tag: 'div', text: host.textContent },
+        blocks: [{ id: 'tweet', tag: 'div', text: host.textContent, el: host as unknown as Element }],
+      },
+      'Translated tweet text.',
+      pageSettings,
+    )
+
+    expect(container.hasAttribute('data-infron-page-expanded-container')).toBe(false)
+    expect(host.hasAttribute('data-infron-page-conservative')).toBe(true)
   })
 })

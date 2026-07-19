@@ -26,6 +26,7 @@ const DISPLAY_MODE_ATTR = 'data-infron-page-display-mode'
 const UI_TRANSLATION_ATTR = 'data-infron-page-ui-translation'
 const UI_STACKED_TRANSLATION_ATTR = 'data-infron-page-ui-stacked-translation'
 const UI_CONTROL_TRANSLATION_ATTR = 'data-infron-page-ui-control-translation'
+const CONSERVATIVE_RENDER_ATTR = 'data-infron-page-conservative'
 const EXPANDED_CONTAINER_ATTR = 'data-infron-page-expanded-container'
 const STYLE_ID = 'infron-translate-page-style'
 const STATUS_ID = 'infron-translate-page-status'
@@ -98,7 +99,7 @@ function pageStyles(settings: PageSettings): string {
   opacity: ${opacity} !important;
 }
 
-[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"]:not([${UI_TRANSLATION_ATTR}]) {
+[${TRANSLATED_ATTR}][${DISPLAY_MODE_ATTR}="bilingual"]:not([${UI_TRANSLATION_ATTR}]):not([${CONSERVATIVE_RENDER_ATTR}]) {
   overflow: visible !important;
   text-overflow: clip !important;
   -webkit-line-clamp: unset !important;
@@ -364,6 +365,9 @@ const PAGE_CONTROL_SELECTOR =
  */
 const PAGE_LAYOUT_LOCKED_SELECTOR =
   '[role="grid"], [role="treegrid"], [class*="ContributionCalendar"], .js-calendar-graph, .contrib-legend, [class*="ContributionCalendar"] [data-level], .js-calendar-graph [data-level]'
+const TWITTER_TEXT_SELECTOR = '[data-testid="tweetText"]'
+const TWITTER_LAYOUT_CHROME_SELECTOR =
+  'header, nav, aside, [role="navigation"], [role="banner"], [role="search"], [role="toolbar"], [role="button"], button, a, time, [data-testid="User-Name"], [data-testid="reply"], [data-testid="retweet"], [data-testid="like"], [data-testid="bookmark"], [data-testid="share"]'
 
 /** Month / weekday axis tokens: near-zero translation value, high layout risk in charts & calendars. */
 const DATE_AXIS_LABEL_RE =
@@ -371,6 +375,16 @@ const DATE_AXIS_LABEL_RE =
 
 function isDateAxisLabel(text: string): boolean {
   return DATE_AXIS_LABEL_RE.test(normalizeText(text))
+}
+
+function isTwitterLikePage(): boolean {
+  const host =
+    typeof window === 'undefined' ? '' : (window.location?.hostname.toLowerCase() ?? '')
+  return host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')
+}
+
+function twitterTextHost(el: Element): Element | null {
+  return el.closest(TWITTER_TEXT_SELECTOR)
 }
 
 export function isPageUiTranslationCandidate(block: ExtractedBlock): boolean {
@@ -433,6 +447,10 @@ function expandedContainerRecord(el: HTMLElement): ExpandedContainerRecord {
 
 /** Attach generated UI copy to the text label instead of the outer flex control. */
 export function pageTranslationHost(block: ExtractedBlock): Element {
+  if (isTwitterLikePage()) {
+    const tweetText = twitterTextHost(block.el)
+    if (tweetText) return tweetText
+  }
   if (!isPageUiTranslationCandidate(block)) return block.el
   const text = normalizeText(block.text)
   let host = block.el
@@ -454,6 +472,10 @@ export function isPageTranslationCandidate(
   // Data-visualization widgets and bare date-axis labels break layout or add no value.
   if (el.closest(PAGE_LAYOUT_LOCKED_SELECTOR)) return false
   if (isDateAxisLabel(text)) return false
+  if (isTwitterLikePage()) {
+    if (!twitterTextHost(el) && el.closest(TWITTER_LAYOUT_CHROME_SELECTOR)) return false
+    if (!twitterTextHost(el) && text.length <= 80) return false
+  }
   const isUi = isPageUiTranslationCandidate(block)
   if (isUi && /@[\p{L}\p{N}_-]+/u.test(text)) return false
   if (!isPageTranslatableText(text, isUi ? Math.min(2, minTextLength) : minTextLength)) {
@@ -527,6 +549,7 @@ export class PageTranslator {
       host.removeAttribute(UI_TRANSLATION_ATTR)
       host.removeAttribute(UI_STACKED_TRANSLATION_ATTR)
       host.removeAttribute(UI_CONTROL_TRANSLATION_ATTR)
+      host.removeAttribute(CONSERVATIVE_RENDER_ATTR)
     }
     this.restoreExpandedContainers()
     for (const [host, previous] of this.sourceHosts) {
@@ -816,7 +839,7 @@ export class PageTranslator {
       if (!block.el.isConnected) continue
       const isUi = isPageUiTranslationCandidate(block)
       if (settings.translationDisplayMode === 'translation-only' && isUi) continue
-      const host = isUi ? pageTranslationHost(block) : block.el
+      const host = pageTranslationHost(block)
       if (this.translatedHosts.has(host)) continue
       if (!this.sourceHosts.has(host)) {
         this.sourceHosts.set(host, host.getAttribute(PAGE_SOURCE_ATTR))
@@ -835,6 +858,7 @@ export class PageTranslator {
       host.setAttribute(TRANSLATED_ATTR, '')
       host.setAttribute(TRANSLATION_TEXT_ATTR, translation)
       host.setAttribute(DISPLAY_MODE_ATTR, settings.translationDisplayMode)
+      if (isTwitterLikePage()) host.setAttribute(CONSERVATIVE_RENDER_ATTR, '')
       if (isUi) {
         host.setAttribute(UI_TRANSLATION_ATTR, '')
         if (isButtonLikeUi(block)) {
@@ -845,7 +869,7 @@ export class PageTranslator {
             host.setAttribute(UI_STACKED_TRANSLATION_ATTR, '')
           }
         }
-      } else if (settings.translationDisplayMode === 'bilingual') {
+      } else if (settings.translationDisplayMode === 'bilingual' && !isTwitterLikePage()) {
         this.expandOverflowContainers(host)
       }
       this.translatedHosts.add(host)
@@ -956,6 +980,7 @@ export class PageTranslator {
     host.removeAttribute(UI_TRANSLATION_ATTR)
     host.removeAttribute(UI_STACKED_TRANSLATION_ATTR)
     host.removeAttribute(UI_CONTROL_TRANSLATION_ATTR)
+    host.removeAttribute(CONSERVATIVE_RENDER_ATTR)
     this.translatedHosts.delete(host)
     const previous = this.sourceHosts.get(host)
     if (previous === null) host.removeAttribute(PAGE_SOURCE_ATTR)
@@ -966,21 +991,49 @@ export class PageTranslator {
   }
 
   private replaceTextWithTranslation(host: Element, translation: string): boolean {
-    const nodes = [...host.childNodes].filter(
+    const nodes = this.translationOnlyTextNodes(host)
+    if (isTwitterLikePage() && twitterTextHost(host) && nodes.length > 1) {
+      if (!this.originalTextNodes.has(host)) {
+        this.originalTextNodes.set(
+          host,
+          nodes.map((textNode) => ({
+            node: textNode,
+            value: textNode.nodeValue ?? '',
+          })),
+        )
+      }
+      nodes.forEach((node, index) => {
+        node.nodeValue = index === 0 ? translation : ''
+      })
+      return true
+    }
+    const directNodes = [...host.childNodes].filter(
       (node): node is Text => node.nodeType === 3 && Boolean(node.nodeValue?.trim()),
     )
-    if (nodes.length !== 1) return false
+    if (directNodes.length !== 1) return false
     if (!this.originalTextNodes.has(host)) {
       this.originalTextNodes.set(
         host,
-        nodes.map((textNode) => ({
+        directNodes.map((textNode) => ({
           node: textNode,
           value: textNode.nodeValue ?? '',
         })),
       )
     }
-    nodes[0].nodeValue = translation
+    directNodes[0].nodeValue = translation
     return true
+  }
+
+  private translationOnlyTextNodes(host: Element): Text[] {
+    if (typeof document.createTreeWalker !== 'function') return []
+    const nodes: Text[] = []
+    const walker = document.createTreeWalker(host, 4 /* SHOW_TEXT */)
+    let node = walker.nextNode()
+    while (node) {
+      if (node.nodeType === 3 && node.nodeValue?.trim()) nodes.push(node as Text)
+      node = walker.nextNode()
+    }
+    return nodes
   }
 
   private restoreOriginalText(host: Element): void {
